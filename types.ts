@@ -1,0 +1,158 @@
+
+export interface Ingredient {
+  ingredient_id: string;
+  name: string;
+  qty: string;
+  cost_per_unit?: number;
+  unit?: string;
+  cost_per_serving?: number;
+}
+
+export interface MenuItem {
+  sku_id: string;
+  name: string;
+  ingredients: Ingredient[];
+  prep_time_min: number;
+  category: 'main' | 'snack' | 'beverage' | 'dessert';
+  current_price: number;
+  food_cost_pct?: number; // Calculated
+  margin_pct?: number; // Calculated
+}
+
+export interface RecipeCard extends MenuItem {
+  yield: number;
+  preparation_steps: string[];
+  equipment_needed: string[];
+  portioning_guideline: string;
+  allergens: string[];
+  shelf_life_hours: number;
+  food_cost_per_serving: number;
+  suggested_selling_price: number;
+  tags: string[];
+  human_summary?: string;
+  reasoning?: string;
+  confidence?: 'High' | 'Medium' | 'Low';
+  assignedRestaurantId?: string;
+  assignedRestaurantName?: string;
+}
+
+export interface SOP {
+  sop_id: string;
+  title: string;
+  scope: string;
+  prerequisites: string;
+  materials_equipment: string[];
+  stepwise_procedure: { step_no: number; action: string; responsible_role: string; time_limit?: string }[];
+  critical_control_points: string[];
+  monitoring_checklist: string[];
+  kpis: string[];
+  quick_troubleshooting: string;
+}
+
+export interface StrategyReport {
+  summary: string[];
+  causes: string[];
+  action_plan: { initiative: string; impact_estimate: string; cost_estimate: string; priority: 'High' | 'Medium' | 'Low' }[];
+  seasonal_menu_suggestions: { type: 'add' | 'remove'; item: string; reason: string }[];
+}
+
+export interface ImplementationGuide {
+    objective: string;
+    phases: {
+        phase_name: string;
+        steps: string[];
+        resources_needed: string[];
+        kpi_to_track: string;
+    }[];
+    estimated_timeline: string;
+}
+
+export enum UserRole {
+  OWNER = 'OWNER',
+  ADMIN = 'ADMIN',
+  SUPER_ADMIN = 'SUPER_ADMIN'
+}
+
+export enum PlanType {
+  FREE = 'FREE',
+  PRO = 'PRO',
+  PRO_PLUS = 'PRO_PLUS'
+}
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  plan: PlanType;
+  // New profile fields
+  restaurantName?: string;
+  location?: string;
+  cuisineType?: string;
+  joinedDate?: string;
+}
+
+export enum AppView {
+  DASHBOARD = 'DASHBOARD',
+  RECIPES = 'RECIPES',
+  SOP = 'SOP',
+  STRATEGY = 'STRATEGY',
+  INTEGRATIONS = 'INTEGRATIONS',
+  BILLING = 'BILLING'
+}
+
+export interface AppNotification {
+  id: string;
+  title: string;
+  message: string;
+  type: 'info' | 'warning' | 'success';
+  read: boolean;
+  date: string;
+  role?: UserRole[]; // If null, visible to all
+}
+
+export interface POSChangeRequest {
+    id: string;
+    sku_id: string;
+    item_name: string;
+    old_price: number;
+    new_price: number;
+    status: 'pending' | 'approved' | 'rejected';
+    requested_by: string;
+    requested_date: string;
+    targetRestaurantId?: string;
+    targetRestaurantName?: string;
+}
+
+// Razorpay Types
+export interface RazorpayOptions {
+    key: string;
+    amount: number;
+    currency: string;
+    name: string;
+    description: string;
+    image?: string;
+    order_id?: string; // Optional for client-side demo
+    handler: (response: RazorpayResponse) => void;
+    prefill?: {
+        name?: string;
+        email?: string;
+        contact?: string;
+    };
+    notes?: Record<string, string>;
+    theme?: {
+        color?: string;
+    };
+}
+
+export interface RazorpayResponse {
+    razorpay_payment_id: string;
+    razorpay_order_id?: string;
+    razorpay_signature?: string;
+}
+
+declare global {
+    interface Window {
+        Razorpay: new (options: RazorpayOptions) => { open: () => void };
+    }
+}
