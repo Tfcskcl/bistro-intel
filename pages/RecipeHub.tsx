@@ -529,6 +529,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
             )}
         </div>
       </div>
+      )}
     </div>
   );
 };
