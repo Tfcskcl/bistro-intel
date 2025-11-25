@@ -4,7 +4,7 @@ import { PLANS } from '../constants';
 import { generateRecipeCard, generateRecipeVariation } from '../services/geminiService';
 import { ingredientService } from '../services/ingredientService';
 import { RecipeCard, MenuItem, User, UserRole, POSChangeRequest } from '../types';
-import { Loader2, ChefHat, Scale, Clock, AlertCircle, Upload, Lock, Sparkles, Check, Save, RefreshCw, Search, Plus, Store, Zap } from 'lucide-react';
+import { Loader2, ChefHat, Scale, Clock, AlertCircle, Upload, Lock, Sparkles, Check, Save, RefreshCw, Search, Plus, Store, Zap, Trash2, Building2 } from 'lucide-react';
 import { storageService } from '../services/storageService';
 import { authService } from '../services/authService';
 
@@ -31,6 +31,10 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
   const [restaurants, setRestaurants] = useState<User[]>([]);
   const [selectedRestaurantId, setSelectedRestaurantId] = useState<string>('');
 
+  // Loading states for actions
+  const [isSaving, setIsSaving] = useState(false);
+  const [isPushing, setIsPushing] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -39,9 +43,13 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
   }, [user.id]);
 
   useEffect(() => {
-    const allUsers = authService.getAllUsers();
-    const owners = allUsers.filter(u => u.restaurantName && u.role === UserRole.OWNER);
-    setRestaurants(owners);
+    const fetchRestaurants = async () => {
+        const allUsers = await authService.getAllUsers();
+        // In a real app, you'd filter by an Org ID. Here we just get all Owners to simulate outlets.
+        const owners = allUsers.filter(u => u.restaurantName && u.role === UserRole.OWNER);
+        setRestaurants(owners);
+    };
+    fetchRestaurants();
   }, []);
 
   const checkUsage = (): boolean => {
@@ -75,7 +83,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
     setGeneratedRecipe(null);
     setSelectedSku(item.sku_id);
     setPosPushStatus(null);
-    setSelectedRestaurantId('');
+    setSelectedRestaurantId(''); // Reset selection on new generation
     
     try {
       const card = await generateRecipeCard(user.id, item);
@@ -177,37 +185,59 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
 
   const handleSaveRecipe = () => {
     if (generatedRecipe) {
+      setIsSaving(true);
+      
+      // Identify target restaurant (if selected) or default to user
       const restaurant = restaurants.find(r => r.id === selectedRestaurantId);
-      const recipeToSave = {
-          ...generatedRecipe,
-          assignedRestaurantId: selectedRestaurantId,
-          assignedRestaurantName: restaurant?.restaurantName
-      };
+      
+      // Simulate delay for visual feedback
+      setTimeout(() => {
+        const recipeToSave = {
+            ...generatedRecipe,
+            assignedRestaurantId: selectedRestaurantId,
+            assignedRestaurantName: restaurant?.restaurantName
+        };
 
-      storageService.saveRecipe(user.id, recipeToSave);
-      setSavedRecipes(storageService.getSavedRecipes(user.id));
-      setImportStatus(restaurant ? `Saved for ${restaurant.restaurantName}!` : "Recipe saved to library!");
-      setTimeout(() => setImportStatus(null), 2000);
+        storageService.saveRecipe(user.id, recipeToSave);
+        setSavedRecipes(storageService.getSavedRecipes(user.id));
+        setImportStatus(restaurant ? `Sent to ${restaurant.restaurantName} DB!` : "Recipe saved to library!");
+        setIsSaving(false);
+        setTimeout(() => setImportStatus(null), 2000);
+      }, 600);
     }
+  };
+
+  const handleDiscard = () => {
+      setGeneratedRecipe(null);
+      setSelectedSku(null);
+      setPosPushStatus(null);
+      setError(null);
+      setSelectedRestaurantId('');
   };
 
   const handlePushToPOS = () => {
       if (!generatedRecipe) return;
+      setIsPushing(true);
       const restaurant = restaurants.find(r => r.id === selectedRestaurantId);
-      const request: POSChangeRequest = {
-          id: `req_${Date.now()}`,
-          sku_id: generatedRecipe.sku_id || 'VAR-001',
-          item_name: generatedRecipe.name,
-          old_price: generatedRecipe.current_price,
-          new_price: generatedRecipe.suggested_selling_price,
-          status: 'pending',
-          requested_by: user.name,
-          requested_date: new Date().toISOString(),
-          targetRestaurantId: selectedRestaurantId,
-          targetRestaurantName: restaurant?.restaurantName
-      };
-      storageService.addPOSChangeRequest(user.id, request);
-      setPosPushStatus(restaurant ? `Sent to ${restaurant.restaurantName}` : "Sent to Integrations");
+
+      // Simulate network request
+      setTimeout(() => {
+          const request: POSChangeRequest = {
+              id: `req_${Date.now()}`,
+              sku_id: generatedRecipe.sku_id || 'VAR-001',
+              item_name: generatedRecipe.name,
+              old_price: generatedRecipe.current_price,
+              new_price: generatedRecipe.suggested_selling_price,
+              status: 'pending',
+              requested_by: user.name,
+              requested_date: new Date().toISOString(),
+              targetRestaurantId: selectedRestaurantId,
+              targetRestaurantName: restaurant?.restaurantName
+          };
+          storageService.addPOSChangeRequest(user.id, request);
+          setPosPushStatus(restaurant ? `Syncing with ${restaurant.restaurantName} POS` : "Sent to Integrations");
+          setIsPushing(false);
+      }, 1000);
   };
 
   if (![UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.OWNER].includes(user.role)) {
@@ -315,10 +345,10 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                     <Search className="absolute left-2.5 top-2.5 text-slate-400" size={14} />
                     <button 
                         onClick={handleGenerateCustom}
-                        disabled={!customItemName}
-                        className="absolute right-1.5 top-1.5 p-1 bg-slate-100 hover:bg-emerald-500 hover:text-white rounded text-slate-400 transition-colors"
+                        disabled={!customItemName || loading}
+                        className="absolute right-1.5 top-1.5 p-1 bg-slate-100 hover:bg-emerald-500 hover:text-white rounded text-slate-400 transition-colors disabled:opacity-50"
                     >
-                        <Plus size={14} />
+                        {loading && customItemName ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
                     </button>
                 </div>
 
@@ -377,7 +407,30 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                     </h2>
                     {generatedRecipe && (
                          <div className="flex gap-2 flex-col items-end">
+                             {/* Restaurant Selection Dropdown */}
+                             <div className="flex items-center gap-2 mb-1">
+                                <Building2 size={16} className="text-slate-400" />
+                                <select 
+                                    value={selectedRestaurantId}
+                                    onChange={(e) => setSelectedRestaurantId(e.target.value)}
+                                    className="text-xs p-1.5 border border-slate-200 rounded-md bg-slate-50 text-slate-600 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                                >
+                                    <option value="">Select Restaurant / Outlet</option>
+                                    {restaurants.map(r => (
+                                        <option key={r.id} value={r.id}>{r.restaurantName || r.name}</option>
+                                    ))}
+                                </select>
+                             </div>
+
                              <div className="flex gap-2">
+                                <button
+                                    onClick={handleDiscard}
+                                    disabled={isSaving || isPushing}
+                                    className="text-sm font-bold text-red-600 hover:text-red-700 flex items-center gap-1 border border-red-200 px-3 py-1.5 rounded hover:bg-red-50 transition-colors disabled:opacity-50"
+                                >
+                                    <Trash2 size={16} /> Discard
+                                </button>
+
                                 {posPushStatus ? (
                                     <span className="text-xs font-bold text-amber-600 bg-amber-50 px-3 py-1.5 rounded border border-amber-200 flex items-center gap-1">
                                         <Clock size={12} /> {posPushStatus}
@@ -385,16 +438,21 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                 ) : (
                                     <button 
                                         onClick={handlePushToPOS}
-                                        className="text-sm font-bold text-slate-600 hover:text-blue-600 flex items-center gap-1 border border-slate-200 px-3 py-1.5 rounded hover:border-blue-200 transition-colors"
+                                        disabled={isPushing}
+                                        className="text-sm font-bold text-slate-600 hover:text-blue-600 flex items-center gap-1 border border-slate-200 px-3 py-1.5 rounded hover:border-blue-200 transition-colors disabled:opacity-50"
                                     >
-                                        <RefreshCw size={16} /> Push to POS
+                                        {isPushing ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+                                        {isPushing ? 'Pushing...' : 'Push to POS'}
                                     </button>
                                 )}
                                 <button 
                                     onClick={handleSaveRecipe}
-                                    className="text-sm font-bold text-slate-600 hover:text-emerald-600 flex items-center gap-1 border border-slate-200 px-3 py-1.5 rounded hover:border-emerald-200 transition-colors"
+                                    disabled={isSaving}
+                                    className="text-sm font-bold text-slate-600 hover:text-emerald-600 flex items-center gap-1 border border-slate-200 px-3 py-1.5 rounded hover:border-emerald-200 transition-colors disabled:opacity-50"
+                                    title={selectedRestaurantId ? "Send to Restaurant Database" : "Save to Library"}
                                 >
-                                    <Save size={16} /> Save
+                                    {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                                    {isSaving ? 'Sending...' : selectedRestaurantId ? 'Send to DB' : 'Save'}
                                 </button>
                              </div>
                          </div>

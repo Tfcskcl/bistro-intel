@@ -1,17 +1,38 @@
 
 import { User, UserRole, PlanType } from '../types';
+import { auth, db, isFirebaseConfigured } from './firebase';
+import { 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  signOut, 
+  sendPasswordResetEmail,
+  onAuthStateChanged
+} from 'firebase/auth';
+import { doc, getDoc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 
-const USERS_KEY = 'bistro_users';
-const SESSION_KEY = 'bistro_session';
+const STORAGE_USER_KEY = 'bistro_current_user_cache';
+const MOCK_DB_USERS_KEY = 'bistro_mock_users_db'; // For local storage mock DB
 
-interface StoredUser extends User {
-  password: string;
-}
+// Mock DB Helpers
+const getMockUsers = (): Record<string, User & {password?: string}> => {
+    try {
+        const s = localStorage.getItem(MOCK_DB_USERS_KEY);
+        return s ? JSON.parse(s) : {};
+    } catch (e) {
+        return {};
+    }
+};
 
-// Seed data for easy testing
-const DEMO_USERS: StoredUser[] = [
+const saveMockUser = (user: User, password?: string) => {
+    const users = getMockUsers();
+    users[user.id] = { ...user, password };
+    localStorage.setItem(MOCK_DB_USERS_KEY, JSON.stringify(users));
+};
+
+// Backup Demo Data for Auto-Creation
+const DEMO_USERS: (User & {password: string})[] = [
   {
-    id: 'demo_owner',
+    id: 'demo_owner', 
     name: 'Jane Owner',
     email: 'owner@bistro.com',
     password: 'pass',
@@ -34,7 +55,18 @@ const DEMO_USERS: StoredUser[] = [
     cuisineType: "Modern European",
     joinedDate: "2023-09-20"
   },
-  // Super Admins
+  {
+    id: 'sa_info_bistro',
+    name: 'Info BistroConnect',
+    email: 'info@bistroconnect.in',
+    password: 'Bistro@2403',
+    role: UserRole.SUPER_ADMIN,
+    plan: PlanType.PRO_PLUS,
+    restaurantName: "BistroHQ",
+    location: "Indore",
+    cuisineType: "HQ",
+    joinedDate: "2023-01-01"
+  },
   {
     id: 'sa_amit',
     name: 'Amit (Super Admin)',
@@ -58,151 +90,280 @@ const DEMO_USERS: StoredUser[] = [
     location: "Indore",
     cuisineType: "HQ",
     joinedDate: "2023-01-01"
-  },
-  {
-    id: 'sa_info_bistro',
-    name: 'Info BistroConnect',
-    email: 'info@bistroconnect.in',
-    password: 'Bistro@2403',
-    role: UserRole.SUPER_ADMIN,
-    plan: PlanType.PRO_PLUS,
-    restaurantName: "BistroHQ",
-    location: "Indore",
-    cuisineType: "HQ",
-    joinedDate: "2023-01-01"
-  },
-  // Customers
-  {
-    id: 'cust_001',
-    name: 'Rahul Verma',
-    email: 'rahul@curryhouse.com',
-    password: 'pass',
-    role: UserRole.OWNER,
-    plan: PlanType.FREE,
-    restaurantName: "Rahul's Curry House",
-    location: "Delhi, CP",
-    cuisineType: "North Indian",
-    joinedDate: "2023-10-05"
-  },
-  {
-    id: 'cust_002',
-    name: 'Sarah Jenkins',
-    email: 'sarah@beanroast.com',
-    password: 'pass',
-    role: UserRole.OWNER,
-    plan: PlanType.PRO_PLUS,
-    restaurantName: "Bean & Roast Chain",
-    location: "Bangalore, Indiranagar",
-    cuisineType: "Cafe & Bakery",
-    joinedDate: "2023-10-12"
   }
 ];
 
+// Mock Observer Pattern to notify App.tsx of state changes
+const observers: ((user: User | null) => void)[] = [];
+const notifyObservers = (user: User | null) => {
+    observers.forEach(cb => {
+        try {
+            cb(user);
+        } catch (e) {
+            console.error("Error in auth observer", e);
+        }
+    });
+};
+
 export const authService = {
-  // Initialize with demo users if empty
-  init: () => {
-    if (!localStorage.getItem(USERS_KEY)) {
-      localStorage.setItem(USERS_KEY, JSON.stringify(DEMO_USERS));
+  // Init listener (called in App.tsx)
+  subscribe: (callback: (user: User | null) => void) => {
+    if (isFirebaseConfigured && auth) {
+        return onAuthStateChanged(auth, async (firebaseUser) => {
+        if (firebaseUser) {
+            // Fetch extended profile from Firestore
+            const userProfile = await authService.getUserProfile(firebaseUser.uid);
+            if (userProfile) {
+                const fullUser = { ...userProfile, id: firebaseUser.uid, email: firebaseUser.email || '' };
+                localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(fullUser));
+                callback(fullUser);
+            } else {
+                callback(null);
+            }
+        } else {
+            localStorage.removeItem(STORAGE_USER_KEY);
+            callback(null);
+        }
+        });
+    } else {
+        // Mock Subscription (Just check local storage on load)
+        try {
+            const stored = localStorage.getItem(STORAGE_USER_KEY);
+            const user = stored ? JSON.parse(stored) : null;
+            callback(user);
+        } catch (e) {
+            callback(null);
+        }
+
+        // Add to observers list for updates
+        observers.push(callback);
+
+        // We initialize demo users into mock DB if they don't exist
+        const mockUsers = getMockUsers();
+        let updated = false;
+        DEMO_USERS.forEach(demoUser => {
+            if (!mockUsers[demoUser.id]) {
+                mockUsers[demoUser.id] = demoUser;
+                updated = true;
+            }
+        });
+        if (updated) {
+            localStorage.setItem(MOCK_DB_USERS_KEY, JSON.stringify(mockUsers));
+        }
+
+        // Return unsubscribe function
+        return () => {
+            const index = observers.indexOf(callback);
+            if (index > -1) observers.splice(index, 1);
+        };
     }
-  },
-
-  signup: (userData: User, password: string): User => {
-    authService.init();
-    const usersStr = localStorage.getItem(USERS_KEY);
-    const users: StoredUser[] = usersStr ? JSON.parse(usersStr) : [];
-
-    if (users.find(u => u.email.toLowerCase() === userData.email.toLowerCase())) {
-      throw new Error('User with this email already exists');
-    }
-
-    const newUser: StoredUser = { ...userData, password };
-    users.push(newUser);
-    localStorage.setItem(USERS_KEY, JSON.stringify(users));
-    
-    // Auto login
-    localStorage.setItem(SESSION_KEY, JSON.stringify(userData));
-    return userData;
-  },
-
-  // Similar to signup, but does NOT log the user in. Used by Super Admin.
-  registerUser: (userData: User, password: string): User => {
-    authService.init();
-    const usersStr = localStorage.getItem(USERS_KEY);
-    const users: StoredUser[] = usersStr ? JSON.parse(usersStr) : [];
-
-    if (users.find(u => u.email.toLowerCase() === userData.email.toLowerCase())) {
-      throw new Error('User with this email already exists');
-    }
-
-    const newUser: StoredUser = { ...userData, password };
-    users.push(newUser);
-    localStorage.setItem(USERS_KEY, JSON.stringify(users));
-    
-    return userData;
-  },
-
-  login: (email: string, password: string): User => {
-    authService.init();
-    const usersStr = localStorage.getItem(USERS_KEY);
-    const users: StoredUser[] = usersStr ? JSON.parse(usersStr) : [];
-    
-    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
-    
-    if (!user) {
-      throw new Error('Invalid email or password');
-    }
-
-    const { password: _, ...safeUser } = user;
-    localStorage.setItem(SESSION_KEY, JSON.stringify(safeUser));
-    return safeUser;
-  },
-
-  logout: () => {
-    localStorage.removeItem(SESSION_KEY);
   },
 
   getCurrentUser: (): User | null => {
-    const sessionStr = localStorage.getItem(SESSION_KEY);
-    return sessionStr ? JSON.parse(sessionStr) : null;
-  },
-
-  // New method for Super Admin to see all users
-  getAllUsers: (): User[] => {
-    authService.init();
-    const usersStr = localStorage.getItem(USERS_KEY);
-    const users: StoredUser[] = usersStr ? JSON.parse(usersStr) : [];
-    // Return users without passwords
-    return users.map(({ password, ...u }) => u);
-  },
-
-  updateUser: (updatedUser: User) => {
-      const usersStr = localStorage.getItem(USERS_KEY);
-      let users: StoredUser[] = usersStr ? JSON.parse(usersStr) : [];
-      
-      users = users.map(u => u.id === updatedUser.id ? { ...u, ...updatedUser } : u);
-      localStorage.setItem(USERS_KEY, JSON.stringify(users));
-      
-      // Only update session if the updated user is the current user
-      const currentUser = authService.getCurrentUser();
-      if (currentUser && currentUser.id === updatedUser.id) {
-          localStorage.setItem(SESSION_KEY, JSON.stringify(updatedUser));
+      try {
+          const stored = localStorage.getItem(STORAGE_USER_KEY);
+          return stored ? JSON.parse(stored) : null;
+      } catch (e) {
+          return null;
       }
   },
 
-  deleteUser: (userId: string) => {
-    const usersStr = localStorage.getItem(USERS_KEY);
-    let users: StoredUser[] = usersStr ? JSON.parse(usersStr) : [];
-    users = users.filter(u => u.id !== userId);
-    localStorage.setItem(USERS_KEY, JSON.stringify(users));
+  signup: async (userData: User, password: string): Promise<User> => {
+    if (isFirebaseConfigured && auth) {
+        try {
+            const userCredential = await createUserWithEmailAndPassword(auth, userData.email, password);
+            const uid = userCredential.user.uid;
+            const { id, ...profileData } = userData;
+            await setDoc(doc(db!, "users", uid), {
+                ...profileData,
+                createdAt: new Date().toISOString()
+            });
+            const fullUser = { ...userData, id: uid };
+            localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(fullUser));
+            return fullUser;
+        } catch (error: any) {
+            throw new Error(authService.mapFirebaseError(error.code));
+        }
+    } else {
+        // Mock Signup
+        const mockUsers = getMockUsers();
+        const exists = Object.values(mockUsers).find(u => u.email === userData.email);
+        if (exists) throw new Error("Email already in use (Mock Mode).");
+
+        const uid = `mock_${Date.now()}`;
+        const newUser = { ...userData, id: uid };
+        saveMockUser(newUser, password);
+        localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(newUser));
+        notifyObservers(newUser);
+        return newUser;
+    }
   },
 
-  resetPassword: (email: string): Promise<void> => {
-    return new Promise((resolve) => {
-      // Simulate network request
-      setTimeout(() => {
-        console.log(`Password reset email sent to ${email}`);
-        resolve();
-      }, 1500);
-    });
+  // Create User (Super Admin Functionality)
+  registerUser: async (userData: User, password: string): Promise<User> => {
+      if (isFirebaseConfigured) {
+          return authService.signup(userData, password);
+      } else {
+          // In mock mode, we just add to DB but don't switch session
+          const uid = `mock_${Date.now()}`;
+          const newUser = { ...userData, id: uid };
+          saveMockUser(newUser, password);
+          return newUser;
+      }
+  },
+
+  login: async (email: string, password: string): Promise<User> => {
+    if (isFirebaseConfigured && auth) {
+        try {
+            const userCredential = await signInWithEmailAndPassword(auth, email, password);
+            const uid = userCredential.user.uid;
+            const userProfile = await authService.getUserProfile(uid);
+            if (!userProfile) throw new Error("User profile not found in database.");
+            const fullUser = { ...userProfile, id: uid, email: userCredential.user.email || '' };
+            localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(fullUser));
+            return fullUser;
+        } catch (error: any) {
+            throw new Error(authService.mapFirebaseError(error.code));
+        }
+    } else {
+        // Mock Login
+        const mockUsers = getMockUsers();
+        
+        // 1. Check if it's a hardcoded Demo User first (Priority)
+        // This ensures super admins always work even if local storage is stale
+        const demoUser = DEMO_USERS.find(u => u.email.toLowerCase() === email.toLowerCase());
+        
+        if (demoUser) {
+            if (demoUser.password === password) {
+                // Force update/save in mock DB to ensure latest details persist
+                saveMockUser(demoUser, password);
+                const { password: _, ...safeUser } = demoUser;
+                localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(safeUser));
+                notifyObservers(safeUser as User);
+                return safeUser as User;
+            }
+        }
+
+        // 2. Fallback to normal mock DB users (signups)
+        const storedUser = Object.values(mockUsers).find(u => u.email.toLowerCase() === email.toLowerCase());
+        
+        if (storedUser && storedUser.password === password) {
+             const { password: _, ...safeUser } = storedUser;
+             localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(safeUser));
+             notifyObservers(safeUser as User);
+             return safeUser as User;
+        }
+
+        throw new Error("Invalid email or password (Mock Mode).");
+    }
+  },
+
+  logout: async () => {
+    if (isFirebaseConfigured && auth) {
+        await signOut(auth);
+    }
+    localStorage.removeItem(STORAGE_USER_KEY);
+    notifyObservers(null);
+  },
+
+  getUserProfile: async (uid: string): Promise<User | null> => {
+    if (isFirebaseConfigured && db) {
+        try {
+            const docRef = doc(db, "users", uid);
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+                return docSnap.data() as User;
+            }
+            return null;
+        } catch (e) {
+            console.error("Error fetching profile", e);
+            return null;
+        }
+    } else {
+        // Mock Profile Fetch
+        const mockUsers = getMockUsers();
+        const user = mockUsers[uid];
+        if (user) {
+            const { password, ...safeUser } = user;
+            return safeUser as User;
+        }
+        // Fallback to demo users list if not found in LS (e.g. fresh browser)
+        const demoUser = DEMO_USERS.find(u => u.id === uid);
+        if (demoUser) {
+             const { password, ...safeUser } = demoUser;
+             return safeUser as User;
+        }
+        return null;
+    }
+  },
+
+  getAllUsers: async (): Promise<User[]> => {
+      if (isFirebaseConfigured && db) {
+          // NOTE: Listing all users is restricted in Client SDK. 
+          // We return empty for now unless using a specific query or Admin SDK.
+          console.warn("getAllUsers requires Admin SDK or custom collection query.");
+          return []; 
+      } else {
+          const mockUsers = getMockUsers();
+          // Ensure Demo users are included in the list even if not explicitly in LS yet
+          DEMO_USERS.forEach(d => {
+              if (!mockUsers[d.id]) {
+                  mockUsers[d.id] = d;
+              }
+          });
+          return Object.values(mockUsers).map(({ password, ...u }) => u as User);
+      }
+  },
+
+  updateUser: async (updatedUser: User) => {
+      if (!updatedUser.id) return;
+      
+      if (isFirebaseConfigured && db) {
+          const { id, email, ...data } = updatedUser;
+          const userRef = doc(db, "users", id);
+          await updateDoc(userRef, data);
+      } else {
+          const mockUsers = getMockUsers();
+          const existing = mockUsers[updatedUser.id] || {};
+          mockUsers[updatedUser.id] = { ...existing, ...updatedUser };
+          localStorage.setItem(MOCK_DB_USERS_KEY, JSON.stringify(mockUsers));
+      }
+      localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(updatedUser));
+      notifyObservers(updatedUser); 
+  },
+
+  deleteUser: async (userId: string) => {
+      if (isFirebaseConfigured && db) {
+          await deleteDoc(doc(db, "users", userId));
+      } else {
+          const mockUsers = getMockUsers();
+          delete mockUsers[userId];
+          localStorage.setItem(MOCK_DB_USERS_KEY, JSON.stringify(mockUsers));
+      }
+  },
+
+  resetPassword: async (email: string): Promise<void> => {
+    if (isFirebaseConfigured && auth) {
+        try {
+            await sendPasswordResetEmail(auth, email);
+        } catch (error: any) {
+            throw new Error(authService.mapFirebaseError(error.code));
+        }
+    } else {
+        console.log(`[Mock] Password reset link sent to ${email}`);
+    }
+  },
+
+  mapFirebaseError: (code: string): string => {
+    switch (code) {
+      case 'auth/invalid-email': return 'Invalid email address.';
+      case 'auth/user-disabled': return 'User account is disabled.';
+      case 'auth/user-not-found': return 'User not found.';
+      case 'auth/wrong-password': return 'Incorrect password.';
+      case 'auth/email-already-in-use': return 'Email already in use.';
+      case 'auth/weak-password': return 'Password is too weak.';
+      case 'auth/invalid-credential': return 'Invalid credentials.';
+      default: return 'Authentication failed. Please check configuration.';
+    }
   }
 };

@@ -1,6 +1,5 @@
-
 import React, { useState } from 'react';
-import { ArrowRight, AlertCircle, CheckCircle2, ArrowLeft, Mail, KeyRound, Store, MapPin, ChefHat, ShieldCheck, User as UserIcon, Shield, FileText, Upload } from 'lucide-react';
+import { ArrowRight, AlertCircle, CheckCircle2, ArrowLeft, Mail, KeyRound, Store, MapPin, ChefHat, ShieldCheck, User as UserIcon, Shield, FileText, Upload, Loader2 } from 'lucide-react';
 import { User, UserRole, PlanType } from '../types';
 import { authService } from '../services/authService';
 import { storageService } from '../services/storageService';
@@ -46,9 +45,6 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
     setLoading(true);
 
     try {
-      // Simulate network delay for feel
-      await new Promise(resolve => setTimeout(resolve, 600));
-
       if (mode === 'forgot') {
         await authService.resetPassword(email);
         setSuccessMsg(`If an account exists for ${email}, you will receive a password reset link shortly.`);
@@ -57,18 +53,17 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
       }
 
       if (mode === 'login') {
-        const user = authService.login(email, password);
+        const user = await authService.login(email, password);
         
-        // CHECK: If this is a Demo Account, seed the data
-        if (user.id.startsWith('demo_')) {
-            storageService.seedDemoData(user.id);
-        }
+        // CHECK: If this is a Demo Account or new user, seed data if empty
+        // We use the ID returned by Firebase
+        storageService.seedDemoData(user.id);
 
         onLogin(user);
       } else if (mode === 'signup') {
-        // Create new user (Fresh State)
+        // Create new user
         const newUser: User = {
-          id: 'usr_' + Date.now(),
+          id: '', // Will be set by Firebase UID
           name,
           email,
           role: UserRole.OWNER, // Forced to Owner/F&B Entrepreneur
@@ -84,11 +79,11 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
           queriesUsed: 0,
           queryLimit: 10
         };
-        const user = authService.signup(newUser, password);
-        // Note: We do NOT seed data here. New users start empty.
+        const user = await authService.signup(newUser, password);
         onLogin(user);
       }
     } catch (err: any) {
+      console.error(err);
       setError(err.message || 'Authentication failed');
     } finally {
       if (mode !== 'forgot') setLoading(false);
@@ -109,7 +104,6 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
       setEmail('admin@bistro.com');
       setPassword('pass');
     } else {
-      // Updated to new super admin credentials
       setEmail('info@bistroconnect.in');
       setPassword('Bistro@2403');
     }
@@ -317,7 +311,11 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
               disabled={loading}
               className="w-full py-3.5 bg-slate-900 dark:bg-emerald-600 text-white font-bold rounded-lg hover:bg-slate-800 dark:hover:bg-emerald-700 active:transform active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-lg shadow-slate-900/20 disabled:opacity-70 disabled:cursor-not-allowed"
             >
-              {loading ? 'Processing...' : (
+              {loading ? (
+                <>
+                  <Loader2 className="animate-spin" size={18} /> Processing...
+                </>
+              ) : (
                 mode === 'login' ? 'Login' : 
                 mode === 'signup' ? 'Start Free Demo' : 
                 'Send Reset Link'

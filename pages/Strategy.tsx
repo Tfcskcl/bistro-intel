@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { generateStrategy, generateImplementationPlan } from '../services/geminiService';
 import { StrategyReport, UserRole, User, PlanType, ImplementationGuide } from '../types';
-import { Send, Loader2, User as UserIcon, Briefcase, TrendingUp, Lock, HelpCircle, ArrowRight, Play, LifeBuoy, CheckCircle2, Clock, X, BookOpen, UserCheck, Calendar, Zap } from 'lucide-react';
+import { Send, Loader2, User as UserIcon, Briefcase, TrendingUp, Lock, HelpCircle, ArrowRight, Play, LifeBuoy, CheckCircle2, Clock, X, BookOpen, UserCheck, Calendar, Zap, ChevronDown, Trash2, Sparkles } from 'lucide-react';
 
 interface StrategyProps {
     user: User;
@@ -10,8 +10,29 @@ interface StrategyProps {
 }
 
 interface ActionState {
-    [key: number]: 'idle' | 'in_progress' | 'help_requested';
+    [key: number]: 'idle' | 'in_progress' | 'help_requested' | 'completed';
 }
+
+const ROLE_SPECIFIC_PROMPTS = {
+    [UserRole.OWNER]: [
+        "Analyze last month's profit margins",
+        "Suggest a price increase strategy",
+        "Expansion plan for a new outlet",
+        "How to reduce overall food cost?"
+    ],
+    [UserRole.ADMIN]: [
+        "Create a weekend staff roster",
+        "Kitchen opening checklist",
+        "Reduce vegetable wastage",
+        "Inventory ordering schedule"
+    ],
+    [UserRole.SUPER_ADMIN]: [
+        "Analyze global user churn",
+        "System latency report",
+        "Revenue forecast for Q4",
+        "Compare outlet performance"
+    ]
+};
 
 export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
   const [role, setRole] = useState<UserRole>(user.role);
@@ -33,13 +54,6 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
   const [loadingPlan, setLoadingPlan] = useState(false);
   const [generatedPlan, setGeneratedPlan] = useState<ImplementationGuide | null>(null);
 
-  // Default prompts based on role
-  const quickPrompts = {
-    [UserRole.OWNER]: "Summarize last 30 days revenue and give me 3 top priorities.",
-    [UserRole.ADMIN]: "Create tomorrow's prep sheet based on sales trends.",
-    [UserRole.SUPER_ADMIN]: "Compare outlet performance and suggest cross-outlet marketing."
-  };
-
   const faqs = [
       {
           question: "How do I reduce food cost?",
@@ -60,9 +74,12 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
   ];
 
   useEffect(() => {
-    // Reset query when role changes (only for super admin toggling)
-    setQuery(quickPrompts[role] || "");
-  }, [role]);
+    // When switching context as Super Admin, clear previous state
+    if (user.role === UserRole.SUPER_ADMIN) {
+        setReport(null);
+        setQuery('');
+    }
+  }, [role, user.role]);
 
   // Usage Logic
   const checkUsage = (): boolean => {
@@ -115,6 +132,12 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleClear = () => {
+      setQuery('');
+      setReport(null);
+      setActionStates({});
   };
 
   // 1. User Clicks "Start Implementation"
@@ -173,6 +196,10 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
           setAssistanceTarget(null);
           setAssistanceMsg('');
       }, 1000);
+  };
+  
+  const updateActionStatus = (index: number, status: 'idle' | 'in_progress' | 'completed') => {
+      setActionStates(prev => ({ ...prev, [index]: status }));
   };
 
   return (
@@ -381,7 +408,7 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
       </div>
 
       {/* Chat Area */}
-      <div className="flex-1 overflow-y-auto p-6 bg-slate-50">
+      <div className="flex-1 overflow-y-auto p-6 bg-slate-50 custom-scrollbar">
         {!report && !loading && (
           <div className="h-full flex flex-col items-center justify-center p-4">
             <div className="text-slate-400 opacity-60 mb-8 flex flex-col items-center">
@@ -444,17 +471,22 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
               </h3>
               <div className="space-y-4">
                 {(report.action_plan || []).map((action, i) => (
-                  <div key={i} className={`p-4 rounded-lg border transition-all ${actionStates[i] === 'in_progress' ? 'bg-emerald-50/50 border-emerald-200' : 'bg-slate-50 border-slate-100'}`}>
+                  <div key={i} className={`p-4 rounded-lg border transition-all ${
+                        actionStates[i] === 'in_progress' ? 'bg-emerald-50/50 border-emerald-200' : 
+                        actionStates[i] === 'completed' ? 'bg-slate-50 border-slate-200 opacity-75' :
+                        'bg-slate-50 border-slate-100'
+                  }`}>
                     <div className="flex items-start gap-4">
-                        <div className={`shrink-0 w-16 text-center py-1 rounded text-xs font-bold border ${
-                        action.priority === 'High' ? 'bg-red-50 text-red-700 border-red-200' :
-                        action.priority === 'Medium' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
-                        'bg-blue-50 text-blue-700 border-blue-200'
+                         <div className={`shrink-0 w-16 text-center py-1 rounded text-xs font-bold border ${
+                            actionStates[i] === 'completed' ? 'bg-slate-200 text-slate-600 border-slate-300' :
+                            action.priority === 'High' ? 'bg-red-50 text-red-700 border-red-200' :
+                            action.priority === 'Medium' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
+                            'bg-blue-50 text-blue-700 border-blue-200'
                         }`}>
-                        {action.priority}
+                        {actionStates[i] === 'completed' ? 'Done' : action.priority}
                         </div>
                         <div className="flex-1">
-                        <h4 className="font-semibold text-slate-800">{action.initiative}</h4>
+                        <h4 className={`font-semibold text-slate-800 ${actionStates[i] === 'completed' ? 'line-through text-slate-500' : ''}`}>{action.initiative}</h4>
                         <div className="flex gap-6 mt-2 text-sm text-slate-500">
                             <span className="flex items-center gap-1">
                             <span className="font-semibold text-emerald-600">Est. Impact:</span> {action.impact_estimate}
@@ -467,39 +499,57 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                     </div>
                     
                     {/* Action Buttons */}
-                    <div className="flex items-center gap-3 mt-4 pt-3 border-t border-slate-200/60">
-                        {actionStates[i] === 'in_progress' ? (
-                            <div className="flex items-center gap-3">
-                                <span className="flex items-center gap-2 text-sm font-bold text-emerald-700 bg-emerald-100 px-3 py-1.5 rounded-lg">
-                                    <Clock size={16} /> Implementation In Progress
+                    <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-200/60">
+                        <div className="flex items-center gap-3">
+                            {actionStates[i] === 'in_progress' ? (
+                                <div className="flex items-center gap-3">
+                                    <span className="flex items-center gap-2 text-sm font-bold text-emerald-700 bg-emerald-100 px-3 py-1.5 rounded-lg">
+                                        <Clock size={16} /> Implementation In Progress
+                                    </span>
+                                    <button 
+                                        onClick={() => handleStartImplementationClick(i, action.initiative)}
+                                        className="text-xs text-slate-500 hover:text-emerald-600 underline"
+                                    >
+                                        View Roadmap
+                                    </button>
+                                </div>
+                            ) : actionStates[i] === 'help_requested' ? (
+                                <span className="flex items-center gap-2 text-sm font-bold text-blue-700 bg-blue-100 px-3 py-1.5 rounded-lg">
+                                    <CheckCircle2 size={16} /> Assistance Requested
                                 </span>
-                                <button 
-                                    onClick={() => handleStartImplementationClick(i, action.initiative)}
-                                    className="text-xs text-slate-500 hover:text-emerald-600 underline"
-                                >
-                                    View Roadmap
-                                </button>
+                            ) : actionStates[i] === 'completed' ? (
+                                <span className="flex items-center gap-2 text-sm font-bold text-slate-600 bg-slate-200 px-3 py-1.5 rounded-lg">
+                                    <CheckCircle2 size={16} /> Completed
+                                </span>
+                            ) : (
+                                <>
+                                    <button 
+                                        onClick={() => handleStartImplementationClick(i, action.initiative)}
+                                        className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 text-white text-xs font-bold rounded hover:bg-emerald-600 transition-colors"
+                                    >
+                                        <Play size={14} fill="currentColor" /> Start Implementation
+                                    </button>
+                                    <button 
+                                        onClick={() => openAssistanceModal(i, action.initiative)}
+                                        className="flex items-center gap-2 px-3 py-1.5 bg-white text-slate-600 border border-slate-300 text-xs font-bold rounded hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-colors"
+                                    >
+                                        <LifeBuoy size={14} /> Need Assistance
+                                    </button>
+                                </>
+                            )}
+                        </div>
+
+                        {/* Status Toggle Dropdown */}
+                        <div className="relative group">
+                            <button className="flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-800">
+                                Status: {actionStates[i] === 'completed' ? 'Completed' : actionStates[i] === 'in_progress' ? 'In Progress' : 'Idle'} <ChevronDown size={12}/>
+                            </button>
+                            <div className="absolute right-0 bottom-full mb-1 w-32 bg-white border border-slate-200 rounded-lg shadow-lg hidden group-hover:block z-10">
+                                <button onClick={() => updateActionStatus(i, 'idle')} className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 text-slate-700">Idle</button>
+                                <button onClick={() => updateActionStatus(i, 'in_progress')} className="w-full text-left px-3 py-2 text-xs hover:bg-emerald-50 text-emerald-700">In Progress</button>
+                                <button onClick={() => updateActionStatus(i, 'completed')} className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 text-slate-700">Completed</button>
                             </div>
-                        ) : actionStates[i] === 'help_requested' ? (
-                             <span className="flex items-center gap-2 text-sm font-bold text-blue-700 bg-blue-100 px-3 py-1.5 rounded-lg">
-                                <CheckCircle2 size={16} /> Assistance Requested
-                            </span>
-                        ) : (
-                            <>
-                                <button 
-                                    onClick={() => handleStartImplementationClick(i, action.initiative)}
-                                    className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 text-white text-xs font-bold rounded hover:bg-emerald-600 transition-colors"
-                                >
-                                    <Play size={14} fill="currentColor" /> Start Implementation
-                                </button>
-                                <button 
-                                    onClick={() => openAssistanceModal(i, action.initiative)}
-                                    className="flex items-center gap-2 px-3 py-1.5 bg-white text-slate-600 border border-slate-300 text-xs font-bold rounded hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-colors"
-                                >
-                                    <LifeBuoy size={14} /> Need Assistance
-                                </button>
-                            </>
-                        )}
+                        </div>
                     </div>
                   </div>
                 ))}
@@ -529,22 +579,45 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
 
       {/* Input */}
       <div className="p-4 bg-white border-t border-slate-200">
-        <div className="flex gap-2 max-w-4xl mx-auto">
-          <input 
-            type="text" 
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-            placeholder="Type instructions for the AI assistant..."
-            className="flex-1 px-4 py-3 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-          />
-          <button 
-            onClick={() => handleSend()}
-            disabled={loading || !query}
-            className="px-4 py-3 bg-slate-900 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50 transition-colors"
-          >
-            <Send size={20} />
-          </button>
+        <div className="max-w-4xl mx-auto space-y-3">
+            {/* Quick Chips */}
+            <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+                {ROLE_SPECIFIC_PROMPTS[role].map((prompt, idx) => (
+                    <button
+                        key={idx}
+                        onClick={() => setQuery(prompt)}
+                        className="whitespace-nowrap px-3 py-1.5 bg-slate-100 hover:bg-emerald-50 text-slate-600 hover:text-emerald-700 border border-slate-200 hover:border-emerald-200 rounded-full text-xs font-medium transition-colors flex items-center gap-1.5"
+                    >
+                        <Sparkles size={12} className="text-yellow-500" />
+                        {prompt}
+                    </button>
+                ))}
+            </div>
+
+            <div className="flex gap-2">
+                <input 
+                    type="text" 
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                    placeholder="Type instructions for the AI assistant..."
+                    className="flex-1 px-4 py-3 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+                />
+                <button 
+                    onClick={handleClear}
+                    title="Clear Chat"
+                    className="px-3 py-3 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                >
+                    <Trash2 size={20} />
+                </button>
+                <button 
+                    onClick={() => handleSend()}
+                    disabled={loading || !query}
+                    className="px-4 py-3 bg-slate-900 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50 transition-colors"
+                >
+                    <Send size={20} />
+                </button>
+            </div>
         </div>
       </div>
     </div>

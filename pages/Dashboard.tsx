@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { DollarSign, ShoppingBag, Utensils, AlertTriangle, Users, Clock, TrendingUp, Activity, MapPin, Globe, Eye, UserX, UserPlus, Zap, Edit, Save, Brain, Database, ArrowRight, X, ChevronRight, Search, Mail, Phone, Calendar, Shield, ShieldCheck, Trash2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { DollarSign, ShoppingBag, Utensils, AlertTriangle, Users, Clock, TrendingUp, Activity, MapPin, Globe, Eye, UserX, UserPlus, Zap, Edit, Save, Brain, Database, ArrowRight, X, ChevronRight, Search, Mail, Phone, Calendar, Shield, ShieldCheck, Trash2, Terminal, UploadCloud, FileText, CheckCircle2 } from 'lucide-react';
 import { StatCard } from '../components/StatCard';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { User, UserRole, PlanType, VisitorSession, PlanConfig } from '../types';
@@ -113,9 +113,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
       // AI Training State
       const [trainingStatus, setTrainingStatus] = useState<'idle' | 'training' | 'complete'>('idle');
       const [trainingProgress, setTrainingProgress] = useState(0);
+      const [trainingLogs, setTrainingLogs] = useState<string[]>([]);
+      const logsEndRef = useRef<HTMLDivElement>(null);
+      
+      // File Upload State for Training
+      const [customTrainingFiles, setCustomTrainingFiles] = useState<{name: string, size: string, type: string}[]>([]);
+      const fileInputRef = useRef<HTMLInputElement>(null);
 
       useEffect(() => {
-          setSubscribers(authService.getAllUsers());
+          if (logsEndRef.current) {
+              logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
+          }
+      }, [trainingLogs]);
+
+      useEffect(() => {
+          const fetchUsers = async () => {
+             const users = await authService.getAllUsers();
+             setSubscribers(users);
+          };
+          fetchUsers();
           
           // Initial Load
           updateTrackingData();
@@ -164,7 +180,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
       };
 
       // --- Create User Handlers ---
-      const handleCreateUser = (e: React.FormEvent) => {
+      const handleCreateUser = async (e: React.FormEvent) => {
           e.preventDefault();
           try {
               const newUser: User = {
@@ -179,9 +195,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                   isTrial: false
               };
               
-              authService.registerUser(newUser, newUserForm.password);
+              await authService.registerUser(newUser, newUserForm.password);
               
-              setSubscribers(authService.getAllUsers());
+              const users = await authService.getAllUsers();
+              setSubscribers(users);
               setShowCreateUserModal(false);
               setNewUserForm({ name: '', email: '', password: '', role: UserRole.ADMIN, restaurantName: '', location: '' });
               alert(`Successfully created new ${newUserForm.role === UserRole.ADMIN ? 'Admin' : 'User'}`);
@@ -196,38 +213,75 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           setEditForm(user);
       };
 
-      const handleSaveUserChanges = () => {
+      const handleSaveUserChanges = async () => {
           if (!managingUser) return;
           const updatedUser = { ...managingUser, ...editForm } as User;
-          authService.updateUser(updatedUser);
-          setSubscribers(authService.getAllUsers());
+          await authService.updateUser(updatedUser);
+          const users = await authService.getAllUsers();
+          setSubscribers(users);
           setManagingUser(null);
           alert("User details updated successfully.");
       };
 
-      const handleDeleteUser = () => {
+      const handleDeleteUser = async () => {
           if (!managingUser) return;
           if (confirm(`Are you sure you want to permanently delete ${managingUser.name}? This action cannot be undone.`)) {
-              authService.deleteUser(managingUser.id);
-              setSubscribers(authService.getAllUsers());
+              await authService.deleteUser(managingUser.id);
+              const users = await authService.getAllUsers();
+              setSubscribers(users);
               setManagingUser(null);
           }
       };
 
       // --- AI Training Handlers ---
+      const handleTrainingFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+          if (e.target.files && e.target.files.length > 0) {
+              const file = e.target.files[0];
+              setCustomTrainingFiles(prev => [...prev, {
+                  name: file.name,
+                  size: (file.size / 1024).toFixed(1) + ' KB',
+                  type: file.type || 'Unknown'
+              }]);
+              // Reset input
+              if (fileInputRef.current) fileInputRef.current.value = '';
+          }
+      };
+
       const startTraining = () => {
           setTrainingStatus('training');
           setTrainingProgress(0);
+          setTrainingLogs(['Initializing training sequence...', 'Connecting to data lake...']);
+          
+          let progress = 0;
           const interval = setInterval(() => {
-              setTrainingProgress(prev => {
-                  if (prev >= 100) {
-                      clearInterval(interval);
-                      setTrainingStatus('complete');
-                      return 100;
+              progress += Math.floor(Math.random() * 4) + 1;
+              if (progress >= 100) {
+                  clearInterval(interval);
+                  setTrainingStatus('complete');
+                  setTrainingProgress(100);
+                  setTrainingLogs(prev => [...prev, 'Weights updated.', 'Validation score: 98.4%', 'Training Complete.']);
+              } else {
+                  setTrainingProgress(progress);
+                  if (Math.random() > 0.6) {
+                      const msgs = [
+                          'Vectorizing recipe data...',
+                          'Processing sales anomalies...',
+                          'Optimizing neural weights...',
+                          'Ingesting user feedback...',
+                          'Calibrating loss function...',
+                          'Syncing with global model...'
+                      ];
+                      
+                      // Inject custom file logs occasionally
+                      if (customTrainingFiles.length > 0 && Math.random() > 0.7) {
+                          const randomFile = customTrainingFiles[Math.floor(Math.random() * customTrainingFiles.length)];
+                          setTrainingLogs(prev => [...prev, `Ingesting custom dataset: ${randomFile.name}...`, `Parsing ${randomFile.size} of data...`]);
+                      } else {
+                          setTrainingLogs(prev => [...prev, msgs[Math.floor(Math.random() * msgs.length)]]);
+                      }
                   }
-                  return prev + 5; // increment
-              });
-          }, 200);
+              }
+          }, 300);
       };
 
       return (
@@ -739,32 +793,82 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                         </p>
                         
                         {trainingStatus === 'idle' ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8 text-left">
-                                {[
-                                    { label: 'Sales Patterns', desc: 'Seasonality & trend data from 500+ outlets', count: '12.5MB' },
-                                    { label: 'Recipe Correlations', desc: 'Ingredient pairings and costing logic', count: '8.2MB' },
-                                    { label: 'User Interactions', desc: 'Common strategy queries and corrections', count: '4.1MB' },
-                                    { label: 'Market Prices', desc: 'Real-time ingredient pricing scrape', count: '1.2MB' }
-                                ].map((item, i) => (
-                                    <label key={i} className="flex items-start gap-3 p-4 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer">
-                                        <input type="checkbox" defaultChecked className="mt-1 w-4 h-4 text-blue-600 rounded focus:ring-blue-500" />
-                                        <div>
-                                            <div className="font-bold text-slate-800 dark:text-slate-200">{item.label}</div>
-                                            <div className="text-xs text-slate-500 mt-0.5">{item.desc}</div>
+                            <div className="mb-8">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8 text-left">
+                                    {[
+                                        { label: 'Sales Patterns', desc: 'Seasonality & trend data from 500+ outlets', count: '12.5MB' },
+                                        { label: 'Recipe Correlations', desc: 'Ingredient pairings and costing logic', count: '8.2MB' },
+                                        { label: 'User Interactions', desc: 'Common strategy queries and corrections', count: '4.1MB' },
+                                        { label: 'Market Prices', desc: 'Real-time ingredient pricing scrape', count: '1.2MB' }
+                                    ].map((item, i) => (
+                                        <label key={i} className="flex items-start gap-3 p-4 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer">
+                                            <input type="checkbox" defaultChecked className="mt-1 w-4 h-4 text-blue-600 rounded focus:ring-blue-500" />
+                                            <div>
+                                                <div className="font-bold text-slate-800 dark:text-slate-200">{item.label}</div>
+                                                <div className="text-xs text-slate-500 mt-0.5">{item.desc}</div>
+                                            </div>
+                                            <div className="ml-auto text-xs font-mono font-bold text-slate-400">{item.count}</div>
+                                        </label>
+                                    ))}
+                                    
+                                    {/* Custom Uploaded Files */}
+                                    {customTrainingFiles.map((file, i) => (
+                                        <label key={`custom-${i}`} className="flex items-start gap-3 p-4 border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/10 rounded-xl cursor-pointer">
+                                            <input type="checkbox" defaultChecked className="mt-1 w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500" />
+                                            <div>
+                                                <div className="font-bold text-emerald-800 dark:text-emerald-300">{file.name}</div>
+                                                <div className="text-xs text-emerald-600 dark:text-emerald-500 mt-0.5 flex items-center gap-1">
+                                                    <CheckCircle2 size={10} /> Ready to ingest
+                                                </div>
+                                            </div>
+                                            <div className="ml-auto text-xs font-mono font-bold text-slate-400">{file.size}</div>
+                                        </label>
+                                    ))}
+                                </div>
+
+                                {/* File Upload Area */}
+                                <div 
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-6 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer group mb-8"
+                                >
+                                    <div className="flex flex-col items-center gap-2">
+                                        <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 group-hover:text-blue-600 transition-colors">
+                                            <UploadCloud size={20} />
                                         </div>
-                                        <div className="ml-auto text-xs font-mono font-bold text-slate-400">{item.count}</div>
-                                    </label>
-                                ))}
+                                        <p className="text-sm font-bold text-slate-600 dark:text-slate-300">Upload Custom Training Data</p>
+                                        <p className="text-xs text-slate-400">Supports .csv, .json, .pdf (Max 50MB)</p>
+                                    </div>
+                                    <input 
+                                        type="file" 
+                                        ref={fileInputRef} 
+                                        className="hidden" 
+                                        onChange={handleTrainingFileUpload}
+                                        accept=".csv,.json,.pdf,.txt"
+                                    />
+                                </div>
                             </div>
                         ) : trainingStatus === 'training' ? (
-                            <div className="mb-8">
+                            <div className="mb-8 text-left">
                                 <div className="h-4 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mb-2">
                                     <div 
                                         className="h-full bg-blue-600 transition-all duration-200"
                                         style={{ width: `${trainingProgress}%` }}
                                     ></div>
                                 </div>
-                                <p className="text-sm font-bold text-blue-600 animate-pulse">Processing vector embeddings... {trainingProgress}%</p>
+                                <p className="text-sm font-bold text-blue-600 animate-pulse text-center mb-4">Processing vector embeddings... {trainingProgress}%</p>
+                                
+                                {/* Terminal Logs */}
+                                <div className="bg-slate-950 rounded-lg p-4 font-mono text-xs text-green-400 h-48 overflow-y-auto border border-slate-800 shadow-inner">
+                                    <div className="flex items-center gap-2 mb-2 pb-2 border-b border-slate-800 text-slate-500">
+                                        <Terminal size={12} /> Training Log Stream
+                                    </div>
+                                    <div className="space-y-1">
+                                        {trainingLogs.map((log, i) => (
+                                            <div key={i} className="animate-fade-in">&gt; {log}</div>
+                                        ))}
+                                        <div ref={logsEndRef} className="animate-pulse">&gt; _</div>
+                                    </div>
+                                </div>
                             </div>
                         ) : (
                             <div className="bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-300 p-6 rounded-xl border border-emerald-100 dark:border-emerald-800 mb-8">
@@ -772,6 +876,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                                     <Zap size={20} fill="currentColor"/> Training Complete!
                                 </div>
                                 <p>The model has been updated with the latest live data. Accuracy improved by ~4.2%.</p>
+                                <div className="mt-4 p-4 bg-slate-900 rounded-lg text-left font-mono text-xs text-green-400 max-h-32 overflow-y-auto">
+                                    {trainingLogs.slice(-5).map((log, i) => <div key={i}>&gt; {log}</div>)}
+                                </div>
                             </div>
                         )}
 

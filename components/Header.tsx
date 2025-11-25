@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Bell, Search, X, Check, Moon, Sun } from 'lucide-react';
 import { authService } from '../services/authService';
@@ -38,16 +39,16 @@ export const Header: React.FC<HeaderProps> = ({ theme, toggleTheme }) => {
   };
 
   return (
-    <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-8 sticky top-0 z-10 transition-colors duration-200">
-      <div className="relative w-96">
+    <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 sm:px-6 lg:px-8 sticky top-0 z-10 transition-colors duration-200">
+      <div className="relative flex-1 max-w-xs md:max-w-md mr-4">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
         <input 
           type="text" 
           placeholder="Search recipes, ingredients, or reports..." 
-          className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+          className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
         />
       </div>
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 sm:gap-4">
         {/* Theme Toggle */}
         <button
             onClick={toggleTheme}
@@ -79,7 +80,7 @@ export const Header: React.FC<HeaderProps> = ({ theme, toggleTheme }) => {
                             </button>
                         )}
                     </div>
-                    <div className="max-h-[300px] overflow-y-auto">
+                    <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
                         {notifications.length === 0 ? (
                             <div className="p-8 text-center text-slate-400 text-sm">No notifications</div>
                         ) : (
@@ -103,11 +104,11 @@ export const Header: React.FC<HeaderProps> = ({ theme, toggleTheme }) => {
             )}
         </div>
 
-        <div className="flex items-center gap-3 pl-4 border-l border-slate-200 dark:border-slate-700">
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center text-white text-xs font-bold shadow-sm">
+        <div className="flex items-center gap-3 pl-2 sm:pl-4 border-l border-slate-200 dark:border-slate-700">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-500 to-cyan-500 flex items-center justify-center text-white text-xs font-bold shadow-sm shrink-0">
             {user?.name?.charAt(0) || 'U'}
           </div>
-          <div className="text-sm hidden md:block">
+          <div className="text-sm hidden lg:block">
             <p className="font-semibold text-slate-700 dark:text-slate-200">{user?.name || 'User'}</p>
             <p className="text-xs text-slate-400">{user?.role?.replace('_', ' ') || 'Guest'}</p>
           </div>

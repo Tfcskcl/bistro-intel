@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
@@ -20,7 +19,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [showLogin, setShowLogin] = useState(false);
   
-  // Theme State - Initialize with local storage to persist preference
+  // Theme State
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const saved = localStorage.getItem('theme');
     if (saved === 'dark' || saved === 'light') return saved;
@@ -41,15 +40,16 @@ function App() {
   };
 
   useEffect(() => {
-    // Check for existing session
-    const currentUser = authService.getCurrentUser();
-    if (currentUser) {
-      setUser(currentUser);
-    }
-    setLoading(false);
-    
-    // Initialize Tracking Session
-    trackingService.initSession(currentUser || undefined);
+    // Subscribe to Firebase Auth State
+    const unsubscribe = authService.subscribe((u) => {
+      setUser(u);
+      setLoading(false);
+      if (u) {
+        trackingService.initSession(u);
+      }
+    });
+
+    return () => unsubscribe();
   }, []);
 
   // Track View Changes
@@ -58,26 +58,26 @@ function App() {
   }, [currentView, user]);
 
   const handleLogin = (userData: User) => {
-    setUser(userData);
+    // State is handled by subscribe, but we can close modal here
+    setShowLogin(false);
+    setCurrentView(AppView.DASHBOARD);
+  };
+
+  const handleLogout = async () => {
+    await authService.logout();
+    // User state update handled by subscribe
     setCurrentView(AppView.DASHBOARD);
     setShowLogin(false);
   };
 
-  const handleLogout = () => {
-    authService.logout();
-    setUser(null);
-    setCurrentView(AppView.DASHBOARD);
-    setShowLogin(false); // Go back to landing page state
-  };
-
-  const onUserUpdate = (updatedUser: User) => {
-      authService.updateUser(updatedUser);
+  const onUserUpdate = async (updatedUser: User) => {
+      await authService.updateUser(updatedUser);
+      // Optimistic update
       setUser(updatedUser);
   };
 
   const handleUpgrade = (plan: PlanType) => {
       if (user) {
-          // If upgrading from trial, remove trial flag
           const updatedUser = { 
               ...user, 
               plan, 
@@ -91,7 +91,10 @@ function App() {
   };
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 text-slate-400">Loading BistroIntelligence...</div>;
+    return <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 text-slate-400 flex-col gap-4">
+      <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+      Loading BistroIntelligence...
+    </div>;
   }
 
   // Route: Authenticated User
