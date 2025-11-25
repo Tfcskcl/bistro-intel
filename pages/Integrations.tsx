@@ -413,4 +413,101 @@ export const Integrations: React.FC = () => {
                         {/* Config Status */}
                         {pos.status === 'connected' && (
                             <div className="mt-4 pt-3 border-t border-emerald-200/50 animate-fade-in">
-                                <div className="flex items-center justify-between
+                                <div className="flex items-center justify-between">
+                                     <span className="text-xs text-emerald-700 font-bold">Configuration Active</span>
+                                     <button 
+                                        onClick={() => handleConfigure(pos.id)}
+                                        className="text-xs flex items-center gap-1 text-emerald-600 hover:text-emerald-800 font-medium"
+                                     >
+                                        <Settings size={12} /> Settings
+                                     </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </div>
+        </div>
+
+        {/* Data Upload Section */}
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col h-full">
+            <div className="mb-6">
+                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    <UploadCloud size={20} className="text-emerald-600"/> Manual Data Upload
+                </h3>
+                <p className="text-sm text-slate-500 mt-1">Upload CSV/Excel files if you don't use a supported POS.</p>
+            </div>
+
+            <div className="space-y-4 flex-1">
+                {/* Sales Upload */}
+                <div 
+                    onClick={handleUploadClick}
+                    className="p-6 border-2 border-dashed border-slate-200 rounded-xl hover:bg-slate-50 hover:border-emerald-300 transition-all cursor-pointer group text-center"
+                >
+                    <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
+                        <FileSpreadsheet size={24} />
+                    </div>
+                    <h4 className="font-bold text-slate-700">Upload Sales Reports</h4>
+                    <p className="text-xs text-slate-400 mt-1">Drag & drop or click to browse</p>
+                    <input 
+                        type="file" 
+                        ref={fileInputRef}
+                        onChange={(e) => handleFileChange(e, 'Sales Data')}
+                        className="hidden" 
+                        accept=".csv,.xlsx"
+                    />
+                </div>
+
+                {/* Purchase Upload */}
+                <div 
+                    onClick={handlePurchaseClick}
+                    className="p-6 border-2 border-dashed border-slate-200 rounded-xl hover:bg-slate-50 hover:border-blue-300 transition-all cursor-pointer group text-center"
+                >
+                    <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
+                        <Database size={24} />
+                    </div>
+                    <h4 className="font-bold text-slate-700">Upload Purchase Logs</h4>
+                    <p className="text-xs text-slate-400 mt-1">For accurate inventory costing</p>
+                    <input 
+                        type="file" 
+                        ref={purchaseInputRef}
+                        onChange={(e) => handleFileChange(e, 'Purchase Logs')}
+                        className="hidden" 
+                        accept=".csv,.xlsx"
+                    />
+                </div>
+            </div>
+            
+            <div className="mt-6 pt-4 border-t border-slate-100">
+                <button className="w-full py-2 flex items-center justify-center gap-2 text-sm text-slate-500 hover:text-emerald-600 font-bold transition-colors">
+                    <Download size={16} /> Download CSV Templates
+                </button>
+            </div>
+        </div>
+      </div>
+
+      {/* Global Toast for Uploads */}
+      {(uploading || uploadSuccess) && (
+          <div className="fixed bottom-6 right-6 bg-slate-900 text-white px-6 py-4 rounded-xl shadow-2xl flex items-center gap-4 animate-fade-in-up z-50">
+              {uploading ? (
+                  <>
+                    <Loader2 className="animate-spin text-emerald-400" size={24} />
+                    <div>
+                        <p className="font-bold">Processing {uploading}...</p>
+                        <p className="text-xs text-slate-400">Parsing rows and normalizing data</p>
+                    </div>
+                  </>
+              ) : (
+                  <>
+                    <CheckCircle2 className="text-emerald-400" size={24} />
+                     <div>
+                        <p className="font-bold">Upload Complete</p>
+                        <p className="text-xs text-slate-400">{uploadSuccess}</p>
+                    </div>
+                  </>
+              )}
+          </div>
+      )}
+    </div>
+  );
+};
