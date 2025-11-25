@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { SYSTEM_INSTRUCTION } from "../constants";
 import { RecipeCard, SOP, StrategyReport, ImplementationGuide, MenuItem } from "../types";
@@ -18,6 +19,29 @@ const getClient = (): GoogleGenAI => {
     client = new GoogleGenAI({ apiKey });
   }
   return client;
+};
+
+// Helper to clean AI output before parsing
+const parseJSON = <T>(text: string | undefined): T => {
+    if (!text) throw new Error("Empty response from AI");
+    
+    try {
+        // 1. Remove markdown code blocks (```json ... ```)
+        let clean = text.replace(/```json\n?|```/g, '');
+        
+        // 2. Extract the first valid JSON object if there's extra text
+        const firstOpen = clean.indexOf('{');
+        const lastClose = clean.lastIndexOf('}');
+        
+        if (firstOpen !== -1 && lastClose !== -1) {
+            clean = clean.substring(firstOpen, lastClose + 1);
+        }
+
+        return JSON.parse(clean) as T;
+    } catch (e) {
+        console.error("JSON Parse Error. Raw text:", text);
+        throw new Error("Failed to parse AI response. Please try again.");
+    }
 };
 
 export const generateRecipeCard = async (userId: string, item: MenuItem): Promise<RecipeCard> => {
@@ -62,12 +86,10 @@ export const generateRecipeCard = async (userId: string, item: MenuItem): Promis
       }
     });
 
-    const text = response.text;
-    if (!text) throw new Error("No response from AI");
-    return JSON.parse(text) as RecipeCard;
-  } catch (error) {
+    return parseJSON<RecipeCard>(response.text);
+  } catch (error: any) {
     console.error("Error generating recipe:", error);
-    throw error;
+    throw new Error(error.message || "Failed to generate recipe");
   }
 };
 
@@ -102,12 +124,10 @@ export const generateRecipeVariation = async (userId: string, originalRecipe: Re
       }
     });
 
-    const text = response.text;
-    if (!text) throw new Error("No response from AI");
-    return JSON.parse(text) as RecipeCard;
-  } catch (error) {
+    return parseJSON<RecipeCard>(response.text);
+  } catch (error: any) {
     console.error("Error generating variation:", error);
-    throw error;
+    throw new Error(error.message || "Failed to generate variation");
   }
 };
 
@@ -116,7 +136,7 @@ export const generateSOP = async (topic: string): Promise<SOP> => {
   const prompt = `
     Create an SOP for "${topic}" for a modern cafe bistro.
     
-    Output as valid JSON:
+    Output STRICTLY as valid JSON:
     {
       "sop_id": "gen-sop-${Date.now()}",
       "title": "string",
@@ -141,12 +161,10 @@ export const generateSOP = async (topic: string): Promise<SOP> => {
       }
     });
 
-    const text = response.text;
-    if (!text) throw new Error("No response from AI");
-    return JSON.parse(text) as SOP;
-  } catch (error) {
+    return parseJSON<SOP>(response.text);
+  } catch (error: any) {
     console.error("Error generating SOP:", error);
-    throw error;
+    throw new Error(error.message || "Failed to generate SOP. Please check API Key.");
   }
 };
 
@@ -177,12 +195,10 @@ export const generateStrategy = async (role: string, context: string): Promise<S
       }
     });
 
-    const text = response.text;
-    if (!text) throw new Error("No response from AI");
-    return JSON.parse(text) as StrategyReport;
-  } catch (error) {
+    return parseJSON<StrategyReport>(response.text);
+  } catch (error: any) {
     console.error("Error generating strategy:", error);
-    throw error;
+    throw new Error(error.message || "Failed to generate strategy");
   }
 };
 
@@ -216,11 +232,9 @@ export const generateImplementationPlan = async (initiative: string): Promise<Im
             }
         });
 
-        const text = response.text;
-        if (!text) throw new Error("No response from AI");
-        return JSON.parse(text) as ImplementationGuide;
-    } catch (error) {
+        return parseJSON<ImplementationGuide>(response.text);
+    } catch (error: any) {
         console.error("Error generating plan:", error);
-        throw error;
+        throw new Error(error.message || "Failed to generate plan");
     }
 };

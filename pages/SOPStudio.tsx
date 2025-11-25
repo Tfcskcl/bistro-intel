@@ -1,8 +1,9 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { generateSOP } from '../services/geminiService';
 import { SOP, User, PlanType } from '../types';
-import { FileText, Loader2, CheckSquare, AlertTriangle, PlayCircle, Lock, Save, Trash2, Zap } from 'lucide-react';
+import { FileText, Loader2, CheckSquare, AlertTriangle, PlayCircle, Lock, Save, Trash2, Zap, AlertCircle } from 'lucide-react';
 import { storageService } from '../services/storageService';
 
 interface SOPStudioProps {
@@ -14,6 +15,7 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
   const [topic, setTopic] = useState('');
   const [sop, setSop] = useState<SOP | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'generator' | 'saved'>('generator');
   
   // Pass user.id to get specific saved SOPs
@@ -29,7 +31,7 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
   const checkUsage = (): boolean => {
       if (user.isTrial) {
           if ((user.queriesUsed || 0) >= (user.queryLimit || 10)) {
-              alert("Free Demo limit reached. Please upgrade to create more SOPs.");
+              setError("Free Demo limit reached. Please upgrade to create more SOPs.");
               return false;
           }
       }
@@ -50,12 +52,13 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
 
     setLoading(true);
     setSop(null);
+    setError(null);
     try {
       const result = await generateSOP(topic);
       setSop(result);
       incrementUsage();
-    } catch (err) {
-      alert("Failed to generate SOP.");
+    } catch (err: any) {
+      setError(err.message || "Failed to generate SOP.");
     } finally {
       setLoading(false);
     }
@@ -137,22 +140,31 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
                 <h2 className="text-2xl font-bold text-slate-800 mb-2">SOP Generator Studio</h2>
                 <p className="text-slate-500 mb-6">Create standardized operational procedures for any process in seconds.</p>
                 
-                <form onSubmit={handleSubmit} className="flex gap-3 max-w-2xl mx-auto">
-                <input
-                    type="text"
-                    value={topic}
-                    onChange={(e) => setTopic(e.target.value)}
-                    placeholder="e.g., Cold chain storage for smoothie bowls, Opening checklist..."
-                    className="flex-1 px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-                />
-                <button 
-                    type="submit" 
-                    disabled={loading || !topic}
-                    className="px-6 py-3 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                    {loading ? <Loader2 className="animate-spin" size={20} /> : <PlayCircle size={20} />}
-                    Generate
-                </button>
+                <form onSubmit={handleSubmit} className="flex gap-3 max-w-2xl mx-auto flex-col">
+                    <div className="flex gap-3">
+                        <input
+                            type="text"
+                            value={topic}
+                            onChange={(e) => setTopic(e.target.value)}
+                            placeholder="e.g., Cold chain storage for smoothie bowls, Opening checklist..."
+                            className="flex-1 px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+                        />
+                        <button 
+                            type="submit" 
+                            disabled={loading || !topic}
+                            className="px-6 py-3 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        >
+                            {loading ? <Loader2 className="animate-spin" size={20} /> : <PlayCircle size={20} />}
+                            Generate
+                        </button>
+                    </div>
+                    
+                    {error && (
+                        <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-200 p-3 rounded-lg mt-2 text-left">
+                            <AlertCircle size={16} className="shrink-0" />
+                            <span>{error}</span>
+                        </div>
+                    )}
                 </form>
             </div>
 
