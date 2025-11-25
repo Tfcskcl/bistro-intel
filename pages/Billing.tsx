@@ -1,9 +1,11 @@
 
-import React, { useState } from 'react';
-import { PLANS } from '../constants';
-import { PlanType, User } from '../types';
-import { Check, Star, Loader2, ShieldCheck } from 'lucide-react';
+
+import React, { useState, useEffect } from 'react';
+import { PlanType, User, PlanConfig } from '../types';
+import { Check, Star, Loader2, ShieldCheck, Zap } from 'lucide-react';
 import { paymentService } from '../services/paymentService';
+import { trackingService } from '../services/trackingService';
+import { storageService } from '../services/storageService';
 
 interface BillingProps {
     user: User;
@@ -12,6 +14,18 @@ interface BillingProps {
 
 export const Billing: React.FC<BillingProps> = ({ user, onUpgrade }) => {
   const [processingPlan, setProcessingPlan] = useState<PlanType | null>(null);
+  const [isQuarterly, setIsQuarterly] = useState(false);
+  const [currentPlans, setCurrentPlans] = useState<Record<PlanType, PlanConfig> | null>(null);
+
+  useEffect(() => {
+    // Load dynamic plans
+    setCurrentPlans(storageService.getPlans());
+  }, []);
+
+  // Track that user started checkout process (entered billing page)
+  useEffect(() => {
+    trackingService.trackCheckoutStart(user);
+  }, [user]);
 
   const handleUpgradeClick = async (planType: PlanType, price: number) => {
       setProcessingPlan(planType);
@@ -34,24 +48,56 @@ export const Billing: React.FC<BillingProps> = ({ user, onUpgrade }) => {
       );
   };
 
+  if (!currentPlans) return <div className="p-8 text-center">Loading plans...</div>;
+
   return (
     <div className="space-y-8 animate-fade-in">
         <div className="text-center max-w-2xl mx-auto">
-            <h2 className="text-3xl font-bold text-slate-900">Choose your Intelligence Plan</h2>
-            <p className="text-slate-500 mt-2">Scale your operations with AI-powered insights. Secure payment via Razorpay.</p>
+            <h2 className="text-3xl font-bold text-slate-900 dark:text-white">Choose your Intelligence Plan</h2>
+            <p className="text-slate-500 dark:text-slate-400 mt-2">Scale your operations with AI-powered insights. Secure payment via Razorpay.</p>
+            
+            {/* Trial Status Banner */}
+            {user.isTrial && (
+                <div className="mt-6 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-3 inline-block">
+                    <div className="flex items-center gap-2 text-yellow-800 dark:text-yellow-400 font-bold">
+                        <Zap size={18} fill="currentColor" />
+                        Free Demo Active
+                    </div>
+                    <p className="text-sm text-yellow-700 dark:text-yellow-500 mt-1">
+                        {user.queriesUsed || 0} / {user.queryLimit || 10} AI Queries Used
+                    </p>
+                </div>
+            )}
+
+            {/* Billing Toggle */}
+            <div className="flex items-center justify-center gap-3 mt-8">
+                <span className={`text-sm font-bold ${!isQuarterly ? 'text-slate-900 dark:text-white' : 'text-slate-400'}`}>Monthly</span>
+                <button 
+                    onClick={() => setIsQuarterly(!isQuarterly)}
+                    className="w-12 h-6 bg-emerald-600 rounded-full relative transition-colors focus:outline-none"
+                >
+                    <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-transform duration-200 ${isQuarterly ? 'left-7' : 'left-1'}`}></div>
+                </button>
+                <span className={`text-sm font-bold ${isQuarterly ? 'text-slate-900 dark:text-white' : 'text-slate-400'}`}>Quarterly</span>
+                <span className="text-[10px] font-bold bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded-full">Save ~10%</span>
+            </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            {Object.entries(PLANS).map(([key, plan]) => {
+            {Object.entries(currentPlans).map(([key, plan]) => {
                 const planType = key as PlanType;
-                const isCurrent = user.plan === planType;
+                // If trial, no plan is technically "Current" in terms of payment, but they have Pro Plus features
+                // So we allow upgrading to everything.
+                const isCurrent = !user.isTrial && user.plan === planType;
                 const isPopular = planType === PlanType.PRO;
                 const isProcessing = processingPlan === planType;
+                
+                const displayPrice = isQuarterly ? plan.quarterlyPrice : plan.price;
 
                 return (
-                    <div key={key} className={`relative flex flex-col p-8 rounded-2xl bg-white border ${
+                    <div key={key} className={`relative flex flex-col p-8 rounded-2xl bg-white dark:bg-slate-900 border transition-colors ${
                         isCurrent ? 'border-emerald-500 ring-2 ring-emerald-500/20' : 
-                        isPopular ? 'border-yellow-400 shadow-xl' : 'border-slate-200 shadow-sm'
+                        isPopular ? 'border-yellow-400 shadow-xl' : 'border-slate-200 dark:border-slate-800 shadow-sm'
                     }`}>
                         {isPopular && (
                             <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-yellow-400 text-slate-900 px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wide flex items-center gap-1">
@@ -60,10 +106,13 @@ export const Billing: React.FC<BillingProps> = ({ user, onUpgrade }) => {
                         )}
                         
                         <div className="mb-6">
-                            <h3 className={`text-lg font-bold ${planType === PlanType.PRO_PLUS ? 'text-purple-600' : 'text-slate-800'}`}>{plan.name}</h3>
+                            <h3 className={`text-lg font-bold ${planType === PlanType.PRO_PLUS ? 'text-purple-600 dark:text-purple-400' : 'text-slate-800 dark:text-slate-200'}`}>{plan.name}</h3>
+                            <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 min-h-[40px] leading-relaxed">
+                                {plan.description}
+                            </p>
                             <div className="mt-4 flex items-baseline">
-                                <span className="text-4xl font-bold tracking-tight text-slate-900">₹{plan.price}</span>
-                                <span className="ml-1 text-sm font-medium text-slate-500">/mo</span>
+                                <span className="text-4xl font-bold tracking-tight text-slate-900 dark:text-white">₹{displayPrice.toLocaleString()}</span>
+                                <span className="ml-1 text-sm font-medium text-slate-500 dark:text-slate-400">/{isQuarterly ? 'qtr' : 'mo'}</span>
                             </div>
                             <p className="text-xs text-slate-400 mt-1">+ Taxes applicable</p>
                         </div>
@@ -72,20 +121,20 @@ export const Billing: React.FC<BillingProps> = ({ user, onUpgrade }) => {
                             {plan.features.map((feature, i) => (
                                 <li key={i} className="flex items-start">
                                     <Check className="h-5 w-5 text-emerald-500 shrink-0 mr-3" />
-                                    <span className="text-sm text-slate-600">{feature}</span>
+                                    <span className="text-sm text-slate-600 dark:text-slate-300">{feature}</span>
                                 </li>
                             ))}
                         </ul>
 
                         <button
-                            onClick={() => handleUpgradeClick(planType, plan.price)}
+                            onClick={() => handleUpgradeClick(planType, displayPrice)}
                             disabled={isCurrent || isProcessing}
                             className={`w-full py-3 px-4 rounded-lg font-bold transition-all flex items-center justify-center gap-2 ${
                                 isCurrent 
-                                ? 'bg-slate-100 text-slate-400 cursor-default'
+                                ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-default'
                                 : planType === PlanType.PRO 
-                                    ? 'bg-slate-900 text-white hover:bg-slate-800 shadow-lg hover:shadow-xl'
-                                    : 'bg-white text-slate-900 border-2 border-slate-200 hover:border-slate-900'
+                                    ? 'bg-slate-900 dark:bg-emerald-600 text-white hover:bg-slate-800 dark:hover:bg-emerald-700 shadow-lg hover:shadow-xl'
+                                    : 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white border-2 border-slate-200 dark:border-slate-700 hover:border-slate-900 dark:hover:border-slate-500'
                             }`}
                         >
                             {isProcessing ? (

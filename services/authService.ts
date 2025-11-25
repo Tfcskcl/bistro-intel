@@ -1,3 +1,4 @@
+
 import { User, UserRole, PlanType } from '../types';
 
 const USERS_KEY = 'bistro_users';
@@ -33,18 +34,44 @@ const DEMO_USERS: StoredUser[] = [
     cuisineType: "Modern European",
     joinedDate: "2023-09-20"
   },
+  // Super Admins
   {
-    id: 'demo_super',
-    name: 'Super User',
-    email: 'super@bistro.com',
-    password: 'pass',
+    id: 'sa_amit',
+    name: 'Amit (Super Admin)',
+    email: 'amit@chef-hire.in',
+    password: 'Bistro@2403',
     role: UserRole.SUPER_ADMIN,
     plan: PlanType.PRO_PLUS,
-    restaurantName: "BistroIntel HQ",
-    location: "Bangalore",
-    cuisineType: "Tech Ops",
+    restaurantName: "BistroHQ",
+    location: "Indore",
+    cuisineType: "HQ",
     joinedDate: "2023-01-01"
   },
+  {
+    id: 'sa_info_chef',
+    name: 'Info Chef-Hire',
+    email: 'info@chef-hire.in',
+    password: 'Bistro@2403',
+    role: UserRole.SUPER_ADMIN,
+    plan: PlanType.PRO_PLUS,
+    restaurantName: "BistroHQ",
+    location: "Indore",
+    cuisineType: "HQ",
+    joinedDate: "2023-01-01"
+  },
+  {
+    id: 'sa_info_bistro',
+    name: 'Info BistroConnect',
+    email: 'info@bistroconnect.in',
+    password: 'Bistro@2403',
+    role: UserRole.SUPER_ADMIN,
+    plan: PlanType.PRO_PLUS,
+    restaurantName: "BistroHQ",
+    location: "Indore",
+    cuisineType: "HQ",
+    joinedDate: "2023-01-01"
+  },
+  // Customers
   {
     id: 'cust_001',
     name: 'Rahul Verma',
@@ -97,6 +124,23 @@ export const authService = {
     return userData;
   },
 
+  // Similar to signup, but does NOT log the user in. Used by Super Admin.
+  registerUser: (userData: User, password: string): User => {
+    authService.init();
+    const usersStr = localStorage.getItem(USERS_KEY);
+    const users: StoredUser[] = usersStr ? JSON.parse(usersStr) : [];
+
+    if (users.find(u => u.email.toLowerCase() === userData.email.toLowerCase())) {
+      throw new Error('User with this email already exists');
+    }
+
+    const newUser: StoredUser = { ...userData, password };
+    users.push(newUser);
+    localStorage.setItem(USERS_KEY, JSON.stringify(users));
+    
+    return userData;
+  },
+
   login: (email: string, password: string): User => {
     authService.init();
     const usersStr = localStorage.getItem(USERS_KEY);
@@ -137,7 +181,19 @@ export const authService = {
       
       users = users.map(u => u.id === updatedUser.id ? { ...u, ...updatedUser } : u);
       localStorage.setItem(USERS_KEY, JSON.stringify(users));
-      localStorage.setItem(SESSION_KEY, JSON.stringify(updatedUser));
+      
+      // Only update session if the updated user is the current user
+      const currentUser = authService.getCurrentUser();
+      if (currentUser && currentUser.id === updatedUser.id) {
+          localStorage.setItem(SESSION_KEY, JSON.stringify(updatedUser));
+      }
+  },
+
+  deleteUser: (userId: string) => {
+    const usersStr = localStorage.getItem(USERS_KEY);
+    let users: StoredUser[] = usersStr ? JSON.parse(usersStr) : [];
+    users = users.filter(u => u.id !== userId);
+    localStorage.setItem(USERS_KEY, JSON.stringify(users));
   },
 
   resetPassword: (email: string): Promise<void> => {

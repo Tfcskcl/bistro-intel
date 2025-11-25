@@ -79,6 +79,16 @@ export enum PlanType {
   PRO_PLUS = 'PRO_PLUS'
 }
 
+export interface PlanConfig {
+    name: string;
+    description?: string;
+    price: number;
+    quarterlyPrice: number;
+    features: string[];
+    color: string;
+    recipeLimit: number;
+}
+
 export interface User {
   id: string;
   name: string;
@@ -90,6 +100,16 @@ export interface User {
   location?: string;
   cuisineType?: string;
   joinedDate?: string;
+  
+  // Registration extras
+  gstNumber?: string;
+  fssaiNumber?: string;
+  menuFile?: string;
+
+  // Usage Tracking
+  queriesUsed?: number;
+  queryLimit?: number; // For trial
+  isTrial?: boolean;
 }
 
 export enum AppView {
@@ -155,4 +175,26 @@ declare global {
     interface Window {
         Razorpay: new (options: RazorpayOptions) => { open: () => void };
     }
+}
+
+// Analytics Types
+export interface VisitorSession {
+    sessionId: string;
+    userId?: string;
+    userName?: string; // 'Guest' if not logged in
+    location: string;
+    device: string;
+    entryTime: string;
+    lastActive: string;
+    pagesVisited: string[];
+    isOnline: boolean;
+    hasAbandonedCheckout: boolean;
+}
+
+export interface AnalyticsEvent {
+    id: string;
+    sessionId: string;
+    type: 'PAGE_VIEW' | 'CLICK' | 'CHECKOUT_START' | 'PURCHASE';
+    detail: string;
+    timestamp: string;
 }

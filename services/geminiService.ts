@@ -1,14 +1,12 @@
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
-import { SYSTEM_INSTRUCTION, MOCK_MENU } from "../constants";
-import { RecipeCard, SOP, StrategyReport, ImplementationGuide } from "../types";
+import { SYSTEM_INSTRUCTION } from "../constants";
+import { RecipeCard, SOP, StrategyReport, ImplementationGuide, MenuItem } from "../types";
 import { ingredientService } from "./ingredientService";
 
 let client: GoogleGenAI | null = null;
 
 const getClient = (): GoogleGenAI => {
   if (!client) {
-    // Safety check for process.env in browser environments
-    // In Vercel/Netlify, make sure to add API_KEY in the Environment Variables settings
     const apiKey = (typeof process !== 'undefined' && process.env && process.env.API_KEY) 
       ? process.env.API_KEY 
       : '';
@@ -22,16 +20,16 @@ const getClient = (): GoogleGenAI => {
   return client;
 };
 
-export const generateRecipeCard = async (skuId: string, skuName: string): Promise<RecipeCard> => {
+export const generateRecipeCard = async (userId: string, item: MenuItem): Promise<RecipeCard> => {
   const ai = getClient();
-  const currentIngredients = ingredientService.getAll();
+  const currentIngredients = ingredientService.getAll(userId);
 
   const prompt = `
-    Generate a standardized recipe card for SKU: ${skuId} with name "${skuName}".
+    Generate a standardized recipe card for SKU: ${item.sku_id} with name "${item.name}".
     
     Context Data:
-    Menu Item: ${JSON.stringify(MOCK_MENU.find(m => m.sku_id === skuId) || {})}
-    Ingredient Prices (Use these for costing): ${JSON.stringify(currentIngredients)}
+    Menu Item: ${JSON.stringify(item)}
+    Ingredient Prices (Use these for costing if matches found, otherwise estimate): ${JSON.stringify(currentIngredients)}
 
     Output as valid JSON conforming to this structure:
     {
@@ -73,9 +71,9 @@ export const generateRecipeCard = async (skuId: string, skuName: string): Promis
   }
 };
 
-export const generateRecipeVariation = async (originalRecipe: RecipeCard, variationType: string): Promise<RecipeCard> => {
+export const generateRecipeVariation = async (userId: string, originalRecipe: RecipeCard, variationType: string): Promise<RecipeCard> => {
   const ai = getClient();
-  const currentIngredients = ingredientService.getAll();
+  const currentIngredients = ingredientService.getAll(userId);
 
   const prompt = `
     Create a "${variationType}" variation of the following recipe.
@@ -86,11 +84,10 @@ export const generateRecipeVariation = async (originalRecipe: RecipeCard, variat
     Ingredient Prices Context: ${JSON.stringify(currentIngredients)}
 
     Tasks:
-    1. Modify ingredients to suit the "${variationType}" requirement (e.g., replace dairy/meat for Vegan, wheat for Gluten-Free).
+    1. Modify ingredients to suit the "${variationType}" requirement.
     2. Adjust preparation steps accordingly.
-    3. Recalculate estimated food cost and price based on standard substitute prices.
-    4. Update the name to reflect the variation (e.g., "Vegan Acai Bowl").
-    5. Update tags and allergens.
+    3. Recalculate estimated food cost and price.
+    4. Update the name to reflect the variation.
 
     Output as valid JSON conforming to the exact same RecipeCard structure as the input.
   `;
@@ -159,7 +156,7 @@ export const generateStrategy = async (role: string, context: string): Promise<S
     Role Context: I am the ${role}.
     User Request: ${context}
     
-    Using the mock sales data (assume typical cafe trends if not provided specifically) and menu performance.
+    Assume a generic restaurant scenario if no specific data is provided, but prioritize actionable advice.
     
     Output as valid JSON:
     {
@@ -192,16 +189,16 @@ export const generateStrategy = async (role: string, context: string): Promise<S
 export const generateImplementationPlan = async (initiative: string): Promise<ImplementationGuide> => {
     const ai = getClient();
     const prompt = `
-      Create a detailed, step-by-step implementation guide for the following restaurant initiative: "${initiative}".
+      Create a detailed implementation guide for: "${initiative}".
       
       Output as valid JSON:
       {
-        "objective": "string (clear goal statement)",
-        "estimated_timeline": "string (e.g. 2 weeks)",
+        "objective": "string",
+        "estimated_timeline": "string",
         "phases": [
             {
-                "phase_name": "string (e.g. Preparation, Execution, Review)",
-                "steps": ["string (actionable step)"],
+                "phase_name": "string",
+                "steps": ["string"],
                 "resources_needed": ["string"],
                 "kpi_to_track": "string"
             }

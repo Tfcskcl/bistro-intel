@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
@@ -11,12 +12,33 @@ import { Billing } from './pages/Billing';
 import { Landing } from './pages/Landing';
 import { AppView, User, PlanType } from './types';
 import { authService } from './services/authService';
+import { trackingService } from './services/trackingService';
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
   const [currentView, setCurrentView] = useState<AppView>(AppView.DASHBOARD);
   const [loading, setLoading] = useState(true);
   const [showLogin, setShowLogin] = useState(false);
+  
+  // Theme State - Initialize with local storage to persist preference
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    const saved = localStorage.getItem('theme');
+    if (saved === 'dark' || saved === 'light') return saved;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  });
+
+  useEffect(() => {
+    if (theme === 'dark') {
+        document.documentElement.classList.add('dark');
+    } else {
+        document.documentElement.classList.remove('dark');
+    }
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'light' ? 'dark' : 'light');
+  };
 
   useEffect(() => {
     // Check for existing session
@@ -25,7 +47,15 @@ function App() {
       setUser(currentUser);
     }
     setLoading(false);
+    
+    // Initialize Tracking Session
+    trackingService.initSession(currentUser || undefined);
   }, []);
+
+  // Track View Changes
+  useEffect(() => {
+    trackingService.trackPageView(currentView, user || undefined);
+  }, [currentView, user]);
 
   const handleLogin = (userData: User) => {
     setUser(userData);
@@ -40,17 +70,28 @@ function App() {
     setShowLogin(false); // Go back to landing page state
   };
 
+  const onUserUpdate = (updatedUser: User) => {
+      authService.updateUser(updatedUser);
+      setUser(updatedUser);
+  };
+
   const handleUpgrade = (plan: PlanType) => {
       if (user) {
-          const updatedUser = { ...user, plan };
-          authService.updateUser(updatedUser);
-          setUser(updatedUser);
+          // If upgrading from trial, remove trial flag
+          const updatedUser = { 
+              ...user, 
+              plan, 
+              isTrial: false,
+              queriesUsed: undefined,
+              queryLimit: undefined
+          };
+          onUserUpdate(updatedUser);
           alert(`Success! Upgraded to ${plan} plan.`);
       }
   };
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-400">Loading BistroIntelligence...</div>;
+    return <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 text-slate-400">Loading BistroIntelligence...</div>;
   }
 
   // Route: Authenticated User
@@ -60,11 +101,11 @@ function App() {
           case AppView.DASHBOARD:
             return <Dashboard user={user} />;
           case AppView.RECIPES:
-            return <RecipeHub user={user} />;
+            return <RecipeHub user={user} onUserUpdate={onUserUpdate} />;
           case AppView.SOP:
-            return <SOPStudio user={user} />;
+            return <SOPStudio user={user} onUserUpdate={onUserUpdate} />;
           case AppView.STRATEGY:
-            return <Strategy user={user} />;
+            return <Strategy user={user} onUserUpdate={onUserUpdate} />;
           case AppView.INTEGRATIONS:
             return <Integrations />;
           case AppView.BILLING:
@@ -75,7 +116,7 @@ function App() {
       };
     
       return (
-        <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-200">
           <Sidebar 
             currentView={currentView} 
             onChangeView={setCurrentView} 
@@ -84,7 +125,7 @@ function App() {
           />
           
           <div className="ml-64 flex flex-col min-h-screen">
-            <Header />
+            <Header theme={theme} toggleTheme={toggleTheme} />
             <main className="flex-1 p-8 overflow-y-auto">
               {renderView()}
             </main>

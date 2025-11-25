@@ -1,17 +1,19 @@
+
 import React, { useState, useEffect } from 'react';
 import { generateStrategy, generateImplementationPlan } from '../services/geminiService';
 import { StrategyReport, UserRole, User, PlanType, ImplementationGuide } from '../types';
-import { Send, Loader2, User as UserIcon, Briefcase, TrendingUp, Lock, HelpCircle, ArrowRight, Play, LifeBuoy, CheckCircle2, Clock, X, BookOpen, UserCheck, Calendar } from 'lucide-react';
+import { Send, Loader2, User as UserIcon, Briefcase, TrendingUp, Lock, HelpCircle, ArrowRight, Play, LifeBuoy, CheckCircle2, Clock, X, BookOpen, UserCheck, Calendar, Zap } from 'lucide-react';
 
 interface StrategyProps {
     user: User;
+    onUserUpdate?: (user: User) => void;
 }
 
 interface ActionState {
     [key: number]: 'idle' | 'in_progress' | 'help_requested';
 }
 
-export const Strategy: React.FC<StrategyProps> = ({ user }) => {
+export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
   const [role, setRole] = useState<UserRole>(user.role);
   const [query, setQuery] = useState('');
   const [report, setReport] = useState<StrategyReport | null>(null);
@@ -62,7 +64,25 @@ export const Strategy: React.FC<StrategyProps> = ({ user }) => {
     setQuery(quickPrompts[role] || "");
   }, [role]);
 
-  if (user.plan !== PlanType.PRO_PLUS) {
+  // Usage Logic
+  const checkUsage = (): boolean => {
+      if (user.isTrial) {
+          if ((user.queriesUsed || 0) >= (user.queryLimit || 10)) {
+              alert("Free Demo limit reached. Upgrade to Pro+ for unlimited AI Strategy.");
+              return false;
+          }
+      }
+      return true;
+  };
+
+  const incrementUsage = () => {
+      if (user.isTrial && onUserUpdate) {
+          const newUsage = (user.queriesUsed || 0) + 1;
+          onUserUpdate({ ...user, queriesUsed: newUsage });
+      }
+  };
+
+  if (!user.isTrial && user.plan !== PlanType.PRO_PLUS) {
     return (
         <div className="h-[calc(100vh-6rem)] flex flex-col items-center justify-center bg-white rounded-xl border border-slate-200 shadow-sm">
             <div className="bg-slate-100 p-4 rounded-full mb-4">
@@ -78,6 +98,7 @@ export const Strategy: React.FC<StrategyProps> = ({ user }) => {
   const handleSend = async (textOverride?: string) => {
     const textToSend = textOverride || query;
     if (!textToSend) return;
+    if (!checkUsage()) return;
     
     // Update input to reflect what is being sent if triggered via click
     if (textOverride) setQuery(textOverride);
@@ -88,6 +109,7 @@ export const Strategy: React.FC<StrategyProps> = ({ user }) => {
     try {
       const data = await generateStrategy(role, textToSend);
       setReport(data);
+      incrementUsage();
     } catch (e) {
       alert("Failed to generate strategy.");
     } finally {
@@ -105,6 +127,8 @@ export const Strategy: React.FC<StrategyProps> = ({ user }) => {
     if (!choiceModalOpen) return;
     const { index, title } = choiceModalOpen;
     
+    if (!checkUsage()) return;
+
     setChoiceModalOpen(null);
     setRoadmapModalOpen(true);
     setLoadingPlan(true);
@@ -114,6 +138,7 @@ export const Strategy: React.FC<StrategyProps> = ({ user }) => {
         const plan = await generateImplementationPlan(title);
         setGeneratedPlan(plan);
         setActionStates(prev => ({ ...prev, [index]: 'in_progress' }));
+        incrementUsage();
     } catch (e) {
         alert("Failed to generate plan.");
         setRoadmapModalOpen(false);
@@ -320,30 +345,39 @@ export const Strategy: React.FC<StrategyProps> = ({ user }) => {
       )}
 
       {/* Header / Role Selector */}
-      <div className="p-4 border-b border-slate-200 bg-slate-50 flex items-center gap-4">
-        <div className="flex items-center gap-2">
-          <div className="p-2 bg-emerald-100 text-emerald-700 rounded-lg">
-            <UserIcon size={20} />
-          </div>
-          
-          {user.role === UserRole.SUPER_ADMIN ? (
-             <select 
-                value={role}
-                onChange={(e) => setRole(e.target.value as UserRole)}
-                className="bg-white border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block p-2.5"
-            >
-                <option value={UserRole.OWNER}>Owner Context</option>
-                <option value={UserRole.ADMIN}>Admin / Ops Context</option>
-                <option value={UserRole.SUPER_ADMIN}>Super Admin Context</option>
-            </select>
-          ) : (
-             <div className="text-sm font-semibold text-slate-700 px-3 py-2 bg-white border border-slate-200 rounded-lg">
-                 Viewing as: {user.role === UserRole.OWNER ? 'Owner' : 'Admin'}
-             </div>
-          )}
+      <div className="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+            <div className="p-2 bg-emerald-100 text-emerald-700 rounded-lg">
+                <UserIcon size={20} />
+            </div>
+            
+            {user.role === UserRole.SUPER_ADMIN ? (
+                <select 
+                    value={role}
+                    onChange={(e) => setRole(e.target.value as UserRole)}
+                    className="bg-white border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block p-2.5"
+                >
+                    <option value={UserRole.OWNER}>Owner Context</option>
+                    <option value={UserRole.ADMIN}>Admin / Ops Context</option>
+                    <option value={UserRole.SUPER_ADMIN}>Super Admin Context</option>
+                </select>
+            ) : (
+                <div className="text-sm font-semibold text-slate-700 px-3 py-2 bg-white border border-slate-200 rounded-lg">
+                    Viewing as: {user.role === UserRole.OWNER ? 'Owner' : 'Admin'}
+                </div>
+            )}
+            </div>
+            <div className="h-6 w-px bg-slate-300 mx-2"></div>
+            <p className="text-sm text-slate-500 italic hidden sm:block">"Ask me about sales, costs, or seasonal strategy..."</p>
         </div>
-        <div className="h-6 w-px bg-slate-300 mx-2"></div>
-        <p className="text-sm text-slate-500 italic">"Ask me about sales, costs, or seasonal strategy..."</p>
+        
+        {user.isTrial && (
+            <div className="flex items-center gap-2 px-3 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400 rounded-full text-xs font-bold">
+                <Zap size={12} fill="currentColor" />
+                Demo: {user.queriesUsed || 0}/{user.queryLimit}
+            </div>
+        )}
       </div>
 
       {/* Chat Area */}

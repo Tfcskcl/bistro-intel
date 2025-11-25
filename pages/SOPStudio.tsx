@@ -1,42 +1,59 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { generateSOP } from '../services/geminiService';
 import { SOP, User, PlanType } from '../types';
-import { FileText, Loader2, CheckSquare, AlertTriangle, PlayCircle, Lock, Save, Trash2 } from 'lucide-react';
+import { FileText, Loader2, CheckSquare, AlertTriangle, PlayCircle, Lock, Save, Trash2, Zap } from 'lucide-react';
 import { storageService } from '../services/storageService';
 
 interface SOPStudioProps {
     user: User;
+    onUserUpdate?: (user: User) => void;
 }
 
-export const SOPStudio: React.FC<SOPStudioProps> = ({ user }) => {
+export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
   const [topic, setTopic] = useState('');
   const [sop, setSop] = useState<SOP | null>(null);
   const [loading, setLoading] = useState(false);
   const [viewMode, setViewMode] = useState<'generator' | 'saved'>('generator');
-  const [savedSOPs, setSavedSOPs] = useState<SOP[]>(storageService.getSavedSOPs());
+  
+  // Pass user.id to get specific saved SOPs
+  const [savedSOPs, setSavedSOPs] = useState<SOP[]>([]);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
 
-  if (user.plan === PlanType.FREE) {
-      return (
-          <div className="h-[calc(100vh-6rem)] flex flex-col items-center justify-center bg-white rounded-xl border border-slate-200 shadow-sm">
-              <div className="bg-slate-100 p-4 rounded-full mb-4">
-                  <Lock size={32} className="text-slate-400" />
-              </div>
-              <h2 className="text-2xl font-bold text-slate-800">Pro Feature Locked</h2>
-              <p className="text-slate-500 mt-2 max-w-md text-center">Standard Operating Procedure (SOP) generation is available on the Pro plan and above.</p>
-              <button className="mt-6 px-6 py-2 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700">Upgrade to Pro</button>
-          </div>
-      );
-  }
+  useEffect(() => {
+      setSavedSOPs(storageService.getSavedSOPs(user.id));
+  }, [user.id]);
+
+  // SOP is now unlocked for all (Basic/Pro/Pro+), but subject to Trial Limits
+  
+  const checkUsage = (): boolean => {
+      if (user.isTrial) {
+          if ((user.queriesUsed || 0) >= (user.queryLimit || 10)) {
+              alert("Free Demo limit reached. Please upgrade to create more SOPs.");
+              return false;
+          }
+      }
+      return true;
+  };
+
+  const incrementUsage = () => {
+      if (user.isTrial && onUserUpdate) {
+          const newUsage = (user.queriesUsed || 0) + 1;
+          onUserUpdate({ ...user, queriesUsed: newUsage });
+      }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!topic.trim()) return;
+    if (!checkUsage()) return;
+
     setLoading(true);
     setSop(null);
     try {
       const result = await generateSOP(topic);
       setSop(result);
+      incrementUsage();
     } catch (err) {
       alert("Failed to generate SOP.");
     } finally {
@@ -46,8 +63,8 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user }) => {
 
   const handleSave = () => {
       if (sop) {
-          storageService.saveSOP(sop);
-          setSavedSOPs(storageService.getSavedSOPs());
+          storageService.saveSOP(user.id, sop);
+          setSavedSOPs(storageService.getSavedSOPs(user.id));
           setSaveStatus("Saved to library");
           setTimeout(() => setSaveStatus(null), 2000);
       }
@@ -56,19 +73,27 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user }) => {
   return (
     <div className="max-w-5xl mx-auto space-y-6">
        {/* Top Bar */}
-       <div className="flex justify-center gap-2 mb-6">
-            <button 
-                onClick={() => setViewMode('generator')}
-                className={`px-6 py-2 rounded-lg text-sm font-bold transition-colors ${viewMode === 'generator' ? 'bg-emerald-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'}`}
-            >
-                SOP Generator
-            </button>
-            <button 
-                onClick={() => setViewMode('saved')}
-                className={`px-6 py-2 rounded-lg text-sm font-bold transition-colors ${viewMode === 'saved' ? 'bg-emerald-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'}`}
-            >
-                Saved SOPs ({savedSOPs.length})
-            </button>
+       <div className="flex justify-between items-center mb-6">
+            <div className="flex gap-2 mx-auto">
+                <button 
+                    onClick={() => setViewMode('generator')}
+                    className={`px-6 py-2 rounded-lg text-sm font-bold transition-colors ${viewMode === 'generator' ? 'bg-emerald-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'}`}
+                >
+                    SOP Generator
+                </button>
+                <button 
+                    onClick={() => setViewMode('saved')}
+                    className={`px-6 py-2 rounded-lg text-sm font-bold transition-colors ${viewMode === 'saved' ? 'bg-emerald-600 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'}`}
+                >
+                    Saved SOPs ({savedSOPs.length})
+                </button>
+            </div>
+            {user.isTrial && (
+                <div className="flex items-center gap-2 px-3 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400 rounded-full text-xs font-bold absolute right-8">
+                    <Zap size={12} fill="currentColor" />
+                    Demo: {user.queriesUsed || 0}/{user.queryLimit}
+                </div>
+            )}
       </div>
 
       {viewMode === 'saved' ? (

@@ -1,3 +1,5 @@
+
+
 import { MenuItem, Ingredient, PlanType } from './types';
 
 export const SYSTEM_INSTRUCTION = `
@@ -14,21 +16,30 @@ Always:
 export const PLANS = {
   [PlanType.FREE]: {
     name: 'Basic Starter',
+    description: 'Essential tools for single outlets to organize recipes and SOPs.',
     price: 199,
-    features: ['1 Free AI Query (Trial)', 'Upload Recipes', 'Basic Analytics', 'Community Support'],
-    color: 'slate'
+    quarterlyPrice: 549, // Approx 10% discount
+    features: ['1 AI Recipe Creation', 'Standard SOPs', 'Training Processes', 'Community Support'],
+    color: 'slate',
+    recipeLimit: 1
   },
   [PlanType.PRO]: {
     name: 'Pro',
+    description: 'Advanced costing and training modules for growing restaurants.',
     price: 9999,
-    features: ['Detailed Recipe Costing', 'SOP Generator', 'Inventory Management', 'Priority Support'],
-    color: 'emerald'
+    quarterlyPrice: 26999, // Approx 10% discount
+    features: ['30 AI Recipe Creations', 'Advanced SOP Generator', 'Training Modules', 'Inventory Management', 'Priority Support'],
+    color: 'emerald',
+    recipeLimit: 30
   },
   [PlanType.PRO_PLUS]: {
     name: 'Pro+ Operations',
+    description: 'Unlimited AI strategy and forecasting for scaling F&B brands.',
     price: 24999,
-    features: ['Everything in Pro', 'AI Strategy & Forecasting', 'Multi-outlet Management', 'Dedicated Account Manager'],
-    color: 'purple'
+    quarterlyPrice: 67499, // Approx 10% discount
+    features: ['Unlimited Recipes', 'AI Strategy & Forecasting', 'Multi-outlet Management', 'Dedicated Account Manager'],
+    color: 'purple',
+    recipeLimit: 9999
   }
 };
 

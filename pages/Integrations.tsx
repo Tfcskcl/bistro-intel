@@ -4,8 +4,17 @@ import { storageService } from '../services/storageService';
 import { POSChangeRequest, User, UserRole } from '../types';
 import { authService } from '../services/authService';
 
+interface IntegrationItem {
+  id: string;
+  name: string;
+  icon: string;
+  status: string;
+  lastSync?: string;
+  loading?: boolean;
+}
+
 export const Integrations: React.FC = () => {
-  const [integrations, setIntegrations] = useState([
+  const [integrations, setIntegrations] = useState<IntegrationItem[]>([
     { id: 'petpooja', name: 'Petpooja', icon: 'P', status: 'connected', lastSync: '10 mins ago' },
     { id: 'rista', name: 'Rista', icon: 'R', status: 'disconnected' },
     { id: 'posist', name: 'Posist', icon: 'Po', status: 'disconnected' },
@@ -23,9 +32,11 @@ export const Integrations: React.FC = () => {
   const purchaseInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-      const requests = storageService.getPOSChangeRequests().filter(r => r.status === 'pending');
-      setPendingRequests(requests);
-  }, []);
+      if (currentUser) {
+          const requests = storageService.getPOSChangeRequests(currentUser.id).filter(r => r.status === 'pending');
+          setPendingRequests(requests);
+      }
+  }, [currentUser]);
 
   const toggleConnection = (id: string) => {
       // Set loading state
@@ -81,13 +92,15 @@ export const Integrations: React.FC = () => {
           alert("Only the Restaurant Owner can confirm POS changes.");
           return;
       }
+      
+      if (!currentUser) return;
 
       // In a real app, this is where we would send confirm=true to the API
       if (action === 'approved') {
           console.log(`Sending API Request to POS: Update SKU ${req.sku_id} price to ${req.new_price} with confirm=true`);
       }
 
-      storageService.updatePOSChangeRequest(req.id, action);
+      storageService.updatePOSChangeRequest(currentUser.id, req.id, action);
       setPendingRequests(prev => prev.filter(p => p.id !== req.id));
       
       if (action === 'approved') {

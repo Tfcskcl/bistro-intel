@@ -1,18 +1,18 @@
-
 import React, { useState, useRef, useEffect } from 'react';
-import { MOCK_MENU } from '../constants';
+import { PLANS } from '../constants';
 import { generateRecipeCard, generateRecipeVariation } from '../services/geminiService';
 import { ingredientService } from '../services/ingredientService';
 import { RecipeCard, MenuItem, User, UserRole, POSChangeRequest } from '../types';
-import { Loader2, ChefHat, Scale, Clock, AlertCircle, Upload, Lock, Sparkles, Check, Save, RefreshCw, Search, Plus, Store } from 'lucide-react';
+import { Loader2, ChefHat, Scale, Clock, AlertCircle, Upload, Lock, Sparkles, Check, Save, RefreshCw, Search, Plus, Store, Zap } from 'lucide-react';
 import { storageService } from '../services/storageService';
 import { authService } from '../services/authService';
 
 interface RecipeHubProps {
   user: User;
+  onUserUpdate?: (user: User) => void;
 }
 
-export const RecipeHub: React.FC<RecipeHubProps> = ({ user }) => {
+export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
   const [selectedSku, setSelectedSku] = useState<string | null>(null);
   const [generatedRecipe, setGeneratedRecipe] = useState<RecipeCard | null>(null);
   const [loading, setLoading] = useState(false);
@@ -20,39 +20,54 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user }) => {
   const [error, setError] = useState<string | null>(null);
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'generator' | 'saved'>('generator');
-  const [savedRecipes, setSavedRecipes] = useState<RecipeCard[]>(storageService.getSavedRecipes());
+  
+  const [savedRecipes, setSavedRecipes] = useState<RecipeCard[]>([]);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+
   const [posPushStatus, setPosPushStatus] = useState<string | null>(null);
   const [customItemName, setCustomItemName] = useState('');
   
-  // Restaurant Assignment
   const [restaurants, setRestaurants] = useState<User[]>([]);
   const [selectedRestaurantId, setSelectedRestaurantId] = useState<string>('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    // Load restaurants (Users who are owners have restaurant profiles)
+    setSavedRecipes(storageService.getSavedRecipes(user.id));
+    setMenuItems(storageService.getMenu(user.id));
+  }, [user.id]);
+
+  useEffect(() => {
     const allUsers = authService.getAllUsers();
     const owners = allUsers.filter(u => u.restaurantName && u.role === UserRole.OWNER);
     setRestaurants(owners);
   }, []);
 
-  // Access Control: Only Admin and Super Admin
-  if (user.role !== UserRole.ADMIN && user.role !== UserRole.SUPER_ADMIN) {
-    return (
-      <div className="h-[calc(100vh-6rem)] flex flex-col items-center justify-center bg-white rounded-xl border border-slate-200 shadow-sm">
-        <div className="bg-slate-100 p-4 rounded-full mb-4">
-          <Lock size={32} className="text-slate-400" />
-        </div>
-        <h2 className="text-2xl font-bold text-slate-800">Restricted Access</h2>
-        <p className="text-slate-500 mt-2 max-w-md text-center">
-          The Recipe Generator is restricted to Admin and Super Admin roles only.
-        </p>
-      </div>
-    );
-  }
+  const checkUsage = (): boolean => {
+      if (user.isTrial) {
+          if ((user.queriesUsed || 0) >= (user.queryLimit || 10)) {
+              setError("Free Demo limit reached (10/10 queries). Please upgrade to continue.");
+              return false;
+          }
+      }
+      const planLimit = PLANS[user.plan]?.recipeLimit || 1;
+      if (!user.isTrial && savedRecipes.length >= planLimit) {
+          setError(`You have reached the ${planLimit} recipe limit for your ${PLANS[user.plan].name} plan.`);
+          return false;
+      }
+      return true;
+  };
+
+  const incrementUsage = () => {
+      if (user.isTrial && onUserUpdate) {
+          const newUsage = (user.queriesUsed || 0) + 1;
+          onUserUpdate({ ...user, queriesUsed: newUsage });
+      }
+  };
 
   const handleGenerateRecipe = async (item: MenuItem) => {
+    if (!checkUsage()) return;
+
     setLoading(true);
     setLoadingText('Generating with AI...');
     setError(null);
@@ -62,10 +77,11 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user }) => {
     setSelectedRestaurantId('');
     
     try {
-      const card = await generateRecipeCard(item.sku_id, item.name);
+      const card = await generateRecipeCard(user.id, item);
       setGeneratedRecipe(card);
+      incrementUsage();
     } catch (e) {
-      setError("Failed to generate recipe card. Please check your API Key or try again.");
+      setError("Failed to generate recipe card. Please check your API Key.");
     } finally {
       setLoading(false);
     }
@@ -73,6 +89,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user }) => {
 
   const handleGenerateCustom = async () => {
       if (!customItemName.trim()) return;
+      if (!checkUsage()) return;
       
       setLoading(true);
       setLoadingText(`Designing ${customItemName}...`);
@@ -81,14 +98,29 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user }) => {
       setPosPushStatus(null);
       setSelectedRestaurantId('');
       
-      // Create a temp SKU
       const tempSku = `NEW-${Date.now().toString().slice(-4)}`;
       setSelectedSku(tempSku);
 
+      // Create a temporary item object
+      const tempItem: MenuItem = {
+          sku_id: tempSku,
+          name: customItemName,
+          category: 'main',
+          prep_time_min: 0,
+          current_price: 0,
+          ingredients: []
+      };
+
       try {
-          const card = await generateRecipeCard(tempSku, customItemName);
+          const card = await generateRecipeCard(user.id, tempItem);
           setGeneratedRecipe(card);
+          incrementUsage();
           setCustomItemName('');
+          
+          // Add to menu locally if successful
+          const newMenu = [...menuItems, tempItem];
+          setMenuItems(newMenu);
+          storageService.saveMenu(user.id, newMenu);
       } catch (e) {
           setError("Failed to generate custom recipe.");
       } finally {
@@ -98,14 +130,17 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user }) => {
 
   const handleVariation = async (type: string) => {
     if (!generatedRecipe) return;
+    if (!checkUsage()) return;
+
     setLoading(true);
     setLoadingText(`Creating ${type} variation...`);
     setError(null);
     setPosPushStatus(null);
 
     try {
-      const variant = await generateRecipeVariation(generatedRecipe, type);
+      const variant = await generateRecipeVariation(user.id, generatedRecipe, type);
       setGeneratedRecipe(variant);
+      incrementUsage();
     } catch (e) {
       setError(`Failed to create ${type} variation.`);
     } finally {
@@ -125,7 +160,8 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user }) => {
     reader.onload = (event) => {
       const text = event.target?.result as string;
       if (text) {
-        const result = ingredientService.importFromCSV(text);
+        // Use ingredient import for now as proxy for data
+        const result = ingredientService.importFromCSV(user.id, text);
         if (result.success) {
           setImportStatus(result.message);
           setTimeout(() => setImportStatus(null), 3000);
@@ -135,7 +171,6 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user }) => {
       }
     };
     reader.readAsText(file);
-    // Reset input
     e.target.value = '';
   };
 
@@ -148,8 +183,8 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user }) => {
           assignedRestaurantName: restaurant?.restaurantName
       };
 
-      storageService.saveRecipe(recipeToSave);
-      setSavedRecipes(storageService.getSavedRecipes());
+      storageService.saveRecipe(user.id, recipeToSave);
+      setSavedRecipes(storageService.getSavedRecipes(user.id));
       setImportStatus(restaurant ? `Saved for ${restaurant.restaurantName}!` : "Recipe saved to library!");
       setTimeout(() => setImportStatus(null), 2000);
     }
@@ -157,9 +192,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user }) => {
 
   const handlePushToPOS = () => {
       if (!generatedRecipe) return;
-      
       const restaurant = restaurants.find(r => r.id === selectedRestaurantId);
-
       const request: POSChangeRequest = {
           id: `req_${Date.now()}`,
           sku_id: generatedRecipe.sku_id || 'VAR-001',
@@ -172,14 +205,22 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user }) => {
           targetRestaurantId: selectedRestaurantId,
           targetRestaurantName: restaurant?.restaurantName
       };
-
-      storageService.addPOSChangeRequest(request);
+      storageService.addPOSChangeRequest(user.id, request);
       setPosPushStatus(restaurant ? `Sent to ${restaurant.restaurantName}` : "Sent to Integrations");
   };
 
+  if (![UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.OWNER].includes(user.role)) {
+    return (
+      <div className="h-[calc(100vh-6rem)] flex flex-col items-center justify-center bg-white rounded-xl border border-slate-200 shadow-sm">
+        <Lock size={32} className="text-slate-400 mb-4" />
+        <h2 className="text-2xl font-bold text-slate-800">Restricted Access</h2>
+      </div>
+    );
+  }
+
   return (
     <div className="h-[calc(100vh-6rem)] flex flex-col gap-4">
-      {/* Top Bar for View Switching */}
+      {/* Top Bar */}
       <div className="flex justify-between items-center">
         <div className="flex gap-2">
             <button 
@@ -195,10 +236,17 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user }) => {
                 Saved Library ({savedRecipes.length})
             </button>
         </div>
+        
+        {user.isTrial && (
+            <div className="flex items-center gap-2 px-3 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400 rounded-full text-xs font-bold">
+                <Zap size={12} fill="currentColor" />
+                Demo: {user.queriesUsed || 0}/{user.queryLimit} Queries
+            </div>
+        )}
       </div>
 
       {viewMode === 'saved' ? (
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 overflow-y-auto flex-1">
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 overflow-y-auto flex-1 animate-fade-in">
               <h2 className="text-xl font-bold text-slate-800 mb-4">Your Saved Recipes</h2>
               {savedRecipes.length === 0 ? (
                   <p className="text-slate-500">No saved recipes yet. Generate one and click Save!</p>
@@ -222,7 +270,6 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user }) => {
                                     setGeneratedRecipe(recipe);
                                     setViewMode('generator');
                                     setSelectedSku(recipe.sku_id);
-                                    setSelectedRestaurantId(recipe.assignedRestaurantId || '');
                                 }}
                                 className="w-full mt-3 py-2 text-xs font-bold text-slate-600 border border-slate-200 rounded hover:bg-slate-50"
                               >
@@ -236,7 +283,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user }) => {
       ) : (
       <div className="flex gap-6 h-full overflow-hidden">
         {/* List */}
-        <div className="w-1/3 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden">
+        <div className="w-1/3 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden animate-fade-in">
             <div className="p-4 border-b border-slate-200 bg-slate-50 flex flex-col gap-3">
                 <div className="flex justify-between items-center">
                     <h3 className="font-bold text-slate-700">Menu Items</h3>
@@ -244,7 +291,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user }) => {
                         onClick={handleImportClick}
                         className="text-xs flex items-center gap-1 text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-2 py-1 rounded border border-emerald-100 transition-colors"
                     >
-                        <Upload size={12} /> Import Ingredients
+                        <Upload size={12} /> Import
                     </button>
                     <input 
                         type="file" 
@@ -255,7 +302,6 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user }) => {
                     />
                 </div>
                 
-                {/* Custom Generator Input */}
                 <div className="relative">
                     <input 
                         type="text" 
@@ -283,35 +329,42 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user }) => {
             </div>
             
             <div className="overflow-y-auto flex-1 p-2 space-y-2">
-            {MOCK_MENU.map((item) => (
-                <div 
-                key={item.sku_id}
-                onClick={() => handleGenerateRecipe(item)}
-                className={`p-4 rounded-lg cursor-pointer transition-all border ${
-                    selectedSku === item.sku_id 
-                    ? 'bg-yellow-50 border-yellow-200 ring-1 ring-yellow-300' 
-                    : 'bg-white border-transparent hover:bg-slate-50 hover:border-slate-200'
-                }`}
-                >
-                <div className="flex justify-between items-start">
-                    <h4 className="font-semibold text-slate-800">{item.name}</h4>
-                    <span className="text-xs font-mono text-slate-400">{item.sku_id}</span>
+            {menuItems.length === 0 ? (
+                <div className="text-center p-8 text-slate-400">
+                    <ChefHat className="mx-auto mb-2 opacity-50" size={32} />
+                    <p className="text-sm">No items found.</p>
+                    <p className="text-xs mt-1">Add a custom item above or import your menu.</p>
                 </div>
-                <div className="flex justify-between mt-2 text-sm text-slate-500">
-                    <span>{item.ingredients ? item.ingredients.length : 0} Ingredients</span>
-                    <span className="font-medium text-slate-700">₹{item.current_price}</span>
-                </div>
-                </div>
-            ))}
+            ) : (
+                menuItems.map((item) => (
+                    <div 
+                    key={item.sku_id}
+                    onClick={() => handleGenerateRecipe(item)}
+                    className={`p-4 rounded-lg cursor-pointer transition-all border ${
+                        selectedSku === item.sku_id 
+                        ? 'bg-yellow-50 border-yellow-200 ring-1 ring-yellow-300' 
+                        : 'bg-white border-transparent hover:bg-slate-50 hover:border-slate-200'
+                    }`}
+                    >
+                    <div className="flex justify-between items-start">
+                        <h4 className="font-semibold text-slate-800">{item.name}</h4>
+                        <span className="text-xs font-mono text-slate-400">{item.sku_id}</span>
+                    </div>
+                    </div>
+                ))
+            )}
             </div>
         </div>
 
         {/* Detail View */}
-        <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+        <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col animate-fade-in">
             {!selectedSku ? (
             <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
                 <ChefHat size={48} className="mb-4 opacity-50" />
                 <p>Select an item or type a name to generate a recipe card</p>
+                {!user.isTrial && (
+                    <p className="text-xs mt-2 text-emerald-600">Plan Limit: {savedRecipes.length} / {PLANS[user.plan].recipeLimit} Recipes</p>
+                )}
             </div>
             ) : (
             <div className="h-full flex flex-col">
@@ -319,7 +372,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user }) => {
                 <div className="p-6 border-b border-slate-200 bg-white">
                 <div className="flex justify-between items-start">
                     <h2 className="text-2xl font-bold text-slate-800">
-                        {generatedRecipe ? generatedRecipe.name : (MOCK_MENU.find(m => m.sku_id === selectedSku)?.name || customItemName || 'New Recipe')}
+                        {generatedRecipe ? generatedRecipe.name : (menuItems.find(m => m.sku_id === selectedSku)?.name || customItemName || 'New Recipe')}
                     </h2>
                     {generatedRecipe && (
                          <div className="flex gap-2 flex-col items-end">
@@ -342,20 +395,6 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user }) => {
                                 >
                                     <Save size={16} /> Save
                                 </button>
-                             </div>
-                             
-                             <div className="relative">
-                                <Store size={14} className="absolute left-2.5 top-2 text-slate-400" />
-                                <select
-                                    value={selectedRestaurantId}
-                                    onChange={(e) => setSelectedRestaurantId(e.target.value)}
-                                    className="pl-8 pr-4 py-1.5 text-xs font-medium border border-slate-200 rounded-lg focus:ring-1 focus:ring-emerald-500 outline-none bg-slate-50 min-w-[200px]"
-                                >
-                                    <option value="">Allot to Restaurant (Optional)</option>
-                                    {restaurants.map(r => (
-                                        <option key={r.id} value={r.id}>{r.restaurantName} ({r.location})</option>
-                                    ))}
-                                </select>
                              </div>
                          </div>
                     )}
@@ -380,114 +419,4 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user }) => {
                                 key={variant}
                                 onClick={() => handleVariation(variant)}
                                 disabled={loading}
-                                className="px-3 py-1 text-xs font-medium bg-slate-50 text-slate-600 rounded-full border border-slate-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200 transition-colors disabled:opacity-50"
-                                >
-                                {variant}
-                                </button>
-                            ))}
-                        </div>
-                    )}
-                </div>
-                </div>
-
-                {/* Content */}
-                <div className="flex-1 overflow-y-auto p-6 bg-slate-50/50">
-                {error && (
-                    <div className="p-4 bg-red-50 text-red-700 border border-red-200 rounded-lg flex items-center gap-2">
-                    <AlertCircle size={20} />
-                    {error}
-                    </div>
-                )}
-                
-                {generatedRecipe && !loading && (
-                    <div className="space-y-8 animate-fade-in">
-                    {/* Summary Block */}
-                    <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white p-6 rounded-xl shadow-lg">
-                        <div className="flex justify-between items-start">
-                        <div>
-                            <p className="text-slate-400 text-xs uppercase tracking-wide font-bold">Food Cost</p>
-                            <p className="text-3xl font-bold mt-1">₹{generatedRecipe.food_cost_per_serving}</p>
-                            <p className="text-sm text-slate-400 mt-1">
-                            {generatedRecipe.current_price ? 
-                                ((generatedRecipe.food_cost_per_serving / generatedRecipe.current_price) * 100).toFixed(1) + '% of selling price'
-                                : 'Calculated per serving'
-                            }
-                            </p>
-                        </div>
-                        <div className="text-right">
-                            <p className="text-slate-400 text-xs uppercase tracking-wide font-bold">Suggested Price</p>
-                            <p className="text-3xl font-bold mt-1 text-yellow-400">₹{generatedRecipe.suggested_selling_price}</p>
-                            <p className="text-sm text-slate-400 mt-1 max-w-xs ml-auto">{generatedRecipe.reasoning}</p>
-                        </div>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        {/* Ingredients Table */}
-                        <div>
-                        <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                            <Scale size={20} className="text-emerald-600"/> Ingredients (Yield: {generatedRecipe.yield})
-                        </h3>
-                        <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-                            <table className="w-full text-sm text-left">
-                            <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
-                                <tr>
-                                <th className="px-4 py-3">Ingredient</th>
-                                <th className="px-4 py-3 text-right">Qty</th>
-                                <th className="px-4 py-3 text-right">Cost</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {(generatedRecipe.ingredients || []).map((ing, i) => (
-                                <tr key={i} className="hover:bg-slate-50">
-                                    <td className="px-4 py-3 font-medium text-slate-700">{ing.name}</td>
-                                    <td className="px-4 py-3 text-right text-slate-600">{ing.qty_per_serving} {ing.unit}</td>
-                                    <td className="px-4 py-3 text-right text-slate-600">₹{ing.cost_per_serving}</td>
-                                </tr>
-                                ))}
-                            </tbody>
-                            </table>
-                        </div>
-                        </div>
-
-                        {/* Method */}
-                        <div>
-                        <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                            <ChefHat size={20} className="text-emerald-600"/> Preparation
-                        </h3>
-                        <div className="bg-white p-6 rounded-lg border border-slate-200 space-y-4">
-                            {(generatedRecipe.preparation_steps || []).map((step, i) => (
-                            <div key={i} className="flex gap-4">
-                                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center text-xs font-bold border border-slate-200">
-                                {i + 1}
-                                </span>
-                                <p className="text-sm text-slate-600 leading-relaxed">{step}</p>
-                            </div>
-                            ))}
-                        </div>
-                        </div>
-                    </div>
-                    
-                    {/* Footer Meta */}
-                    <div className="border-t border-slate-200 pt-6">
-                        <p className="text-sm text-slate-500">
-                        <span className="font-semibold">Allergens:</span> {generatedRecipe.allergens ? generatedRecipe.allergens.join(', ') : 'None'}
-                        </p>
-                        <p className="text-sm text-slate-500 mt-1">
-                        <span className="font-semibold">AI Confidence:</span> 
-                        <span className={`ml-2 px-2 py-0.5 rounded text-xs font-medium ${generatedRecipe.confidence === 'High' ? 'bg-emerald-100 text-emerald-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                            {generatedRecipe.confidence}
-                        </span>
-                        </p>
-                    </div>
-                    </div>
-                )}
-                </div>
-            </div>
-            )}
-        </div>
-      </div>
-      )}
-    </div>
-  );
-};
+                                className="px-3 py-1 text-xs font-medium bg-slate-50 text-slate-6

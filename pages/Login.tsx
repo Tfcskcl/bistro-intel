@@ -1,7 +1,9 @@
+
 import React, { useState } from 'react';
-import { ArrowRight, AlertCircle, CheckCircle2, ArrowLeft, Mail, KeyRound, Store, MapPin, ChefHat, ShieldCheck, User as UserIcon, Shield } from 'lucide-react';
+import { ArrowRight, AlertCircle, CheckCircle2, ArrowLeft, Mail, KeyRound, Store, MapPin, ChefHat, ShieldCheck, User as UserIcon, Shield, FileText, Upload } from 'lucide-react';
 import { User, UserRole, PlanType } from '../types';
 import { authService } from '../services/authService';
+import { storageService } from '../services/storageService';
 import { Logo } from '../components/Logo';
 
 interface LoginProps {
@@ -21,12 +23,21 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
   const [restaurantName, setRestaurantName] = useState('');
   const [location, setLocation] = useState('');
   const [cuisineType, setCuisineType] = useState('');
+  
+  // Compliance & Menu Fields
+  const [gstNumber, setGstNumber] = useState('');
+  const [fssaiNumber, setFssaiNumber] = useState('');
+  const [menuFileName, setMenuFileName] = useState('');
 
-  const [role, setRole] = useState<UserRole>(UserRole.OWNER);
-  const [plan, setPlan] = useState<PlanType>(PlanType.FREE);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const handleMenuUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files && e.target.files[0]) {
+          setMenuFileName(e.target.files[0].name);
+      }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,20 +58,34 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
 
       if (mode === 'login') {
         const user = authService.login(email, password);
+        
+        // CHECK: If this is a Demo Account, seed the data
+        if (user.id.startsWith('demo_')) {
+            storageService.seedDemoData(user.id);
+        }
+
         onLogin(user);
       } else if (mode === 'signup') {
+        // Create new user (Fresh State)
         const newUser: User = {
           id: 'usr_' + Date.now(),
           name,
           email,
-          role,
-          plan,
+          role: UserRole.OWNER, // Forced to Owner/F&B Entrepreneur
+          plan: PlanType.PRO_PLUS, // Give Full Access initially
           restaurantName,
           location,
           cuisineType,
-          joinedDate: new Date().toISOString().split('T')[0]
+          joinedDate: new Date().toISOString().split('T')[0],
+          gstNumber,
+          fssaiNumber,
+          menuFile: menuFileName,
+          isTrial: true,
+          queriesUsed: 0,
+          queryLimit: 10
         };
         const user = authService.signup(newUser, password);
+        // Note: We do NOT seed data here. New users start empty.
         onLogin(user);
       }
     } catch (err: any) {
@@ -84,43 +109,44 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
       setEmail('admin@bistro.com');
       setPassword('pass');
     } else {
-      setEmail('super@bistro.com');
-      setPassword('pass');
+      // Updated to new super admin credentials
+      setEmail('info@bistroconnect.in');
+      setPassword('Bistro@2403');
     }
     setError(null);
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans relative">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4 font-sans relative transition-colors duration-200">
       
       <button 
         onClick={onBack}
-        className="absolute top-6 left-6 flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors font-medium"
+        className="absolute top-6 left-6 flex items-center gap-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors font-medium"
       >
         <ArrowLeft size={20} /> Back to Home
       </button>
 
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden animate-fade-in-up my-8">
+      <div className="max-w-md w-full bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden animate-fade-in-up my-8">
         {/* Header */}
-        <div className="p-8 text-center bg-slate-900">
+        <div className="p-8 text-center bg-slate-900 dark:bg-slate-950 border-b border-slate-800">
             <div className="flex justify-center mb-6">
                 <Logo light={true} iconSize={32} className="scale-125" />
             </div>
           <p className="text-slate-400 mt-2 text-sm">
             {mode === 'login' ? 'Sign in to access your dashboard' : 
-             mode === 'signup' ? 'Create your restaurant workspace' : 
+             mode === 'signup' ? 'Start your 10-Query Free Demo' : 
              'Reset your password'}
           </p>
         </div>
         
         {mode === 'forgot' && successMsg ? (
           <div className="p-8 text-center space-y-6 animate-fade-in">
-            <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto text-emerald-600">
+            <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center mx-auto text-emerald-600 dark:text-emerald-400">
               <Mail size={32} />
             </div>
             <div>
-              <h3 className="text-xl font-bold text-slate-900">Check your inbox</h3>
-              <p className="text-slate-600 mt-2 text-sm leading-relaxed">{successMsg}</p>
+              <h3 className="text-xl font-bold text-slate-900 dark:text-white">Check your inbox</h3>
+              <p className="text-slate-600 dark:text-slate-400 mt-2 text-sm leading-relaxed">{successMsg}</p>
             </div>
             <button 
               onClick={() => switchMode('login')}
@@ -132,7 +158,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
         ) : (
           <form onSubmit={handleSubmit} className="p-8 space-y-5">
             {error && (
-              <div className="p-3 bg-red-50 border border-red-100 text-red-600 text-sm rounded-lg flex items-center gap-2">
+              <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/50 text-red-600 dark:text-red-400 text-sm rounded-lg flex items-center gap-2">
                 <AlertCircle size={16} />
                 {error}
               </div>
@@ -140,26 +166,26 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
 
             {mode === 'signup' && (
               <div className="space-y-2 animate-fade-in">
-                <label className="text-sm font-bold text-slate-700">Full Name</label>
+                <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Full Name</label>
                 <input 
                   type="text" 
                   required
                   value={name}
                   onChange={e => setName(e.target.value)}
-                  className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none transition-all bg-slate-50 focus:bg-white"
+                  className="w-full px-4 py-3 rounded-lg border border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none transition-all bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:bg-white dark:focus:bg-slate-800"
                   placeholder="John Doe"
                 />
               </div>
             )}
             
             <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-700">Email Address</label>
+              <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Email Address</label>
               <input 
                 type="email" 
                 required
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none transition-all bg-slate-50 focus:bg-white"
+                className="w-full px-4 py-3 rounded-lg border border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none transition-all bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:bg-white dark:focus:bg-slate-800"
                 placeholder="name@restaurant.com"
               />
             </div>
@@ -167,12 +193,12 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
             {mode !== 'forgot' && (
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
-                  <label className="text-sm font-bold text-slate-700">Password</label>
+                  <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Password</label>
                   {mode === 'login' && (
                     <button 
                       type="button"
                       onClick={() => switchMode('forgot')}
-                      className="text-xs text-emerald-600 hover:text-emerald-700 font-medium"
+                      className="text-xs text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 font-medium"
                     >
                       Forgot Password?
                     </button>
@@ -183,7 +209,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
                   required
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none transition-all bg-slate-50 focus:bg-white"
+                  className="w-full px-4 py-3 rounded-lg border border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-yellow-400 focus:border-transparent outline-none transition-all bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:bg-white dark:focus:bg-slate-800"
                   placeholder="••••••••"
                 />
               </div>
@@ -191,10 +217,10 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
 
             {/* Business Details - Signup Only */}
             {mode === 'signup' && (
-                <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 space-y-4 animate-fade-in">
+                <div className="bg-blue-50 dark:bg-blue-900/10 p-4 rounded-lg border border-blue-100 dark:border-blue-900/30 space-y-4 animate-fade-in">
                     <div className="flex items-center gap-2 mb-2">
-                        <Store size={16} className="text-blue-600" />
-                        <p className="text-xs font-bold text-slate-600 uppercase tracking-wide">Business Details</p>
+                        <Store size={16} className="text-blue-600 dark:text-blue-400" />
+                        <p className="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wide">Business Profile</p>
                     </div>
                     <div className="space-y-3">
                         <input 
@@ -203,7 +229,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
                             value={restaurantName}
                             onChange={e => setRestaurantName(e.target.value)}
                             placeholder="Restaurant Name (e.g. Spicy Wok)"
-                            className="w-full px-3 py-2 text-sm rounded border border-slate-300 outline-none focus:border-blue-500"
+                            className="w-full px-3 py-2 text-sm rounded border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white outline-none focus:border-blue-500"
                         />
                         <div className="flex gap-3">
                             <div className="flex-1 relative">
@@ -214,7 +240,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
                                     value={location}
                                     onChange={e => setLocation(e.target.value)}
                                     placeholder="City / Area"
-                                    className="w-full pl-7 pr-3 py-2 text-sm rounded border border-slate-300 outline-none focus:border-blue-500"
+                                    className="w-full pl-7 pr-3 py-2 text-sm rounded border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white outline-none focus:border-blue-500"
                                 />
                             </div>
                              <div className="flex-1 relative">
@@ -225,59 +251,75 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
                                     value={cuisineType}
                                     onChange={e => setCuisineType(e.target.value)}
                                     placeholder="Cuisine Type"
-                                    className="w-full pl-7 pr-3 py-2 text-sm rounded border border-slate-300 outline-none focus:border-blue-500"
+                                    className="w-full pl-7 pr-3 py-2 text-sm rounded border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white outline-none focus:border-blue-500"
                                 />
+                            </div>
+                        </div>
+
+                        {/* GST & FSSAI */}
+                        <div className="flex gap-3">
+                            <input 
+                                type="text" 
+                                value={gstNumber}
+                                onChange={e => setGstNumber(e.target.value)}
+                                placeholder="GST No (Optional)"
+                                className="w-1/2 px-3 py-2 text-sm rounded border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white outline-none focus:border-blue-500"
+                            />
+                             <input 
+                                type="text" 
+                                value={fssaiNumber}
+                                onChange={e => setFssaiNumber(e.target.value)}
+                                placeholder="FSSAI No (Optional)"
+                                className="w-1/2 px-3 py-2 text-sm rounded border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white outline-none focus:border-blue-500"
+                            />
+                        </div>
+
+                        {/* Menu Upload */}
+                         <div className="relative border border-dashed border-slate-300 dark:border-slate-600 rounded-lg p-3 hover:bg-white/50 transition-colors">
+                            <input 
+                                type="file" 
+                                onChange={handleMenuUpload}
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                accept=".pdf,.jpg,.png"
+                            />
+                            <div className="flex items-center justify-center gap-2 text-slate-500 dark:text-slate-400">
+                                {menuFileName ? (
+                                    <span className="text-sm font-bold text-emerald-600 flex items-center gap-1">
+                                        <CheckCircle2 size={14} /> {menuFileName}
+                                    </span>
+                                ) : (
+                                    <>
+                                        <Upload size={14} />
+                                        <span className="text-xs">Upload Menu (PDF/Img)</span>
+                                    </>
+                                )}
                             </div>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Role & Plan Selection - Signup Only */}
+            {/* Trial Offer Banner for Signup */}
             {mode === 'signup' && (
-              <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 space-y-4 animate-fade-in">
-                <div className="flex items-center gap-2 mb-2">
-                    <CheckCircle2 size={16} className="text-emerald-600" />
-                    <p className="text-xs font-bold text-slate-600 uppercase tracking-wide">Plan Selection</p>
+                <div className="bg-emerald-50 dark:bg-emerald-900/20 p-3 rounded-lg border border-emerald-100 dark:border-emerald-800 text-center animate-fade-in">
+                    <p className="text-xs font-bold text-emerald-800 dark:text-emerald-400 uppercase tracking-wide mb-1">
+                        Free Demo Included
+                    </p>
+                    <p className="text-sm text-emerald-700 dark:text-emerald-300">
+                        Get instant full access (10 Queries). <br/>
+                        Upgrade to Pro+ for ₹24,999/mo later.
+                    </p>
                 </div>
-                
-                <div className="grid grid-cols-1 gap-4">
-                     <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-500">Role</label>
-                        <select 
-                            value={role} 
-                            onChange={e => setRole(e.target.value as UserRole)}
-                            className="w-full text-sm p-2.5 rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
-                        >
-                            <option value={UserRole.OWNER}>Owner</option>
-                            <option value={UserRole.ADMIN}>Admin</option>
-                            <option value={UserRole.SUPER_ADMIN}>Super Admin</option>
-                        </select>
-                    </div>
-                    <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-500">Plan</label>
-                        <select 
-                            value={plan} 
-                            onChange={e => setPlan(e.target.value as PlanType)}
-                            className="w-full text-sm p-2.5 rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-emerald-500 outline-none"
-                        >
-                            <option value={PlanType.FREE}>Basic (1 Free Query, then ₹199)</option>
-                            <option value={PlanType.PRO}>Pro (₹9,999/mo)</option>
-                            <option value={PlanType.PRO_PLUS}>Pro+ (₹24,999/mo)</option>
-                        </select>
-                    </div>
-                </div>
-              </div>
             )}
 
             <button 
               type="submit" 
               disabled={loading}
-              className="w-full py-3.5 bg-slate-900 text-white font-bold rounded-lg hover:bg-slate-800 active:transform active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-lg shadow-slate-900/20 disabled:opacity-70 disabled:cursor-not-allowed"
+              className="w-full py-3.5 bg-slate-900 dark:bg-emerald-600 text-white font-bold rounded-lg hover:bg-slate-800 dark:hover:bg-emerald-700 active:transform active:scale-[0.98] transition-all flex items-center justify-center gap-2 shadow-lg shadow-slate-900/20 disabled:opacity-70 disabled:cursor-not-allowed"
             >
               {loading ? 'Processing...' : (
                 mode === 'login' ? 'Login' : 
-                mode === 'signup' ? 'Create Account' : 
+                mode === 'signup' ? 'Start Free Demo' : 
                 'Send Reset Link'
               )} 
               {!loading && (mode === 'forgot' ? <Mail size={18} /> : <ArrowRight size={18} />)}
@@ -285,22 +327,22 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
           </form>
         )}
 
-        <div className="p-6 text-center bg-slate-50 border-t border-slate-100">
+        <div className="p-6 text-center bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800">
             {mode === 'forgot' ? (
                <button 
                   onClick={() => switchMode('login')}
-                  className="text-sm text-slate-600 hover:text-slate-900 font-medium flex items-center justify-center gap-2 mx-auto"
+                  className="text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium flex items-center justify-center gap-2 mx-auto"
                >
                   <ArrowLeft size={16} /> Back to Login
                </button>
             ) : (
-              <p className="text-sm text-slate-600">
+              <p className="text-sm text-slate-600 dark:text-slate-400">
                 {mode === 'login' ? "Don't have an account?" : "Already have an account?"} 
                 <button 
                     onClick={() => switchMode(mode === 'login' ? 'signup' : 'login')} 
-                    className="ml-1 text-emerald-600 font-bold hover:text-emerald-700 transition-colors"
+                    className="ml-1 text-emerald-600 dark:text-emerald-400 font-bold hover:text-emerald-700 transition-colors"
                 >
-                    {mode === 'login' ? 'Sign Up' : 'Login'}
+                    {mode === 'login' ? 'Start Demo' : 'Login'}
                 </button>
               </p>
             )}
@@ -308,28 +350,28 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
 
         {/* Quick Access Helper */}
         {mode === 'login' && (
-          <div className="bg-white p-4 border-t border-slate-100">
+          <div className="bg-white dark:bg-slate-900 p-4 border-t border-slate-100 dark:border-slate-800">
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide text-center mb-3">
               Quick Demo Access
             </p>
             <div className="flex gap-2 justify-center">
               <button 
                 onClick={() => fillCredentials('owner')}
-                className="px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-xs font-medium text-slate-600 transition-colors flex items-center gap-1.5"
+                className="px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-medium text-slate-600 dark:text-slate-300 transition-colors flex items-center gap-1.5"
               >
-                <UserIcon size={12} /> Owner
+                <UserIcon size={12} /> F&B Entrepreneur
               </button>
               <button 
                 onClick={() => fillCredentials('admin')}
-                className="px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-xs font-medium text-slate-600 transition-colors flex items-center gap-1.5"
+                className="px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-medium text-slate-600 dark:text-slate-300 transition-colors flex items-center gap-1.5"
               >
                 <Shield size={12} /> Admin
               </button>
               <button 
                 onClick={() => fillCredentials('super')}
-                className="px-3 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-xs font-medium text-slate-600 transition-colors flex items-center gap-1.5 border border-slate-200"
+                className="px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-medium text-slate-600 dark:text-slate-300 transition-colors flex items-center gap-1.5 border border-slate-200 dark:border-slate-700"
               >
-                <ShieldCheck size={12} className="text-emerald-600" /> Super Admin
+                <ShieldCheck size={12} className="text-emerald-600 dark:text-emerald-400" /> Super Admin
               </button>
             </div>
           </div>
