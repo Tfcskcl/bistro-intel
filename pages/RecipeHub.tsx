@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { PLANS } from '../constants';
 import { generateRecipeCard, generateRecipeVariation } from '../services/geminiService';
@@ -419,4 +420,115 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                 key={variant}
                                 onClick={() => handleVariation(variant)}
                                 disabled={loading}
-                                className="px-3 py-1 text-xs font-medium bg-slate-50 text-slate-6
+                                className="px-3 py-1 text-xs font-medium bg-slate-50 text-slate-600 border border-slate-200 rounded-full hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 transition-colors disabled:opacity-50"
+                                >
+                                    {variant}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                </div>
+                </div>
+
+                {/* Content Area - Generator Output */}
+                <div className="flex-1 overflow-y-auto p-6 bg-slate-50 custom-scrollbar">
+                    {loading ? (
+                        <div className="h-full flex flex-col items-center justify-center text-slate-400 animate-pulse">
+                            <Loader2 size={48} className="mb-4 animate-spin text-emerald-600" />
+                            <p className="text-lg font-medium">{loadingText}</p>
+                        </div>
+                    ) : generatedRecipe ? (
+                        <div className="max-w-3xl mx-auto bg-white p-8 rounded-xl shadow-sm border border-slate-200 space-y-8 animate-fade-in">
+                           {/* Food Cost & Pricing High Level */}
+                           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div>
+                                    <h3 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
+                                        <Scale size={18} className="text-emerald-600"/> Ingredients ({generatedRecipe.yield} servings)
+                                    </h3>
+                                    <ul className="space-y-2 text-sm text-slate-700">
+                                        {generatedRecipe.ingredients.map((ing, i) => (
+                                            <li key={i} className="flex justify-between border-b border-slate-50 pb-1 last:border-0">
+                                                <span>{ing.qty_per_serving} {ing.unit} {ing.name}</span>
+                                                <span className="text-slate-400">₹{ing.cost_per_serving?.toFixed(2) || '0.00'}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                    <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between font-bold text-slate-800">
+                                        <span>Total Food Cost (Per Serving)</span>
+                                        <span>₹{generatedRecipe.food_cost_per_serving}</span>
+                                    </div>
+                                </div>
+                                <div>
+                                     <h3 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
+                                        <Zap size={18} className="text-yellow-500"/> Smart Costing
+                                    </h3>
+                                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3">
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-slate-600">Suggested Sell Price</span>
+                                            <span className="font-bold text-slate-900 text-lg">₹{generatedRecipe.suggested_selling_price}</span>
+                                        </div>
+                                        <div className="flex justify-between text-sm">
+                                            <span className="text-slate-600">Est. Margin</span>
+                                            <span className="font-bold text-emerald-600">
+                                                {generatedRecipe.suggested_selling_price > 0 
+                                                    ? ((1 - (generatedRecipe.food_cost_per_serving / generatedRecipe.suggested_selling_price)) * 100).toFixed(1)
+                                                    : '0.0'}%
+                                            </span>
+                                        </div>
+                                         <div className="pt-2 mt-2 border-t border-slate-200 text-xs text-slate-500 italic">
+                                            "{generatedRecipe.human_summary}"
+                                        </div>
+                                    </div>
+                                    {generatedRecipe.reasoning && (
+                                        <div className="mt-4 p-3 bg-blue-50 text-blue-800 text-xs rounded-lg border border-blue-100">
+                                            <strong>AI Logic:</strong> {generatedRecipe.reasoning}
+                                        </div>
+                                    )}
+                                </div>
+                           </div>
+
+                           {/* Instructions */}
+                           <div>
+                                <h3 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
+                                    <ChefHat size={18} className="text-slate-600"/> Preparation
+                                </h3>
+                                <ol className="list-decimal pl-5 space-y-3 text-sm text-slate-700">
+                                    {generatedRecipe.preparation_steps.map((step, i) => (
+                                        <li key={i} className="pl-2 leading-relaxed">{step}</li>
+                                    ))}
+                                </ol>
+                           </div>
+
+                           <div className="grid grid-cols-2 gap-6 pt-4 border-t border-slate-100">
+                               <div>
+                                    <span className="text-xs font-bold text-slate-400 uppercase block mb-2">Allergens</span>
+                                    <div className="flex flex-wrap gap-2">
+                                        {generatedRecipe.allergens && generatedRecipe.allergens.length > 0 ? generatedRecipe.allergens.map(a => (
+                                            <span key={a} className="px-2 py-1 bg-red-50 text-red-600 rounded-md text-xs font-medium border border-red-100">{a}</span>
+                                        )) : <span className="text-xs text-slate-400">None detected</span>}
+                                    </div>
+                               </div>
+                               <div>
+                                   <span className="text-xs font-bold text-slate-400 uppercase block mb-2">Equipment Needed</span>
+                                   <div className="flex flex-wrap gap-2">
+                                        {generatedRecipe.equipment_needed && generatedRecipe.equipment_needed.length > 0 ? generatedRecipe.equipment_needed.map(e => (
+                                            <span key={e} className="px-2 py-1 bg-slate-100 text-slate-600 rounded-md text-xs font-medium border border-slate-200">{e}</span>
+                                        )) : <span className="text-xs text-slate-400">Standard Kitchen Kit</span>}
+                                    </div>
+                               </div>
+                           </div>
+                        </div>
+                    ) : (
+                        <div className="h-full flex flex-col items-center justify-center text-slate-400 opacity-60">
+                             <ChefHat size={64} className="mb-4 text-slate-300" />
+                             <p>Select an item from the menu to generate a recipe card</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+            )}
+        </div>
+      </div>
+    </div>
+  );
+};

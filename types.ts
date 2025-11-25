@@ -2,7 +2,8 @@
 export interface Ingredient {
   ingredient_id: string;
   name: string;
-  qty: string;
+  qty?: string;
+  qty_per_serving?: number;
   cost_per_unit?: number;
   unit?: string;
   cost_per_serving?: number;
