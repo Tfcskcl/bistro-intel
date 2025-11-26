@@ -144,20 +144,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           // Initial Load
           updateTrackingData();
 
-          // Simulate Live Updates
-          const interval = setInterval(() => {
-              updateTrackingData();
-              
-              // Randomly trigger a "New Visitor" notification (only on overview)
-              if (activeTab === 'overview' && Math.random() > 0.8) {
-                  const locs = ['Mumbai', 'Delhi', 'Bangalore', 'Pune', 'New York', 'London'];
-                  const loc = locs[Math.floor(Math.random() * locs.length)];
-                  setLiveNotification({ msg: 'New visitor landed on Landing Page', loc });
-                  setTimeout(() => setLiveNotification(null), 4000);
-              }
-          }, 5000);
-
-          return () => clearInterval(interval);
+          // Removed Mock Data Simulation Interval
       }, [activeTab]);
 
       const updateTrackingData = () => {
@@ -578,37 +565,43 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                                        {liveVisitors.slice(0, 8).map((visitor, i) => (
-                                            <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                                <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-200">
-                                                    {visitor.userName || 'Guest'}
-                                                    {visitor.userId && <span className="block text-[10px] text-slate-400 font-mono">{visitor.userId}</span>}
-                                                </td>
-                                                <td className="px-6 py-4 text-slate-600 dark:text-slate-400">
-                                                    <div className="flex items-center gap-1.5">
-                                                        <MapPin size={14} className="text-slate-400" />
-                                                        {visitor.location}
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4">
-                                                    <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2 py-1 rounded text-xs border border-slate-200 dark:border-slate-700">
-                                                        {visitor.pagesVisited[visitor.pagesVisited.length - 1]}
-                                                    </span>
-                                                </td>
-                                                <td className="px-6 py-4 text-slate-500 dark:text-slate-400 text-xs">{visitor.device}</td>
-                                                <td className="px-6 py-4">
-                                                    {visitor.isOnline ? (
-                                                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                                                            <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div> Online
-                                                        </span>
-                                                    ) : (
-                                                        <span className="inline-flex items-center gap-1.5 text-xs text-slate-400">
-                                                            <div className="w-1.5 h-1.5 bg-slate-300 rounded-full"></div> Away
-                                                        </span>
-                                                    )}
-                                                </td>
+                                        {liveVisitors.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={5} className="px-6 py-8 text-center text-slate-500">No active visitors.</td>
                                             </tr>
-                                        ))}
+                                        ) : (
+                                            liveVisitors.slice(0, 8).map((visitor, i) => (
+                                                <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                                    <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-200">
+                                                        {visitor.userName || 'Guest'}
+                                                        {visitor.userId && <span className="block text-[10px] text-slate-400 font-mono">{visitor.userId}</span>}
+                                                    </td>
+                                                    <td className="px-6 py-4 text-slate-600 dark:text-slate-400">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <MapPin size={14} className="text-slate-400" />
+                                                            {visitor.location}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2 py-1 rounded text-xs border border-slate-200 dark:border-slate-700">
+                                                            {visitor.pagesVisited[visitor.pagesVisited.length - 1]}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-slate-500 dark:text-slate-400 text-xs">{visitor.device}</td>
+                                                    <td className="px-6 py-4">
+                                                        {visitor.isOnline ? (
+                                                            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                                                                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div> Online
+                                                            </span>
+                                                        ) : (
+                                                            <span className="inline-flex items-center gap-1.5 text-xs text-slate-400">
+                                                                <div className="w-1.5 h-1.5 bg-slate-300 rounded-full"></div> Away
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
                                     </tbody>
                                 </table>
                             </div>
