@@ -110,6 +110,21 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       }
   };
 
+  const handleTabChange = (mode: 'generator' | 'saved' | 'requests') => {
+      setViewMode(mode);
+      // Clear errors on tab switch
+      setError(null);
+      
+      if (mode === 'generator') {
+          // Explicitly clear active request so Admin isn't stuck in "Fulfillment" mode
+          setActiveRequest(null);
+          setGeneratedRecipe(null);
+          setSelectedSku(null);
+          setCustomItemName('');
+          setPosPushStatus(null);
+      }
+  };
+
   // 1. Open Form from List
   const handleGenerateClick = (item: MenuItem) => {
       if (!isAdmin && limitReached) return; 
@@ -187,24 +202,27 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       }
       
       alert("Request received! Our culinary team will review and generate this recipe within 1 hour.");
-      setViewMode('requests'); // Switch to request view
+      handleTabChange('requests');
   };
 
   const runAdminGeneration = async (item: MenuItem, requirements: string) => {
+      // Ensure UI enters "viewing" mode immediately
+      setSelectedSku(item.sku_id);
       setLoading(true);
       setLoadingText(`Designing ${item.name}...`);
       setGeneratedRecipe(null);
-      setSelectedSku(item.sku_id);
       setPosPushStatus(null);
       setSelectedRestaurantId('');
+      setError(null);
 
       try {
           // If fulfilling a request, use the requester's ID for ingredient context
           const contextUserId = activeRequest ? activeRequest.userId : user.id;
           const card = await generateRecipeCard(contextUserId, item, requirements);
           setGeneratedRecipe(card);
-      } catch (e) {
-          setError("Failed to generate recipe card. Please check your inputs.");
+      } catch (e: any) {
+          console.error(e);
+          setError(e.message || "Failed to generate recipe card. Please check your inputs or API key.");
       } finally {
           setLoading(false);
       }
@@ -214,6 +232,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
   const handleFulfillRequest = (req: RecipeRequest) => {
       setActiveRequest(req);
       setViewMode('generator');
+      setSelectedSku(req.item.sku_id);
       // Trigger generation immediately
       runAdminGeneration(req.item, req.requirements);
   };
@@ -284,7 +303,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
             refreshRequests();
             setActiveRequest(null);
             setImportStatus(`Sent to ${activeRequest.userName}!`);
-            setViewMode('requests');
+            handleTabChange('requests');
             setGeneratedRecipe(null);
         } else {
             // Regular Save
@@ -312,7 +331,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       setError(null);
       setSelectedRestaurantId('');
       if (isAdmin && activeRequest) {
-          setViewMode('requests');
+          handleTabChange('requests');
           setActiveRequest(null);
       }
   };
@@ -459,20 +478,20 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       <div className="flex justify-between items-center">
         <div className="flex gap-2">
             <button 
-                onClick={() => setViewMode('generator')}
+                onClick={() => handleTabChange('generator')}
                 className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${viewMode === 'generator' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`}
             >
                 {isAdmin ? (activeRequest ? 'Fulfilling Request' : 'AI Generator') : 'Request Recipe'}
             </button>
             <button 
-                onClick={() => setViewMode('saved')}
+                onClick={() => handleTabChange('saved')}
                 className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${viewMode === 'saved' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`}
             >
                 Saved Library ({savedRecipes.length})
             </button>
             
             <button 
-                onClick={() => setViewMode('requests')}
+                onClick={() => handleTabChange('requests')}
                 className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-2 ${viewMode === 'requests' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`}
             >
                 {isAdmin ? (
@@ -566,7 +585,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                               <button 
                                 onClick={() => {
                                     setGeneratedRecipe(recipe);
-                                    setViewMode('generator');
+                                    handleTabChange('generator');
                                     setSelectedSku(recipe.sku_id);
                                 }}
                                 className="w-full mt-3 py-2 text-xs font-bold text-slate-600 border border-slate-200 rounded hover:bg-slate-50"
@@ -684,100 +703,115 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
             <div className="h-full flex flex-col">
                 {/* Header */}
                 <div className={`p-6 border-b border-slate-200 ${isAdmin && activeRequest ? 'bg-yellow-50' : 'bg-white'}`}>
-                <div className="flex justify-between items-start">
-                    <div>
-                        <h2 className="text-2xl font-bold text-slate-800">
-                            {generatedRecipe ? generatedRecipe.name : (menuItems.find(m => m.sku_id === selectedSku)?.name || customItemName || 'New Recipe')}
-                        </h2>
-                        {activeRequest && (
-                             <p className="text-xs text-yellow-700 font-bold flex items-center gap-1 mt-1">
-                                 <UserCheck size={12} /> Fulfilling request for: {activeRequest.userName}
-                             </p>
-                        )}
-                    </div>
-                    {generatedRecipe && (
-                         <div className="flex gap-2 flex-col items-end">
-                             {/* Restaurant Selection Dropdown (Only for regular generation, not fulfillment) */}
-                             {!activeRequest && (
-                                 <div className="flex items-center gap-2 mb-1">
-                                    <Building2 size={16} className="text-slate-400" />
-                                    <select 
-                                        value={selectedRestaurantId}
-                                        onChange={(e) => setSelectedRestaurantId(e.target.value)}
-                                        className="text-xs p-1.5 border border-slate-200 rounded-md bg-slate-50 text-slate-600 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                                    >
-                                        <option value="">Select Restaurant / Outlet</option>
-                                        {restaurants.map(r => (
-                                            <option key={r.id} value={r.id}>{r.restaurantName || r.name}</option>
-                                        ))}
-                                    </select>
-                                 </div>
-                             )}
-
-                             <div className="flex gap-2">
-                                <button
-                                    onClick={handleDiscard}
-                                    disabled={isSaving || isPushing}
-                                    className="text-sm font-bold text-red-600 hover:text-red-700 flex items-center gap-1 border border-red-200 px-3 py-1.5 rounded hover:bg-red-50 transition-colors disabled:opacity-50"
-                                >
-                                    <Trash2 size={16} /> Discard
-                                </button>
-
-                                {posPushStatus ? (
-                                    <span className="text-xs font-bold text-amber-600 bg-amber-50 px-3 py-1.5 rounded border border-amber-200 flex items-center gap-1">
-                                        <Clock size={12} /> {posPushStatus}
-                                    </span>
-                                ) : (
-                                    <button 
-                                        onClick={handlePushToPOS}
-                                        disabled={isPushing}
-                                        className="text-sm font-bold text-slate-600 hover:text-blue-600 flex items-center gap-1 border border-slate-200 px-3 py-1.5 rounded hover:border-blue-200 transition-colors disabled:opacity-50"
-                                    >
-                                        {isPushing ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
-                                        {isPushing ? 'Pushing...' : 'Push to POS'}
-                                    </button>
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <h2 className="text-2xl font-bold text-slate-800">
+                                {generatedRecipe ? generatedRecipe.name : (menuItems.find(m => m.sku_id === selectedSku)?.name || customItemName || 'New Recipe')}
+                            </h2>
+                            {activeRequest && (
+                                <p className="text-xs text-yellow-700 font-bold flex items-center gap-1 mt-1">
+                                    <UserCheck size={12} /> Fulfilling request for: {activeRequest.userName}
+                                </p>
+                            )}
+                        </div>
+                        {generatedRecipe && (
+                            <div className="flex gap-2 flex-col items-end">
+                                {/* Restaurant Selection Dropdown (Only for regular generation, not fulfillment) */}
+                                {!activeRequest && (
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <Building2 size={16} className="text-slate-400" />
+                                        <select 
+                                            value={selectedRestaurantId}
+                                            onChange={(e) => setSelectedRestaurantId(e.target.value)}
+                                            className="text-xs p-1.5 border border-slate-200 rounded-md bg-slate-50 text-slate-600 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                                        >
+                                            <option value="">Select Restaurant / Outlet</option>
+                                            {restaurants.map(r => (
+                                                <option key={r.id} value={r.id}>{r.restaurantName || r.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 )}
-                                <button 
-                                    onClick={handleSaveRecipe}
-                                    disabled={isSaving}
-                                    className="text-sm font-bold text-slate-600 hover:text-emerald-600 flex items-center gap-1 border border-slate-200 px-3 py-1.5 rounded hover:border-emerald-200 transition-colors disabled:opacity-50"
-                                    title={activeRequest ? "Send to User" : selectedRestaurantId ? "Send to Restaurant Database" : "Save to Library"}
-                                >
-                                    {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                                    {isSaving ? 'Saving...' : activeRequest ? 'Send to User' : selectedRestaurantId ? 'Send to DB' : 'Save'}
-                                </button>
-                             </div>
-                         </div>
-                    )}
-                </div>
-                <div className="flex flex-col gap-2 mt-2">
-                    <div className="flex gap-4">
-                        {loading && <span className="flex items-center text-sm text-emerald-600"><Loader2 className="animate-spin mr-2" size={16}/> {loadingText}</span>}
-                        {generatedRecipe && !loading && (
-                        <span className="flex items-center text-sm text-slate-500">
-                            <Clock size={16} className="mr-1"/> {generatedRecipe.prep_time_min} mins
-                        </span>
+
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={handleDiscard}
+                                        disabled={isSaving || isPushing}
+                                        className="text-sm font-bold text-red-600 hover:text-red-700 flex items-center gap-1 border border-red-200 px-3 py-1.5 rounded hover:bg-red-50 transition-colors disabled:opacity-50"
+                                    >
+                                        <Trash2 size={16} /> Discard
+                                    </button>
+
+                                    {posPushStatus ? (
+                                        <span className="text-xs font-bold text-amber-600 bg-amber-50 px-3 py-1.5 rounded border border-amber-200 flex items-center gap-1">
+                                            <Clock size={12} /> {posPushStatus}
+                                        </span>
+                                    ) : (
+                                        <button 
+                                            onClick={handlePushToPOS}
+                                            disabled={isPushing}
+                                            className="text-sm font-bold text-slate-600 hover:text-blue-600 flex items-center gap-1 border border-slate-200 px-3 py-1.5 rounded hover:border-blue-200 transition-colors disabled:opacity-50"
+                                        >
+                                            {isPushing ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+                                            {isPushing ? 'Pushing...' : 'Push to POS'}
+                                        </button>
+                                    )}
+                                    <button 
+                                        onClick={handleSaveRecipe}
+                                        disabled={isSaving}
+                                        className="text-sm font-bold text-slate-600 hover:text-emerald-600 flex items-center gap-1 border border-slate-200 px-3 py-1.5 rounded hover:border-emerald-200 transition-colors disabled:opacity-50"
+                                        title={activeRequest ? "Send to User" : selectedRestaurantId ? "Send to Restaurant Database" : "Save to Library"}
+                                    >
+                                        {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                                        {isSaving ? 'Saving...' : activeRequest ? 'Send to User' : selectedRestaurantId ? 'Send to DB' : 'Save'}
+                                    </button>
+                                </div>
+                            </div>
                         )}
                     </div>
 
-                    {generatedRecipe && !loading && (
-                        <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
-                            <span className="text-xs font-bold text-slate-400 uppercase tracking-wide py-1.5 flex items-center gap-1">
-                                <Sparkles size={12} /> Variations:
-                            </span>
-                            {['Vegan', 'Gluten-Free', 'Keto', 'Low Calorie'].map((variant) => (
-                                <button
-                                key={variant}
-                                onClick={() => handleVariation(variant)}
-                                disabled={loading}
-                                className="px-3 py-1 text-xs font-medium bg-slate-50 text-slate-600 border border-slate-200 rounded-full hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 transition-colors disabled:opacity-50"
-                                >
-                                    {variant}
-                                </button>
-                            ))}
+                    {/* Error Banner */}
+                    {error && (
+                        <div className="mt-4 p-4 bg-red-50 text-red-700 border border-red-200 rounded-lg flex items-start gap-3 animate-fade-in shadow-sm">
+                            <AlertCircle size={20} className="shrink-0 mt-0.5" />
+                            <div className="flex-1">
+                                <h4 className="font-bold text-sm">Generation Failed</h4>
+                                <p className="text-xs mt-1">{error}</p>
+                            </div>
+                            <button onClick={() => setError(null)} className="p-1 hover:bg-red-100 rounded text-red-500">
+                                <X size={16} />
+                            </button>
                         </div>
                     )}
-                </div>
+
+                    <div className="flex flex-col gap-2 mt-2">
+                        <div className="flex gap-4">
+                            {loading && <span className="flex items-center text-sm text-emerald-600"><Loader2 className="animate-spin mr-2" size={16}/> {loadingText}</span>}
+                            {generatedRecipe && !loading && (
+                            <span className="flex items-center text-sm text-slate-500">
+                                <Clock size={16} className="mr-1"/> {generatedRecipe.prep_time_min} mins
+                            </span>
+                            )}
+                        </div>
+
+                        {generatedRecipe && !loading && (
+                            <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
+                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wide py-1.5 flex items-center gap-1">
+                                    <Sparkles size={12} /> Variations:
+                                </span>
+                                {['Vegan', 'Gluten-Free', 'Keto', 'Low Calorie'].map((variant) => (
+                                    <button
+                                    key={variant}
+                                    onClick={() => handleVariation(variant)}
+                                    disabled={loading}
+                                    className="px-3 py-1 text-xs font-medium bg-slate-50 text-slate-600 border border-slate-200 rounded-full hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 transition-colors disabled:opacity-50"
+                                    >
+                                        {variant}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {/* Content Area - Generator Output */}
