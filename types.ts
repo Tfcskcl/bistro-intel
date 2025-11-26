@@ -1,4 +1,5 @@
 
+
 export interface Ingredient {
   ingredient_id: string;
   name: string;
@@ -148,6 +149,7 @@ export enum AppView {
   RECIPES = 'RECIPES',
   SOP = 'SOP',
   STRATEGY = 'STRATEGY',
+  VIDEO = 'VIDEO',
   INTEGRATIONS = 'INTEGRATIONS',
   BILLING = 'BILLING'
 }

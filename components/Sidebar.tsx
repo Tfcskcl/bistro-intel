@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { LayoutDashboard, ChefHat, FileText, TrendingUp, Database, CreditCard, LogOut } from 'lucide-react';
+import { LayoutDashboard, ChefHat, FileText, TrendingUp, Database, CreditCard, LogOut, Clapperboard } from 'lucide-react';
 import { AppView, User, PlanType, UserRole } from '../types';
 import { Logo } from './Logo';
 
@@ -25,6 +25,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
     { id: AppView.INTEGRATIONS, label: 'Data & Integrations', icon: Database, allowedRoles: [UserRole.OWNER, UserRole.SUPER_ADMIN, UserRole.ADMIN] },
     { id: AppView.RECIPES, label: 'Recipe & Costing', icon: ChefHat, allowedRoles: [UserRole.OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN] },
     { id: AppView.SOP, label: 'SOP Studio', icon: FileText, allowedRoles: [UserRole.OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN] },
+    { id: AppView.VIDEO, label: 'Marketing Studio', icon: Clapperboard, allowedRoles: [UserRole.OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN] },
     { id: AppView.STRATEGY, label: 'Strategy AI', icon: TrendingUp, requiredPlan: PlanType.PRO_PLUS, allowedRoles: [UserRole.OWNER, UserRole.SUPER_ADMIN] },
     { id: AppView.BILLING, label: 'Plans & Billing', icon: CreditCard, allowedRoles: [UserRole.OWNER] },
   ];

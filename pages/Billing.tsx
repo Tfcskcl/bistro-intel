@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { PlanType, User, PlanConfig } from '../types';
-import { Check, Star, Loader2, ShieldCheck, Zap, ArrowDown, ArrowUp, AlertCircle, X } from 'lucide-react';
+import { Check, Star, Loader2, ShieldCheck, Zap, ArrowDown, ArrowUp, AlertCircle, X, CreditCard, Calendar, Clock, FileText, Download, Smartphone, CheckCircle2 } from 'lucide-react';
 import { paymentService } from '../services/paymentService';
 import { trackingService } from '../services/trackingService';
 import { storageService } from '../services/storageService';
@@ -21,6 +21,7 @@ export const Billing: React.FC<BillingProps> = ({ user, onUpgrade }) => {
   const [processingPlan, setProcessingPlan] = useState<PlanType | null>(null);
   const [isQuarterly, setIsQuarterly] = useState(false);
   const [currentPlans, setCurrentPlans] = useState<Record<PlanType, PlanConfig> | null>(null);
+  const [invoices, setInvoices] = useState<any[]>([]);
 
   // Downgrade Modal State
   const [showDowngradeModal, setShowDowngradeModal] = useState(false);
@@ -28,9 +29,10 @@ export const Billing: React.FC<BillingProps> = ({ user, onUpgrade }) => {
   const [downgradeReason, setDowngradeReason] = useState('');
 
   useEffect(() => {
-    // Load dynamic plans
+    // Load dynamic plans & invoices
     setCurrentPlans(storageService.getPlans());
-  }, []);
+    setInvoices(storageService.getInvoices(user.id));
+  }, [user.id]);
 
   // Track that user started checkout process (entered billing page)
   useEffect(() => {
@@ -53,11 +55,24 @@ export const Billing: React.FC<BillingProps> = ({ user, onUpgrade }) => {
               price,
               (paymentId) => {
                   console.log(`Payment success: ${paymentId}`);
+                  // Create Invoice Record
+                  storageService.addInvoice(user.id, {
+                      id: paymentId,
+                      date: new Date().toISOString(),
+                      amount: price,
+                      plan: targetPlan,
+                      status: 'Paid',
+                      period: isQuarterly ? 'Quarterly' : 'Monthly'
+                  });
+                  setInvoices(storageService.getInvoices(user.id));
+                  
                   onUpgrade(targetPlan);
                   setProcessingPlan(null);
               },
               (error) => {
-                  alert(error);
+                  if (error !== "Payment process cancelled") {
+                      alert(error);
+                  }
                   setProcessingPlan(null);
               }
           );
@@ -83,10 +98,14 @@ export const Billing: React.FC<BillingProps> = ({ user, onUpgrade }) => {
       }
   };
 
-  if (!currentPlans) return <div className="p-8 text-center">Loading plans...</div>;
+  // Mock Date for Next Billing
+  const nextBillingDate = new Date();
+  nextBillingDate.setDate(nextBillingDate.getDate() + 30);
+
+  if (!currentPlans) return <div className="p-8 text-center text-slate-500 flex flex-col items-center gap-2"><Loader2 className="animate-spin" /> Loading billing...</div>;
 
   return (
-    <div className="space-y-8 animate-fade-in relative">
+    <div className="space-y-8 animate-fade-in relative pb-16">
         
         {/* Downgrade Reason Modal */}
         {showDowngradeModal && (
@@ -243,6 +262,135 @@ export const Billing: React.FC<BillingProps> = ({ user, onUpgrade }) => {
                     </div>
                 );
             })}
+        </div>
+
+        {/* Billing Management Section */}
+        <div className="max-w-6xl mx-auto mt-16 grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Payment Methods & Next Billing */}
+            <div className="lg:col-span-1 space-y-6">
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
+                    <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                        <CreditCard size={20} className="text-emerald-500" /> Payment Methods
+                    </h3>
+                    
+                    <div className="space-y-3">
+                        {/* Credit Card Option */}
+                        <div className="flex items-center gap-3 p-3 border border-emerald-500/50 rounded-lg bg-emerald-50/10 relative">
+                            <div className="w-10 h-8 bg-slate-800 rounded flex items-center justify-center text-white text-[10px] font-bold shadow-sm">
+                                CARD
+                            </div>
+                            <div className="flex-1">
+                                <p className="text-sm font-bold text-slate-700 dark:text-slate-300">Credit / Debit Card</p>
+                                <p className="text-xs text-slate-500">Expires 12/28</p>
+                            </div>
+                            <div className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-white dark:bg-slate-800 px-2 py-1 rounded-full border border-emerald-200 dark:border-emerald-800 shadow-sm">
+                                <CheckCircle2 size={10} /> Active
+                            </div>
+                        </div>
+
+                        {/* UPI Option */}
+                        <div className="flex items-center gap-3 p-3 border border-slate-200 dark:border-slate-700 rounded-lg hover:border-emerald-300 transition-colors cursor-pointer bg-white dark:bg-slate-900 group">
+                            <div className="w-10 h-8 bg-slate-100 dark:bg-slate-800 rounded flex items-center justify-center text-slate-500 dark:text-slate-400 group-hover:text-emerald-600 transition-colors">
+                                <Smartphone size={16} />
+                            </div>
+                            <div className="flex-1">
+                                <p className="text-sm font-bold text-slate-700 dark:text-slate-300">UPI</p>
+                                <p className="text-xs text-slate-500">Google Pay, PhonePe, Paytm</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button 
+                        onClick={() => alert("You can manage payment methods during checkout.")}
+                        className="w-full mt-4 text-xs font-bold text-slate-500 hover:text-slate-700 border border-slate-200 dark:border-slate-700 rounded py-2 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                    >
+                        Manage Payment Methods
+                    </button>
+                </div>
+                
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
+                    <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                        <Calendar size={20} className="text-blue-500" /> Renewal
+                    </h3>
+                    {user.plan === PlanType.FREE ? (
+                         <div className="text-center py-4">
+                             <p className="text-sm font-bold text-slate-700 dark:text-white">Free Forever</p>
+                             <p className="text-xs text-slate-500 mt-1">Upgrade anytime to unlock features.</p>
+                         </div>
+                    ) : (
+                        <>
+                            <div className="flex justify-between items-end mb-2">
+                                <p className="text-sm text-slate-500">Next billing date</p>
+                                <p className="font-bold text-slate-800 dark:text-white">{nextBillingDate.toLocaleDateString()}</p>
+                            </div>
+                            <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 mb-4">
+                                <div className="bg-blue-500 h-2 rounded-full w-[25%]"></div>
+                            </div>
+                            <p className="text-xs text-slate-400">
+                                Your payment method will be charged automatically.
+                            </p>
+                        </>
+                    )}
+                </div>
+            </div>
+
+            {/* Billing History */}
+            <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                        <Clock size={20} className="text-slate-400" /> Billing History
+                    </h3>
+                    <button className="text-xs font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1">
+                        <Download size={12} /> Download All
+                    </button>
+                </div>
+                
+                {invoices.length === 0 ? (
+                    <div className="text-center py-12 text-slate-400 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl">
+                        <FileText size={32} className="mx-auto mb-2 opacity-50" />
+                        <p className="text-sm">No invoices found.</p>
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left">
+                            <thead className="text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 uppercase text-xs font-bold">
+                                <tr>
+                                    <th className="px-4 py-3 rounded-l-lg">Date</th>
+                                    <th className="px-4 py-3">Plan</th>
+                                    <th className="px-4 py-3">Amount</th>
+                                    <th className="px-4 py-3">Status</th>
+                                    <th className="px-4 py-3 rounded-r-lg text-right">Invoice</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                {invoices.map((inv, i) => (
+                                    <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                        <td className="px-4 py-3 font-medium text-slate-800 dark:text-white">
+                                            {new Date(inv.date).toLocaleDateString()}
+                                        </td>
+                                        <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                                            {inv.plan.replace('_', ' ')} <span className="text-xs text-slate-400">({inv.period || 'Monthly'})</span>
+                                        </td>
+                                        <td className="px-4 py-3 font-bold text-slate-800 dark:text-white">
+                                            ₹{inv.amount.toLocaleString()}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-xs font-bold bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400">
+                                                <Check size={10} /> {inv.status}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-3 text-right">
+                                            <button className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-colors">
+                                                <Download size={14} />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
         </div>
         
         <div className="max-w-md mx-auto mt-8 flex items-center justify-center gap-2 text-slate-400 text-xs">

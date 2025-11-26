@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { SYSTEM_INSTRUCTION } from "../constants";
 import { RecipeCard, SOP, StrategyReport, ImplementationGuide, MenuItem } from "../types";
@@ -33,6 +34,33 @@ const parseJSON = <T>(text: string | undefined): T => {
     }
 };
 
+// Helper to format AI errors into user-friendly messages
+const formatError = (error: any): string => {
+    console.error("Gemini API Error:", error);
+    const msg = (error.message || error.toString()).toLowerCase();
+    
+    if (msg.includes('429') || msg.includes('quota') || msg.includes('resource has been exhausted')) {
+        return "AI usage limit reached. Please try again in a moment or check your billing.";
+    }
+    if (msg.includes('401') || msg.includes('api key') || msg.includes('unauthenticated')) {
+        return "Authorization failed. Please check your API Key configuration.";
+    }
+    if (msg.includes('500') || msg.includes('internal')) {
+        return "AI Service is currently experiencing technical issues. Please try again later.";
+    }
+    if (msg.includes('503') || msg.includes('overloaded') || msg.includes('unavailable')) {
+        return "The system is under heavy load. Please retry in a few seconds.";
+    }
+    if (msg.includes('safety') || msg.includes('blocked') || msg.includes('harmful') || msg.includes('candidate')) {
+        return "The request was blocked by safety filters. Please try rephrasing your prompt.";
+    }
+    if (msg.includes('fetch') || msg.includes('network') || msg.includes('failed to fetch')) {
+        return "Network connection error. Please check your internet connection.";
+    }
+    
+    return error.message || "An unexpected error occurred. Please try again.";
+};
+
 export const generateRecipeCard = async (userId: string, item: MenuItem, requirements?: string): Promise<RecipeCard> => {
   const apiKey = getApiKey();
   
@@ -42,13 +70,13 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
     return {
       ...item,
       yield: 4,
-      ingredients: item.ingredients.map(ing => ({
+      ingredients: item.ingredients ? item.ingredients.map(ing => ({
         ...ing,
         qty_per_serving: 100,
         cost_per_unit: 100,
         cost_per_serving: 25,
         unit: ing.unit || 'g'
-      })),
+      })) : [],
       preparation_steps: [
         "Prepare all ingredients and equipment.",
         `Combine ingredients for ${item.name}.`,
@@ -63,7 +91,7 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
       food_cost_per_serving: (item.current_price || 100) * 0.3,
       suggested_selling_price: item.current_price || 300,
       tags: ["Mock Data", "Demo"],
-      human_summary: "This is a simulated recipe because the API Key is missing.",
+      human_summary: "This is a simulated recipe because the API Key is missing. Add an API Key to generate real AI recipes.",
       reasoning: "Mock reasoning for demo purposes.",
       confidence: "High",
       category: item.category,
@@ -117,8 +145,7 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
 
     return parseJSON<RecipeCard>(response.text);
   } catch (error: any) {
-    console.error("Error generating recipe:", error);
-    throw new Error(error.message || "Failed to generate recipe");
+    throw new Error(formatError(error));
   }
 };
 
@@ -169,8 +196,7 @@ export const generateRecipeVariation = async (userId: string, originalRecipe: Re
 
     return parseJSON<RecipeCard>(response.text);
   } catch (error: any) {
-    console.error("Error generating variation:", error);
-    throw new Error(error.message || "Failed to generate variation");
+    throw new Error(formatError(error));
   }
 };
 
@@ -229,8 +255,7 @@ export const generateSOP = async (topic: string): Promise<SOP> => {
 
     return parseJSON<SOP>(response.text);
   } catch (error: any) {
-    console.error("Error generating SOP:", error);
-    throw new Error(error.message || "Failed to generate SOP. Please check API Key.");
+    throw new Error(formatError(error));
   }
 };
 
@@ -296,8 +321,7 @@ export const generateStrategy = async (role: string, context: string): Promise<S
 
     return parseJSON<StrategyReport>(response.text);
   } catch (error: any) {
-    console.error("Error generating strategy:", error);
-    throw new Error(error.message || "Failed to generate strategy");
+    throw new Error(formatError(error));
   }
 };
 
@@ -358,7 +382,52 @@ export const generateImplementationPlan = async (initiative: string): Promise<Im
 
         return parseJSON<ImplementationGuide>(response.text);
     } catch (error: any) {
-        console.error("Error generating plan:", error);
-        throw new Error(error.message || "Failed to generate plan");
+        throw new Error(formatError(error));
     }
+};
+
+export const generateMarketingVideo = async (imageBase64: string, prompt: string, aspectRatio: '16:9' | '9:16'): Promise<string> => {
+  const apiKey = getApiKey();
+  if (!apiKey) {
+      throw new Error("API Key required for video generation");
+  }
+
+  // NOTE: Users must select their own API key via window.aistudio.openSelectKey() in the UI before calling this.
+  const ai = new GoogleGenAI({ apiKey });
+
+  try {
+      let operation = await ai.models.generateVideos({
+          model: 'veo-3.1-fast-generate-preview',
+          prompt: prompt || 'Cinematic food shot', 
+          image: {
+              imageBytes: imageBase64,
+              mimeType: 'image/png', 
+          },
+          config: {
+              numberOfVideos: 1,
+              resolution: '720p',
+              aspectRatio: aspectRatio
+          }
+      });
+
+      // Poll for completion
+      while (!operation.done) {
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          operation = await ai.operations.getVideosOperation({operation: operation});
+      }
+
+      const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
+      
+      if (!downloadLink) {
+          throw new Error("Video generation completed but no URI returned.");
+      }
+
+      // Append API key for fetching the actual bytes
+      const response = await fetch(`${downloadLink}&key=${apiKey}`);
+      const blob = await response.blob();
+      return URL.createObjectURL(blob);
+
+  } catch (error: any) {
+      throw new Error(formatError(error));
+  }
 };

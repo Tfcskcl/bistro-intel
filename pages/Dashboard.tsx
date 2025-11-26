@@ -87,6 +87,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
       const [liveVisitors, setLiveVisitors] = useState<VisitorSession[]>([]);
       const [stats, setStats] = useState({ activeNow: 0, totalVisitsToday: 0, bounceRate: '0%', checkoutDropoff: 0 });
       const [liveNotification, setLiveNotification] = useState<{msg: string, loc: string} | null>(null);
+      const [error, setError] = useState<string | null>(null);
       
       // Journey Modal State
       const [selectedVisitor, setSelectedVisitor] = useState<VisitorSession | null>(null);
@@ -136,15 +137,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
 
       useEffect(() => {
           const fetchUsers = async () => {
-             const users = await authService.getAllUsers();
-             setSubscribers(users);
+             setError(null);
+             try {
+                const users = await authService.getAllUsers();
+                setSubscribers(users);
+             } catch (err: any) {
+                console.error("Failed to fetch users", err);
+                setError("Unable to load user data. Please check your connection.");
+             }
           };
           fetchUsers();
           
           // Initial Load
           updateTrackingData();
-
-          // Removed Mock Data Simulation Interval
       }, [activeTab]);
 
       const updateTrackingData = () => {
@@ -303,6 +308,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
       return (
         <div className="space-y-6 relative">
             <JourneyModal visitor={selectedVisitor} onClose={() => setSelectedVisitor(null)} />
+
+            {/* Error Banner */}
+            {error && (
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/50 p-4 rounded-lg flex items-center gap-3 animate-fade-in">
+                    <AlertTriangle className="text-red-600 dark:text-red-400" size={20} />
+                    <p className="text-red-800 dark:text-red-300 font-medium text-sm">{error}</p>
+                    <button onClick={() => setError(null)} className="ml-auto text-red-600 hover:text-red-800 text-xs font-bold uppercase">Dismiss</button>
+                </div>
+            )}
 
             {/* Create User Modal */}
             {showCreateUserModal && (
@@ -515,10 +529,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                         <StatCard 
                             label="Active Visitors Now" 
                             value={stats.activeNow.toString()} 
-                            trend="Live"
+                            trend="Live View"
                             trendUp={true}
                             icon={Eye} 
                             colorClass="text-emerald-500 bg-emerald-500" 
+                            isLive={true}
                         />
                         <StatCard 
                             label="Checkout Drop-offs" 
@@ -732,6 +747,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
                 </div>
             )}
 
+            {/* ... rest of the component (plans, training tabs) remains the same */}
             {/* --- TAB CONTENT: PLANS --- */}
             {activeTab === 'plans' && (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-fade-in">

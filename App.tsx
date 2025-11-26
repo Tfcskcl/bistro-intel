@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
@@ -5,6 +6,7 @@ import { Dashboard } from './pages/Dashboard';
 import { RecipeHub } from './pages/RecipeHub';
 import { SOPStudio } from './pages/SOPStudio';
 import { Strategy } from './pages/Strategy';
+import { VideoStudio } from './pages/VideoStudio';
 import { Login } from './pages/Login';
 import { Integrations } from './pages/Integrations';
 import { Billing } from './pages/Billing';
@@ -109,6 +111,8 @@ function App() {
             return <SOPStudio user={user} onUserUpdate={onUserUpdate} />;
           case AppView.STRATEGY:
             return <Strategy user={user} onUserUpdate={onUserUpdate} />;
+          case AppView.VIDEO:
+            return <VideoStudio user={user} />;
           case AppView.INTEGRATIONS:
             return <Integrations />;
           case AppView.BILLING:

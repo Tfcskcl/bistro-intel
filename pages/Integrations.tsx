@@ -63,7 +63,7 @@ const POS_CONFIGS: Record<string, {
 
 export const Integrations: React.FC = () => {
   const [integrations, setIntegrations] = useState<IntegrationItem[]>([
-    { id: 'petpooja', name: 'Petpooja', icon: 'P', status: 'connected', lastSync: '10 mins ago' },
+    { id: 'petpooja', name: 'Petpooja', icon: 'P', status: 'disconnected' },
     { id: 'rista', name: 'Rista', icon: 'R', status: 'disconnected' },
     { id: 'posist', name: 'Posist', icon: 'Po', status: 'disconnected' },
     { id: 'urbanpiper', name: 'UrbanPiper', icon: 'U', status: 'disconnected' },

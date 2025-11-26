@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Logo } from '../components/Logo';
-import { ArrowRight, CheckCircle2, TrendingUp, ChefHat, FileText, Zap, BarChart3, ShieldCheck, Mail, Phone, MapPin, X, Star, Users, PlayCircle, Quote } from 'lucide-react';
+import { ArrowRight, CheckCircle2, TrendingUp, ChefHat, FileText, Zap, Star, PlayCircle, Quote, Calculator, Server, BarChart3, ArrowUpRight, DollarSign, Mail, Phone, MapPin, X } from 'lucide-react';
 import { PLANS } from '../constants';
 import { PlanType } from '../types';
 
@@ -103,6 +103,10 @@ const TESTIMONIALS = [
 export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
   const [activeLegal, setActiveLegal] = useState<LegalSection>(null);
   const [showDemo, setShowDemo] = useState(false);
+  
+  // ROI Calculator State
+  const [revenue, setRevenue] = useState(1500000);
+  const annualSavings = (revenue * 12 * 0.12).toLocaleString('en-IN', { maximumFractionDigits: 0 });
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-yellow-200">
@@ -185,7 +189,6 @@ export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
                 <div className="relative bg-slate-800 rounded-2xl p-2 border border-slate-700 shadow-2xl">
                     <img 
                         src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?ixlib=rb-4.0.3&auto=format&fit=crop&w=1600&q=80" 
-                        style={{ backgroundImage: `url('https://images.unsplash.com/photo-1551288049-bebda4e38f71?ixlib=rb-4.0.3&auto=format&fit=crop&w=1600&q=80')` }}
                         alt="Bistro Dashboard" 
                         className="rounded-xl w-full h-auto object-cover opacity-90 hover:opacity-100 transition-opacity"
                         referrerPolicy="no-referrer"
@@ -298,32 +301,176 @@ export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
         </div>
       </section>
 
+      {/* How It Works Section */}
+      <section className="py-20 bg-slate-50 border-t border-slate-200">
+        <div className="max-w-7xl mx-auto px-6">
+            <div className="text-center mb-16">
+                <h2 className="text-3xl font-bold text-slate-900">How BistroIntelligence Works</h2>
+                <p className="text-slate-600 mt-2">Transform your operations in three simple steps.</p>
+            </div>
+            
+            <div className="grid md:grid-cols-3 gap-8 relative">
+                <div className="hidden md:block absolute top-12 left-0 right-0 h-0.5 bg-slate-200 z-0 mx-24"></div>
+                
+                {[
+                    { title: "Connect", desc: "Sync your POS & Inventory", icon: Server },
+                    { title: "Analyze", desc: "AI scans for inefficiencies", icon: BarChart3 },
+                    { title: "Optimize", desc: "Execute profitable strategies", icon: ArrowUpRight }
+                ].map((step, i) => (
+                    <div key={i} className="relative z-10 text-center">
+                        <div className="w-24 h-24 bg-white rounded-full border-4 border-slate-100 flex items-center justify-center mx-auto mb-6 shadow-sm">
+                            <step.icon size={32} className="text-emerald-600" />
+                        </div>
+                        <h3 className="text-xl font-bold text-slate-900 mb-2">{step.title}</h3>
+                        <p className="text-slate-500">{step.desc}</p>
+                    </div>
+                ))}
+            </div>
+        </div>
+      </section>
+
+      {/* Kitchen Visuals Gallery - Updated Images */}
+      <section className="py-20 bg-white">
+        <div className="max-w-7xl mx-auto px-6">
+            <div className="text-center mb-12">
+                <h2 className="text-3xl font-bold text-slate-900">Built for the Heat of the Kitchen</h2>
+                <p className="text-slate-600 mt-2 max-w-2xl mx-auto">
+                    Designed by restaurateurs, for restaurateurs. We understand the chaos of service and the precision required for profitability.
+                </p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-4 grid-rows-2 gap-4 h-[600px]">
+                {/* Large Left Image */}
+                <div className="md:col-span-2 md:row-span-2 relative rounded-2xl overflow-hidden group shadow-lg">
+                    <div className="absolute inset-0 bg-slate-900/20 group-hover:bg-slate-900/0 transition-colors z-10"></div>
+                    <img 
+                        src="https://images.unsplash.com/photo-1559339352-11d035aa65de?auto=format&fit=crop&w=1000&q=80" 
+                        alt="Plated Food" 
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                        referrerPolicy="no-referrer"
+                    />
+                    <div className="absolute bottom-0 left-0 p-6 z-20 bg-gradient-to-t from-black/80 to-transparent w-full">
+                        <p className="text-white font-bold text-lg">Streamlined Workflow</p>
+                        <p className="text-slate-200 text-sm">Orchestrate your team with digital precision.</p>
+                    </div>
+                </div>
+
+                {/* Top Right Small */}
+                <div className="relative rounded-2xl overflow-hidden group shadow-lg">
+                    <img 
+                        src="https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&fit=crop&w=800&q=80" 
+                        alt="Bar service" 
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                        referrerPolicy="no-referrer"
+                    />
+                </div>
+
+                {/* Top Right Small 2 */}
+                <div className="relative rounded-2xl overflow-hidden group shadow-lg">
+                    <img 
+                        src="https://images.unsplash.com/photo-1550989460-0adf9ea622e2?auto=format&fit=crop&w=800&q=80" 
+                        alt="Cafe atmosphere" 
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                        referrerPolicy="no-referrer"
+                    />
+                </div>
+
+                {/* Bottom Wide */}
+                <div className="md:col-span-2 relative rounded-2xl overflow-hidden group shadow-lg">
+                     <div className="absolute inset-0 bg-slate-900/20 group-hover:bg-slate-900/0 transition-colors z-10"></div>
+                    <img 
+                        src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1200&q=80" 
+                        alt="Fresh ingredients" 
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                        referrerPolicy="no-referrer"
+                    />
+                    <div className="absolute bottom-0 left-0 p-6 z-20 bg-gradient-to-t from-black/80 to-transparent w-full">
+                        <p className="text-white font-bold text-lg">Inventory Control</p>
+                        <p className="text-slate-200 text-sm">Track every gram, reducing waste and boosting margin.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+      </section>
+
+      {/* ROI Calculator */}
+      <section className="py-20 bg-slate-900 text-white">
+        <div className="max-w-7xl mx-auto px-6 grid md:grid-cols-2 gap-16 items-center">
+            <div>
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold uppercase mb-6">
+                    <Calculator size={14} /> Profit Simulator
+                </div>
+                <h2 className="text-3xl font-bold mb-4">See your potential savings</h2>
+                <p className="text-slate-400 text-lg mb-8">
+                    Based on our average user data, BistroIntel helps restaurants reduce food costs by ~5-8% and operational waste by ~10%.
+                </p>
+                
+                <div className="space-y-6">
+                    <div>
+                        <div className="flex justify-between text-sm font-bold mb-2">
+                            <span>Monthly Revenue</span>
+                            <span className="text-emerald-400">₹{revenue.toLocaleString()}</span>
+                        </div>
+                        <input 
+                            type="range" 
+                            min="500000" 
+                            max="5000000" 
+                            step="100000"
+                            value={revenue}
+                            onChange={(e) => setRevenue(parseInt(e.target.value))}
+                            className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                        />
+                        <div className="flex justify-between text-xs text-slate-500 mt-2">
+                            <span>₹5L</span>
+                            <span>₹50L+</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div className="bg-slate-800 p-8 rounded-2xl border border-slate-700 relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-32 bg-emerald-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+                <h3 className="text-slate-400 font-medium mb-2">Estimated Annual Savings</h3>
+                <div className="text-5xl font-bold text-white mb-2 flex items-baseline gap-2">
+                    ₹{annualSavings}
+                    <span className="text-lg text-emerald-400 font-medium">*</span>
+                </div>
+                <p className="text-sm text-slate-500 mb-8">* Projected based on 12% margin improvement.</p>
+                <button 
+                    onClick={onGetStarted}
+                    className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-white font-bold rounded-xl transition-all"
+                >
+                    Unlock My Savings
+                </button>
+            </div>
+        </div>
+      </section>
+
       {/* Social Proof / Wall of Love */}
-      <section className="py-24 bg-slate-900 text-white relative">
-          <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')]"></div>
+      <section className="py-24 bg-white text-slate-900 relative">
           <div className="max-w-7xl mx-auto px-6 relative z-10">
               <div className="text-center mb-16">
                    <div className="mb-4 flex justify-center">
                         {[1,2,3,4,5].map(i => <Star key={i} size={24} className="text-yellow-400 fill-yellow-400" />)}
                    </div>
                    <h2 className="text-4xl font-bold mb-4">Loved by Restaurateurs Across India</h2>
-                   <p className="text-slate-400 text-lg">Join hundreds of businesses transforming their operations.</p>
+                   <p className="text-slate-500 text-lg">Join hundreds of businesses transforming their operations.</p>
               </div>
 
               <div className="grid md:grid-cols-3 gap-8">
                   {TESTIMONIALS.map((t, i) => (
-                      <div key={i} className="bg-slate-800 p-8 rounded-2xl border border-slate-700 hover:border-slate-600 transition-colors">
-                          <Quote className="text-yellow-400 mb-6 opacity-50" size={32} />
-                          <p className="text-lg text-slate-300 mb-8 leading-relaxed italic">
+                      <div key={i} className="bg-slate-50 p-8 rounded-2xl border border-slate-200 hover:border-slate-300 transition-colors">
+                          <Quote className="text-yellow-500 mb-6 opacity-50" size={32} />
+                          <p className="text-lg text-slate-600 mb-8 leading-relaxed italic">
                               "{t.quote}"
                           </p>
                           <div className="flex items-center gap-4">
-                              <div className="w-12 h-12 rounded-full border-2 border-yellow-400/50 overflow-hidden shrink-0">
+                              <div className="w-12 h-12 rounded-full border-2 border-white shadow-sm overflow-hidden shrink-0">
                                   <img src={t.image} alt={t.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                               </div>
                               <div>
-                                  <p className="font-bold text-white">{t.name}</p>
-                                  <p className="text-emerald-400 text-sm">{t.role}</p>
+                                  <p className="font-bold text-slate-900">{t.name}</p>
+                                  <p className="text-emerald-600 text-sm">{t.role}</p>
                               </div>
                           </div>
                       </div>
@@ -333,7 +480,7 @@ export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
       </section>
 
       {/* Pricing */}
-      <section className="py-24 bg-slate-50">
+      <section className="py-24 bg-slate-50 border-t border-slate-200">
           <div className="max-w-7xl mx-auto px-6">
             <div className="text-center mb-16">
                 <h2 className="text-4xl font-bold text-slate-900">Simple, Transparent Pricing</h2>
@@ -471,7 +618,7 @@ export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
                 <iframe 
                     width="100%" 
                     height="100%" 
-                    src="https://www.youtube.com/embed/LXb3EKWsInQ?autoplay=1&mute=1&loop=1&playlist=LXb3EKWsInQ" 
+                    src="https://www.youtube.com/embed/ysz5S6PUM-U?autoplay=1&mute=1&loop=1&playlist=ysz5S6PUM-U" 
                     title="BistroIntelligence Demo" 
                     frameBorder="0" 
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 

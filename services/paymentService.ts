@@ -33,16 +33,15 @@ export const paymentService = {
             return;
         }
 
-        // In a production environment, you should call your backend to create an Order 
-        // using the Key Secret and pass the order_id here for security.
-        
-        const options: RazorpayOptions = {
+        // Configuration for Razorpay
+        // Using 'any' for options to support 'modal' property without modifying global types
+        const options: any = {
             key: RAZORPAY_KEY_ID, 
             amount: amount * 100, // Amount in paise
             currency: 'INR',
             name: 'BistroIntelligence',
             description: `Upgrade to ${planType.replace('_', ' ')} Plan`,
-            image: 'https://cdn-icons-png.flaticon.com/512/3075/3075977.png', // Placeholder logo
+            image: 'https://cdn-icons-png.flaticon.com/512/3075/3075977.png',
             handler: function (response: RazorpayResponse) {
                 console.log("Payment Successful", response);
                 onSuccess(response.razorpay_payment_id);
@@ -50,7 +49,7 @@ export const paymentService = {
             prefill: {
                 name: user.name,
                 email: user.email,
-                contact: '9999999999' // Placeholder or user's phone
+                // Contact omitted to allow user to enter their own phone number
             },
             notes: {
                 plan: planType,
@@ -58,11 +57,20 @@ export const paymentService = {
             },
             theme: {
                 color: '#10b981' // Emerald-500
+            },
+            modal: {
+                ondismiss: function() {
+                    onFailure("Payment process cancelled");
+                }
             }
         };
 
         try {
-            const rzp = new window.Razorpay(options);
+            const rzp = new (window as any).Razorpay(options);
+            rzp.on('payment.failed', function (response: any){
+                console.error(response.error);
+                onFailure(response.error.description || "Payment Failed");
+            });
             rzp.open();
         } catch (error) {
             console.error("Payment Error", error);

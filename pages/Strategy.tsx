@@ -50,6 +50,7 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
   const [query, setQuery] = useState('');
   const [report, setReport] = useState<StrategyReport | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
   // Track status of individual action items
   const [actionStates, setActionStates] = useState<ActionState>({});
@@ -89,6 +90,7 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
     if (user.role === UserRole.SUPER_ADMIN) {
         setReport(null);
         setQuery('');
+        setError(null);
     }
   }, [role, user.role]);
 
@@ -133,13 +135,14 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
 
     setLoading(true);
     setReport(null);
+    setError(null);
     setActionStates({}); // Reset action states
     try {
       const data = await generateStrategy(role, textToSend);
       setReport(data);
       incrementUsage();
-    } catch (e) {
-      alert("Failed to generate strategy.");
+    } catch (e: any) {
+      setError(e.message || "Failed to generate strategy.");
     } finally {
       setLoading(false);
     }
@@ -148,6 +151,7 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
   const handleClear = () => {
       setQuery('');
       setReport(null);
+      setError(null);
       setActionStates({});
   };
 
@@ -167,14 +171,15 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
     setRoadmapModalOpen(true);
     setLoadingPlan(true);
     setGeneratedPlan(null);
+    setError(null);
 
     try {
         const plan = await generateImplementationPlan(title);
         setGeneratedPlan(plan);
         setActionStates(prev => ({ ...prev, [index]: 'in_progress' }));
         incrementUsage();
-    } catch (e) {
-        alert("Failed to generate plan.");
+    } catch (e: any) {
+        setError(e.message || "Failed to generate implementation plan.");
         setRoadmapModalOpen(false);
     } finally {
         setLoadingPlan(false);
@@ -435,6 +440,19 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
 
       {/* Chat Area */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-8 bg-slate-50 custom-scrollbar">
+        {error && (
+            <div className="max-w-4xl mx-auto mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3 text-red-700 animate-fade-in shadow-sm">
+                <AlertTriangle size={20} className="shrink-0" />
+                <p className="flex-1 font-medium text-sm">{error}</p>
+                <button 
+                    onClick={() => setError(null)} 
+                    className="text-xs font-bold uppercase hover:underline"
+                >
+                    Dismiss
+                </button>
+            </div>
+        )}
+
         {!report && !loading && (
           <div className="h-full flex flex-col items-center justify-center p-4">
             <div className="text-slate-400 opacity-60 mb-8 flex flex-col items-center animate-fade-in-up">

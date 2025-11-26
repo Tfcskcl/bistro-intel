@@ -110,12 +110,12 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       }
   };
 
-  const handleTabChange = (mode: 'generator' | 'saved' | 'requests') => {
+  const handleTabChange = (mode: 'generator' | 'saved' | 'requests', keepState = false) => {
       setViewMode(mode);
       // Clear errors on tab switch
       setError(null);
       
-      if (mode === 'generator') {
+      if (mode === 'generator' && !keepState) {
           // Explicitly clear active request so Admin isn't stuck in "Fulfillment" mode
           setActiveRequest(null);
           setGeneratedRecipe(null);
@@ -220,6 +220,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
           const contextUserId = activeRequest ? activeRequest.userId : user.id;
           const card = await generateRecipeCard(contextUserId, item, requirements);
           setGeneratedRecipe(card);
+          incrementUsage(); // Increment only on successful generation
       } catch (e: any) {
           console.error(e);
           setError(e.message || "Failed to generate recipe card. Please check your inputs or API key.");
@@ -249,6 +250,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
     try {
       const variant = await generateRecipeVariation(user.id, generatedRecipe, type);
       setGeneratedRecipe(variant);
+      incrementUsage();
     } catch (e) {
       setError(`Failed to create ${type} variation.`);
     } finally {
@@ -268,9 +270,10 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
     reader.onload = (event) => {
       const text = event.target?.result as string;
       if (text) {
-        const result = ingredientService.importFromCSV(user.id, text);
+        const result = storageService.importMenuFromCSV(user.id, text);
         if (result.success) {
           setImportStatus(result.message);
+          setMenuItems(storageService.getMenu(user.id));
           setTimeout(() => setImportStatus(null), 3000);
         } else {
           setError(result.message);
@@ -584,8 +587,8 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                               </div>
                               <button 
                                 onClick={() => {
+                                    handleTabChange('generator', true);
                                     setGeneratedRecipe(recipe);
-                                    handleTabChange('generator');
                                     setSelectedSku(recipe.sku_id);
                                 }}
                                 className="w-full mt-3 py-2 text-xs font-bold text-slate-600 border border-slate-200 rounded hover:bg-slate-50"
@@ -692,234 +695,198 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
             {!selectedSku ? (
             <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
                 <ChefHat size={48} className="mb-4 opacity-50" />
-                <p>Select an item or type a name to {isAdmin ? 'generate' : 'request'} a recipe card</p>
-                {!user.isTrial && !isAdmin && (
-                    <p className={`text-xs mt-2 ${limitReached ? 'text-red-500 font-bold' : 'text-emerald-600'}`}>
-                        Plan Limit: {savedRecipes.length} / {PLANS[user.plan].recipeLimit} Recipes
-                    </p>
-                )}
+                <p className="text-sm">Select an item to view details</p>
+                <p className="text-xs mt-1">or create a new request</p>
             </div>
             ) : (
-            <div className="h-full flex flex-col">
-                {/* Header */}
-                <div className={`p-6 border-b border-slate-200 ${isAdmin && activeRequest ? 'bg-yellow-50' : 'bg-white'}`}>
-                    <div className="flex justify-between items-start">
-                        <div>
-                            <h2 className="text-2xl font-bold text-slate-800">
-                                {generatedRecipe ? generatedRecipe.name : (menuItems.find(m => m.sku_id === selectedSku)?.name || customItemName || 'New Recipe')}
-                            </h2>
-                            {activeRequest && (
-                                <p className="text-xs text-yellow-700 font-bold flex items-center gap-1 mt-1">
-                                    <UserCheck size={12} /> Fulfilling request for: {activeRequest.userName}
-                                </p>
-                            )}
+                <>
+                {loading ? (
+                    <div className="flex-1 flex flex-col items-center justify-center gap-4">
+                        <Loader2 size={48} className="animate-spin text-emerald-500" />
+                        <p className="text-slate-600 font-bold animate-pulse">{loadingText}</p>
+                    </div>
+                ) : error ? (
+                    <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8 text-center">
+                        <div className="bg-red-100 p-4 rounded-full text-red-500">
+                            <AlertCircle size={32} />
                         </div>
-                        {generatedRecipe && (
-                            <div className="flex gap-2 flex-col items-end">
-                                {/* Restaurant Selection Dropdown (Only for regular generation, not fulfillment) */}
-                                {!activeRequest && (
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <Building2 size={16} className="text-slate-400" />
-                                        <select 
-                                            value={selectedRestaurantId}
-                                            onChange={(e) => setSelectedRestaurantId(e.target.value)}
-                                            className="text-xs p-1.5 border border-slate-200 rounded-md bg-slate-50 text-slate-600 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                                        >
-                                            <option value="">Select Restaurant / Outlet</option>
-                                            {restaurants.map(r => (
-                                                <option key={r.id} value={r.id}>{r.restaurantName || r.name}</option>
-                                            ))}
-                                        </select>
+                        <h3 className="text-lg font-bold text-slate-800">Generation Failed</h3>
+                        <p className="text-slate-500 max-w-sm">{error}</p>
+                        <button 
+                            onClick={() => handleDiscard()}
+                            className="text-sm text-slate-400 hover:text-slate-600 underline"
+                        >
+                            Close
+                        </button>
+                    </div>
+                ) : generatedRecipe ? (
+                    <div className="flex flex-col h-full animate-fade-in">
+                        {/* Header */}
+                        <div className="p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-start">
+                            <div>
+                                {activeRequest && isAdmin && (
+                                    <div className="mb-2 inline-flex items-center gap-1 text-[10px] font-bold text-yellow-700 bg-yellow-100 px-2 py-0.5 rounded">
+                                        <UserCheck size={10} /> Fulfilling Request for: {activeRequest.userName}
                                     </div>
                                 )}
+                                <h2 className="text-2xl font-bold text-slate-800 leading-tight">{generatedRecipe.name}</h2>
+                                <p className="text-sm text-slate-500 mt-1 flex items-center gap-2">
+                                    <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-slate-200 text-xs">{generatedRecipe.sku_id}</span>
+                                    <span>•</span>
+                                    <span>Yield: {generatedRecipe.yield} servings</span>
+                                    <span>•</span>
+                                    <span>Prep: {generatedRecipe.prep_time_min} mins</span>
+                                </p>
+                            </div>
+                            
+                            <div className="flex gap-2">
+                                <button 
+                                    onClick={handleDiscard}
+                                    className="p-2 text-slate-400 hover:bg-slate-200 rounded-lg transition-colors"
+                                    title="Close"
+                                >
+                                    <X size={20} />
+                                </button>
+                            </div>
+                        </div>
 
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={handleDiscard}
-                                        disabled={isSaving || isPushing}
-                                        className="text-sm font-bold text-red-600 hover:text-red-700 flex items-center gap-1 border border-red-200 px-3 py-1.5 rounded hover:bg-red-50 transition-colors disabled:opacity-50"
-                                    >
-                                        <Trash2 size={16} /> Discard
-                                    </button>
+                        {/* Content Scroll */}
+                        <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+                            
+                            {/* Summary & Confidence */}
+                            {generatedRecipe.human_summary && (
+                                <div className="bg-blue-50 border border-blue-100 p-4 rounded-lg flex gap-3">
+                                    <Sparkles className="text-blue-500 shrink-0 mt-0.5" size={18} />
+                                    <div>
+                                        <p className="text-sm text-blue-900 leading-relaxed">{generatedRecipe.human_summary}</p>
+                                        <div className="mt-2 flex items-center gap-2">
+                                            <span className="text-[10px] uppercase font-bold text-blue-400">AI Confidence:</span>
+                                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                                generatedRecipe.confidence === 'High' ? 'bg-emerald-100 text-emerald-700' : 'bg-yellow-100 text-yellow-700'
+                                            }`}>
+                                                {generatedRecipe.confidence}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
 
-                                    {posPushStatus ? (
-                                        <span className="text-xs font-bold text-amber-600 bg-amber-50 px-3 py-1.5 rounded border border-amber-200 flex items-center gap-1">
-                                            <Clock size={12} /> {posPushStatus}
-                                        </span>
-                                    ) : (
-                                        <button 
-                                            onClick={handlePushToPOS}
-                                            disabled={isPushing}
-                                            className="text-sm font-bold text-slate-600 hover:text-blue-600 flex items-center gap-1 border border-slate-200 px-3 py-1.5 rounded hover:border-blue-200 transition-colors disabled:opacity-50"
-                                        >
-                                            {isPushing ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
-                                            {isPushing ? 'Pushing...' : 'Push to POS'}
-                                        </button>
-                                    )}
-                                    <button 
-                                        onClick={handleSaveRecipe}
-                                        disabled={isSaving}
-                                        className="text-sm font-bold text-slate-600 hover:text-emerald-600 flex items-center gap-1 border border-slate-200 px-3 py-1.5 rounded hover:border-emerald-200 transition-colors disabled:opacity-50"
-                                        title={activeRequest ? "Send to User" : selectedRestaurantId ? "Send to Restaurant Database" : "Save to Library"}
-                                    >
-                                        {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                                        {isSaving ? 'Saving...' : activeRequest ? 'Send to User' : selectedRestaurantId ? 'Send to DB' : 'Save'}
-                                    </button>
+                            {/* Costing Section */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="bg-white border border-slate-200 p-4 rounded-xl shadow-sm">
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1">Food Cost (Per Serving)</p>
+                                    <p className="text-2xl font-bold text-slate-800">₹{generatedRecipe.food_cost_per_serving.toFixed(2)}</p>
+                                </div>
+                                <div className="bg-white border border-slate-200 p-4 rounded-xl shadow-sm">
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1">Suggested Price</p>
+                                    <p className="text-2xl font-bold text-emerald-600">₹{generatedRecipe.suggested_selling_price}</p>
+                                    <p className="text-[10px] text-slate-400 mt-1">
+                                        ~{((generatedRecipe.food_cost_per_serving / generatedRecipe.suggested_selling_price) * 100).toFixed(1)}% Cost
+                                    </p>
                                 </div>
                             </div>
-                        )}
-                    </div>
 
-                    {/* Error Banner */}
-                    {error && (
-                        <div className="mt-4 p-4 bg-red-50 text-red-700 border border-red-200 rounded-lg flex items-start gap-3 animate-fade-in shadow-sm">
-                            <AlertCircle size={20} className="shrink-0 mt-0.5" />
-                            <div className="flex-1">
-                                <h4 className="font-bold text-sm">Generation Failed</h4>
-                                <p className="text-xs mt-1">{error}</p>
+                            {/* Ingredients Table */}
+                            <div>
+                                <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
+                                    <Scale size={18} className="text-slate-400"/> Ingredients
+                                </h3>
+                                <div className="border border-slate-200 rounded-lg overflow-hidden">
+                                    <table className="w-full text-sm text-left">
+                                        <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
+                                            <tr>
+                                                <th className="px-4 py-2">Item</th>
+                                                <th className="px-4 py-2 text-right">Qty</th>
+                                                <th className="px-4 py-2 text-right">Cost</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {generatedRecipe.ingredients.map((ing, i) => (
+                                                <tr key={i} className="hover:bg-slate-50">
+                                                    <td className="px-4 py-2 font-medium text-slate-700">{ing.name}</td>
+                                                    <td className="px-4 py-2 text-right text-slate-500">{ing.qty_per_serving} {ing.unit}</td>
+                                                    <td className="px-4 py-2 text-right text-slate-600">₹{ing.cost_per_serving?.toFixed(2)}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
-                            <button onClick={() => setError(null)} className="p-1 hover:bg-red-100 rounded text-red-500">
-                                <X size={16} />
+
+                            {/* Preparation Steps */}
+                            <div>
+                                <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
+                                    <ChefHat size={18} className="text-slate-400"/> Preparation
+                                </h3>
+                                <div className="space-y-3">
+                                    {generatedRecipe.preparation_steps.map((step, i) => (
+                                        <div key={i} className="flex gap-3 text-sm text-slate-700">
+                                            <span className="font-bold text-slate-300 select-none">{i + 1}.</span>
+                                            <p>{step}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                        </div>
+
+                        {/* Footer Actions */}
+                        <div className="p-4 border-t border-slate-200 bg-slate-50 flex flex-wrap gap-3">
+                            {/* Admin Context Selector for Outlets */}
+                            {isAdmin && !activeRequest && (
+                                <div className="w-full mb-2 flex items-center gap-2 bg-white p-2 rounded border border-slate-200">
+                                    <Building2 size={16} className="text-slate-400" />
+                                    <select 
+                                        value={selectedRestaurantId}
+                                        onChange={(e) => setSelectedRestaurantId(e.target.value)}
+                                        className="text-xs w-full outline-none text-slate-700 font-medium bg-transparent"
+                                    >
+                                        <option value="">-- Assign to Restaurant (Optional) --</option>
+                                        {restaurants.map(r => (
+                                            <option key={r.id} value={r.id}>{r.restaurantName} ({r.location})</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+
+                            <button 
+                                onClick={handleSaveRecipe}
+                                disabled={isSaving}
+                                className="flex-1 py-2 bg-emerald-600 text-white font-bold rounded-lg hover:bg-emerald-700 transition-all shadow-sm flex items-center justify-center gap-2"
+                            >
+                                {isSaving ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
+                                {activeRequest && isAdmin ? `Send to ${activeRequest.userName}` : "Save Recipe"}
+                            </button>
+                            
+                            <button 
+                                onClick={() => handleVariation('Vegan')}
+                                className="px-4 py-2 bg-white border border-slate-200 text-slate-600 font-bold rounded-lg hover:bg-slate-50 transition-colors text-xs"
+                            >
+                                Make Vegan
+                            </button>
+                            <button 
+                                onClick={() => handleVariation('Premium')}
+                                className="px-4 py-2 bg-white border border-slate-200 text-slate-600 font-bold rounded-lg hover:bg-slate-50 transition-colors text-xs"
+                            >
+                                Premium Ver.
+                            </button>
+                            
+                            <button 
+                                onClick={handlePushToPOS}
+                                disabled={isPushing}
+                                className={`px-4 py-2 border font-bold rounded-lg transition-colors text-xs flex items-center gap-2 ${
+                                    posPushStatus 
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                                    : 'bg-white text-blue-600 border-blue-200 hover:bg-blue-50'
+                                }`}
+                            >
+                                {isPushing ? <RefreshCw className="animate-spin" size={14} /> : <Store size={14} />}
+                                {posPushStatus || 'Push to POS'}
                             </button>
                         </div>
-                    )}
-
-                    <div className="flex flex-col gap-2 mt-2">
-                        <div className="flex gap-4">
-                            {loading && <span className="flex items-center text-sm text-emerald-600"><Loader2 className="animate-spin mr-2" size={16}/> {loadingText}</span>}
-                            {generatedRecipe && !loading && (
-                            <span className="flex items-center text-sm text-slate-500">
-                                <Clock size={16} className="mr-1"/> {generatedRecipe.prep_time_min} mins
-                            </span>
-                            )}
-                        </div>
-
-                        {generatedRecipe && !loading && (
-                            <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
-                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wide py-1.5 flex items-center gap-1">
-                                    <Sparkles size={12} /> Variations:
-                                </span>
-                                {['Vegan', 'Gluten-Free', 'Keto', 'Low Calorie'].map((variant) => (
-                                    <button
-                                    key={variant}
-                                    onClick={() => handleVariation(variant)}
-                                    disabled={loading}
-                                    className="px-3 py-1 text-xs font-medium bg-slate-50 text-slate-600 border border-slate-200 rounded-full hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 transition-colors disabled:opacity-50"
-                                    >
-                                        {variant}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
                     </div>
-                </div>
-
-                {/* Content Area - Generator Output */}
-                <div className="flex-1 overflow-y-auto p-6 bg-slate-50 custom-scrollbar">
-                    {loading ? (
-                        <div className="h-full flex flex-col items-center justify-center text-slate-400 animate-pulse">
-                            <Loader2 size={48} className="mb-4 animate-spin text-emerald-600" />
-                            <p className="text-lg font-medium">{loadingText}</p>
-                        </div>
-                    ) : generatedRecipe ? (
-                        <div className="max-w-3xl mx-auto bg-white p-8 rounded-xl shadow-sm border border-slate-200 space-y-8 animate-fade-in">
-                           {/* Food Cost & Pricing High Level */}
-                           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                <div>
-                                    <h3 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
-                                        <Scale size={18} className="text-emerald-600"/> Ingredients ({generatedRecipe.yield} servings)
-                                    </h3>
-                                    <ul className="space-y-2 text-sm text-slate-700">
-                                        {generatedRecipe.ingredients.map((ing, i) => (
-                                            <li key={i} className="flex justify-between border-b border-slate-50 pb-1 last:border-0">
-                                                <span>{ing.qty_per_serving} {ing.unit} {ing.name}</span>
-                                                <span className="text-slate-400">₹{ing.cost_per_serving?.toFixed(2) || '0.00'}</span>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                    <div className="mt-4 pt-3 border-t border-slate-100 flex justify-between font-bold text-slate-800">
-                                        <span>Total Food Cost (Per Serving)</span>
-                                        <span>₹{generatedRecipe.food_cost_per_serving}</span>
-                                    </div>
-                                </div>
-                                <div>
-                                     <h3 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
-                                        <Zap size={18} className="text-yellow-500"/> Smart Costing
-                                    </h3>
-                                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3">
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-slate-600">Suggested Sell Price</span>
-                                            <span className="font-bold text-slate-900 text-lg">₹{generatedRecipe.suggested_selling_price}</span>
-                                        </div>
-                                        <div className="flex justify-between text-sm">
-                                            <span className="text-slate-600">Est. Margin</span>
-                                            <span className="font-bold text-emerald-600">
-                                                {generatedRecipe.suggested_selling_price > 0 
-                                                    ? ((1 - (generatedRecipe.food_cost_per_serving / generatedRecipe.suggested_selling_price)) * 100).toFixed(1)
-                                                    : '0.0'}%
-                                            </span>
-                                        </div>
-                                         <div className="pt-2 mt-2 border-t border-slate-200 text-xs text-slate-500 italic">
-                                            "{generatedRecipe.human_summary}"
-                                        </div>
-                                    </div>
-                                    {generatedRecipe.reasoning && (
-                                        <div className="mt-4 p-3 bg-blue-50 text-blue-800 text-xs rounded-lg border border-blue-100">
-                                            <strong>AI Logic:</strong> {generatedRecipe.reasoning}
-                                        </div>
-                                    )}
-                                </div>
-                           </div>
-
-                           {/* Instructions */}
-                           <div>
-                                <h3 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
-                                    <ChefHat size={18} className="text-slate-600"/> Preparation
-                                </h3>
-                                <ol className="list-decimal pl-5 space-y-2 marker:font-bold marker:text-slate-400">
-                                    {generatedRecipe.preparation_steps.map((step, i) => (
-                                        <li key={i} className="text-slate-700 leading-relaxed">{step}</li>
-                                    ))}
-                                </ol>
-                           </div>
-
-                           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-6 border-t border-slate-100">
-                                <div>
-                                     <h3 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 bg-slate-800 rounded-full"></div> Equipment
-                                    </h3>
-                                    <div className="flex flex-wrap gap-2">
-                                        {generatedRecipe.equipment_needed.map((eq, i) => (
-                                            <span key={i} className="px-3 py-1 bg-slate-100 text-slate-600 text-xs rounded-full border border-slate-200">
-                                                {eq}
-                                            </span>
-                                        ))}
-                                    </div>
-                                </div>
-                                <div>
-                                     <h3 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
-                                        <AlertCircle size={16} className="text-amber-500"/> Allergens & Info
-                                    </h3>
-                                    <div className="flex flex-wrap gap-2 mb-2">
-                                        {generatedRecipe.allergens.map((alg, i) => (
-                                            <span key={i} className="px-3 py-1 bg-amber-50 text-amber-700 text-xs font-bold rounded-full border border-amber-100">
-                                                {alg}
-                                            </span>
-                                        ))}
-                                    </div>
-                                    <div className="flex items-center gap-2 text-xs text-slate-500 mt-2">
-                                        <Clock size={14} /> Shelf Life: {generatedRecipe.shelf_life_hours} hours
-                                    </div>
-                                </div>
-                           </div>
-                        </div>
-                    ) : (
-                        <div className="flex items-center justify-center h-full text-slate-400">
-                            Select an item to view details
-                        </div>
-                    )}
-                </div>
-            </div>
+                ) : null}
+                </>
             )}
         </div>
       </div>
