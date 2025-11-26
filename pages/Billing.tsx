@@ -1,8 +1,7 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { PlanType, User, PlanConfig } from '../types';
-import { Check, Star, Loader2, ShieldCheck, Zap } from 'lucide-react';
+import { Check, Star, Loader2, ShieldCheck, Zap, ArrowDown, ArrowUp, AlertCircle, X } from 'lucide-react';
 import { paymentService } from '../services/paymentService';
 import { trackingService } from '../services/trackingService';
 import { storageService } from '../services/storageService';
@@ -12,10 +11,21 @@ interface BillingProps {
     onUpgrade: (plan: PlanType) => void;
 }
 
+const PLAN_HIERARCHY: Record<PlanType, number> = {
+    [PlanType.FREE]: 0,
+    [PlanType.PRO]: 1,
+    [PlanType.PRO_PLUS]: 2
+};
+
 export const Billing: React.FC<BillingProps> = ({ user, onUpgrade }) => {
   const [processingPlan, setProcessingPlan] = useState<PlanType | null>(null);
   const [isQuarterly, setIsQuarterly] = useState(false);
   const [currentPlans, setCurrentPlans] = useState<Record<PlanType, PlanConfig> | null>(null);
+
+  // Downgrade Modal State
+  const [showDowngradeModal, setShowDowngradeModal] = useState(false);
+  const [targetDowngradePlan, setTargetDowngradePlan] = useState<PlanType | null>(null);
+  const [downgradeReason, setDowngradeReason] = useState('');
 
   useEffect(() => {
     // Load dynamic plans
@@ -27,31 +37,107 @@ export const Billing: React.FC<BillingProps> = ({ user, onUpgrade }) => {
     trackingService.trackCheckoutStart(user);
   }, [user]);
 
-  const handleUpgradeClick = async (planType: PlanType, price: number) => {
-      setProcessingPlan(planType);
+  const handlePlanAction = async (targetPlan: PlanType, price: number) => {
+      const currentLevel = PLAN_HIERARCHY[user.plan];
+      const targetLevel = PLAN_HIERARCHY[targetPlan];
 
-      await paymentService.initiatePayment(
-          user,
-          planType,
-          price,
-          (paymentId) => {
-              // Success Callback
-              console.log(`Payment success: ${paymentId}`);
-              onUpgrade(planType);
-              setProcessingPlan(null);
-          },
-          (error) => {
-              // Failure Callback
-              alert(error);
-              setProcessingPlan(null);
-          }
-      );
+      // If User is on Trial, any paid plan is an upgrade
+      const isUpgrade = user.isTrial || targetLevel > currentLevel;
+
+      if (isUpgrade) {
+          // --- UPGRADE FLOW ---
+          setProcessingPlan(targetPlan);
+          await paymentService.initiatePayment(
+              user,
+              targetPlan,
+              price,
+              (paymentId) => {
+                  console.log(`Payment success: ${paymentId}`);
+                  onUpgrade(targetPlan);
+                  setProcessingPlan(null);
+              },
+              (error) => {
+                  alert(error);
+                  setProcessingPlan(null);
+              }
+          );
+      } else {
+          // --- DOWNGRADE FLOW ---
+          setTargetDowngradePlan(targetPlan);
+          setDowngradeReason('');
+          setShowDowngradeModal(true);
+      }
+  };
+
+  const confirmDowngrade = () => {
+      if (targetDowngradePlan) {
+          // Log reason (in a real app, send to backend)
+          console.log(`User ${user.id} downgraded to ${targetDowngradePlan}. Reason: ${downgradeReason}`);
+          
+          // Process the change
+          onUpgrade(targetDowngradePlan);
+          
+          // Reset UI
+          setShowDowngradeModal(false);
+          setTargetDowngradePlan(null);
+      }
   };
 
   if (!currentPlans) return <div className="p-8 text-center">Loading plans...</div>;
 
   return (
-    <div className="space-y-8 animate-fade-in">
+    <div className="space-y-8 animate-fade-in relative">
+        
+        {/* Downgrade Reason Modal */}
+        {showDowngradeModal && (
+            <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+                <div className="bg-white dark:bg-slate-900 rounded-xl max-w-md w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 animate-scale-in">
+                    <div className="flex justify-between items-start mb-4">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-full text-amber-600 dark:text-amber-400">
+                                <AlertCircle size={24} />
+                            </div>
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">We're sorry to see you go</h3>
+                        </div>
+                        <button onClick={() => setShowDowngradeModal(false)} className="text-slate-400 hover:text-slate-600">
+                            <X size={20} />
+                        </button>
+                    </div>
+                    
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                        You are downgrading to the <strong>{currentPlans[targetDowngradePlan!].name}</strong> plan. 
+                        You will lose access to premium features immediately.
+                    </p>
+
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-2">
+                        Could you tell us why you are downgrading?
+                    </label>
+                    <textarea 
+                        value={downgradeReason}
+                        onChange={(e) => setDowngradeReason(e.target.value)}
+                        placeholder="Too expensive, missing features, not using enough..."
+                        className="w-full p-3 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-emerald-500 outline-none mb-6 h-24 resize-none"
+                    />
+
+                    <div className="flex gap-3">
+                        <button 
+                            onClick={() => setShowDowngradeModal(false)}
+                            className="flex-1 py-2 text-slate-600 dark:text-slate-300 font-bold hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button 
+                            onClick={confirmDowngrade}
+                            disabled={!downgradeReason.trim()}
+                            className="flex-1 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            Confirm Downgrade
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )}
+
         <div className="text-center max-w-2xl mx-auto">
             <h2 className="text-3xl font-bold text-slate-900 dark:text-white">Choose your Intelligence Plan</h2>
             <p className="text-slate-500 dark:text-slate-400 mt-2">Scale your operations with AI-powered insights. Secure payment via Razorpay.</p>
@@ -84,14 +170,19 @@ export const Billing: React.FC<BillingProps> = ({ user, onUpgrade }) => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            {Object.entries(currentPlans).map(([key, plan]) => {
+            {(Object.entries(currentPlans) as [string, PlanConfig][]).map(([key, plan]) => {
                 const planType = key as PlanType;
-                // If trial, no plan is technically "Current" in terms of payment, but they have Pro Plus features
-                // So we allow upgrading to everything.
+                
                 const isCurrent = !user.isTrial && user.plan === planType;
                 const isPopular = planType === PlanType.PRO;
                 const isProcessing = processingPlan === planType;
                 
+                // Rank Logic
+                const currentLevel = PLAN_HIERARCHY[user.plan];
+                const thisLevel = PLAN_HIERARCHY[planType];
+                const isUpgrade = user.isTrial || thisLevel > currentLevel;
+                const isDowngrade = !user.isTrial && thisLevel < currentLevel;
+
                 const displayPrice = isQuarterly ? plan.quarterlyPrice : plan.price;
 
                 return (
@@ -127,22 +218,26 @@ export const Billing: React.FC<BillingProps> = ({ user, onUpgrade }) => {
                         </ul>
 
                         <button
-                            onClick={() => handleUpgradeClick(planType, displayPrice)}
+                            onClick={() => handlePlanAction(planType, displayPrice)}
                             disabled={isCurrent || isProcessing}
                             className={`w-full py-3 px-4 rounded-lg font-bold transition-all flex items-center justify-center gap-2 ${
                                 isCurrent 
                                 ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-default'
-                                : planType === PlanType.PRO 
-                                    ? 'bg-slate-900 dark:bg-emerald-600 text-white hover:bg-slate-800 dark:hover:bg-emerald-700 shadow-lg hover:shadow-xl'
-                                    : 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white border-2 border-slate-200 dark:border-slate-700 hover:border-slate-900 dark:hover:border-slate-500'
+                                : isDowngrade
+                                    ? 'bg-white dark:bg-slate-900 text-slate-500 border-2 border-slate-200 dark:border-slate-700 hover:border-slate-400 hover:text-slate-700'
+                                    : planType === PlanType.PRO 
+                                        ? 'bg-slate-900 dark:bg-emerald-600 text-white hover:bg-slate-800 dark:hover:bg-emerald-700 shadow-lg hover:shadow-xl'
+                                        : 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white border-2 border-slate-200 dark:border-slate-700 hover:border-slate-900 dark:hover:border-slate-500'
                             }`}
                         >
                             {isProcessing ? (
                                 <><Loader2 className="animate-spin" size={18} /> Processing...</>
                             ) : isCurrent ? (
                                 'Current Plan'
+                            ) : isDowngrade ? (
+                                <><ArrowDown size={16} /> Downgrade Now</>
                             ) : (
-                                'Upgrade Now'
+                                <><ArrowUp size={16} /> Upgrade Now</>
                             )}
                         </button>
                     </div>

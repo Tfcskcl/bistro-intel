@@ -3,8 +3,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { PLANS } from '../constants';
 import { generateRecipeCard, generateRecipeVariation } from '../services/geminiService';
 import { ingredientService } from '../services/ingredientService';
-import { RecipeCard, MenuItem, User, UserRole, POSChangeRequest } from '../types';
-import { Loader2, ChefHat, Scale, Clock, AlertCircle, Upload, Lock, Sparkles, Check, Save, RefreshCw, Search, Plus, Store, Zap, Trash2, Building2 } from 'lucide-react';
+import { RecipeCard, MenuItem, User, UserRole, POSChangeRequest, RecipeRequest } from '../types';
+import { Loader2, ChefHat, Scale, Clock, AlertCircle, Upload, Lock, Sparkles, Check, Save, RefreshCw, Search, Plus, Store, Zap, Trash2, Building2, FileSignature, X, AlignLeft, UtensilsCrossed, Inbox, UserCheck, CheckCircle2, Clock3 } from 'lucide-react';
 import { storageService } from '../services/storageService';
 import { authService } from '../services/authService';
 
@@ -20,10 +20,17 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
   const [loadingText, setLoadingText] = useState('Generating with AI...');
   const [error, setError] = useState<string | null>(null);
   const [importStatus, setImportStatus] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<'generator' | 'saved'>('generator');
+  
+  // View Modes: 'generator' is now Contextual (Request Form for Owner / Generator for Admin)
+  const [viewMode, setViewMode] = useState<'generator' | 'saved' | 'requests'>('generator');
   
   const [savedRecipes, setSavedRecipes] = useState<RecipeCard[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  
+  // Request Management
+  const [myRequests, setMyRequests] = useState<RecipeRequest[]>([]);
+  const [adminQueue, setAdminQueue] = useState<RecipeRequest[]>([]);
+  const [activeRequest, setActiveRequest] = useState<RecipeRequest | null>(null); // For Admin fulfilling
 
   const [posPushStatus, setPosPushStatus] = useState<string | null>(null);
   const [customItemName, setCustomItemName] = useState('');
@@ -35,12 +42,36 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [isPushing, setIsPushing] = useState(false);
 
+  // Requirement Form State
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [formItem, setFormItem] = useState<MenuItem | null>(null);
+  const [formData, setFormData] = useState<{
+      cuisine: string;
+      dietary: string[];
+      notes: string;
+  }>({
+      cuisine: '',
+      dietary: [],
+      notes: ''
+  });
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isAdmin = [UserRole.ADMIN, UserRole.SUPER_ADMIN].includes(user.role);
 
   useEffect(() => {
     setSavedRecipes(storageService.getSavedRecipes(user.id));
     setMenuItems(storageService.getMenu(user.id));
-  }, [user.id]);
+    refreshRequests();
+  }, [user.id, user.role]);
+
+  const refreshRequests = () => {
+    const allRequests = storageService.getAllRecipeRequests();
+    if (isAdmin) {
+        setAdminQueue(allRequests.filter(r => r.status === 'pending'));
+    } else {
+        setMyRequests(allRequests.filter(r => r.userId === user.id));
+    }
+  };
 
   useEffect(() => {
     const fetchRestaurants = async () => {
@@ -52,6 +83,11 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
     fetchRestaurants();
   }, []);
 
+  // Plan Limit Logic
+  const planLimit = PLANS[user.plan]?.recipeLimit || 1;
+  // Limit applies to Saved Recipes for now
+  const limitReached = !user.isTrial && savedRecipes.length >= planLimit;
+
   const checkUsage = (): boolean => {
       if (user.isTrial) {
           if ((user.queriesUsed || 0) >= (user.queryLimit || 10)) {
@@ -59,10 +95,10 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
               return false;
           }
       }
-      const planLimit = PLANS[user.plan]?.recipeLimit || 1;
-      if (!user.isTrial && savedRecipes.length >= planLimit) {
-          setError(`You have reached the ${planLimit} recipe limit for your ${PLANS[user.plan].name} plan.`);
-          return false;
+      
+      if (limitReached && !isAdmin) {
+           setError(`You have reached the ${planLimit} recipe limit for your ${PLANS[user.plan].name} plan. Please upgrade or delete recipes.`);
+           return false;
       }
       return true;
   };
@@ -74,43 +110,23 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       }
   };
 
-  const handleGenerateRecipe = async (item: MenuItem) => {
-    if (!checkUsage()) return;
-
-    setLoading(true);
-    setLoadingText('Generating with AI...');
-    setError(null);
-    setGeneratedRecipe(null);
-    setSelectedSku(item.sku_id);
-    setPosPushStatus(null);
-    setSelectedRestaurantId(''); // Reset selection on new generation
-    
-    try {
-      const card = await generateRecipeCard(user.id, item);
-      setGeneratedRecipe(card);
-      incrementUsage();
-    } catch (e) {
-      setError("Failed to generate recipe card. Please check your API Key.");
-    } finally {
-      setLoading(false);
-    }
+  // 1. Open Form from List
+  const handleGenerateClick = (item: MenuItem) => {
+      if (!isAdmin && limitReached) return; 
+      if (!checkUsage()) return;
+      setFormItem(item);
+      // Pre-fill standard values or reset
+      setFormData({ cuisine: '', dietary: [], notes: '' });
+      setIsFormOpen(true);
   };
 
-  const handleGenerateCustom = async () => {
+  // 2. Open Form from Custom Input
+  const handleGenerateCustomClick = () => {
       if (!customItemName.trim()) return;
+      if (!isAdmin && limitReached) return;
       if (!checkUsage()) return;
-      
-      setLoading(true);
-      setLoadingText(`Designing ${customItemName}...`);
-      setError(null);
-      setGeneratedRecipe(null);
-      setPosPushStatus(null);
-      setSelectedRestaurantId('');
-      
-      const tempSku = `NEW-${Date.now().toString().slice(-4)}`;
-      setSelectedSku(tempSku);
 
-      // Create a temporary item object
+      const tempSku = `NEW-${Date.now().toString().slice(-4)}`;
       const tempItem: MenuItem = {
           sku_id: tempSku,
           name: customItemName,
@@ -119,27 +135,92 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
           current_price: 0,
           ingredients: []
       };
+      
+      setFormItem(tempItem);
+      setFormData({ cuisine: '', dietary: [], notes: '' });
+      setIsFormOpen(true);
+  };
 
-      try {
-          const card = await generateRecipeCard(user.id, tempItem);
-          setGeneratedRecipe(card);
-          incrementUsage();
-          setCustomItemName('');
-          
-          // Add to menu locally if successful
-          const newMenu = [...menuItems, tempItem];
+  // 3. Submit Form -> Handle Request or Admin Generation
+  const handleFormSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!formItem) return;
+
+      setIsFormOpen(false); // Close modal
+      setError(null);
+
+      const requirements = `
+          Cuisine Style: ${formData.cuisine || 'Standard'}
+          Dietary Restrictions: ${formData.dietary.length > 0 ? formData.dietary.join(', ') : 'None'}
+          Preparation Notes: ${formData.notes || 'Standard preparation'}
+      `;
+
+      if (isAdmin) {
+          // Admin Flow: Direct Generation
+          await runAdminGeneration(formItem, requirements);
+      } else {
+          // Customer Flow: Create Request
+          createRequest(formItem, requirements);
+      }
+  };
+
+  const createRequest = (item: MenuItem, requirements: string) => {
+      const newRequest: RecipeRequest = {
+          id: `req_${Date.now()}`,
+          userId: user.id,
+          userName: user.name,
+          item: item,
+          requirements: requirements,
+          status: 'pending',
+          requestDate: new Date().toISOString()
+      };
+      
+      storageService.saveRecipeRequest(newRequest);
+      refreshRequests();
+      setCustomItemName('');
+      
+      // Save item to menu if new
+      if (!menuItems.find(m => m.sku_id === item.sku_id)) {
+          const newMenu = [...menuItems, item];
           setMenuItems(newMenu);
           storageService.saveMenu(user.id, newMenu);
+      }
+      
+      alert("Request received! Our culinary team will review and generate this recipe within 1 hour.");
+      setViewMode('requests'); // Switch to request view
+  };
+
+  const runAdminGeneration = async (item: MenuItem, requirements: string) => {
+      setLoading(true);
+      setLoadingText(`Designing ${item.name}...`);
+      setGeneratedRecipe(null);
+      setSelectedSku(item.sku_id);
+      setPosPushStatus(null);
+      setSelectedRestaurantId('');
+
+      try {
+          // If fulfilling a request, use the requester's ID for ingredient context
+          const contextUserId = activeRequest ? activeRequest.userId : user.id;
+          const card = await generateRecipeCard(contextUserId, item, requirements);
+          setGeneratedRecipe(card);
       } catch (e) {
-          setError("Failed to generate custom recipe.");
+          setError("Failed to generate recipe card. Please check your inputs.");
       } finally {
           setLoading(false);
       }
   };
 
+  // Admin: Select a request to fulfill
+  const handleFulfillRequest = (req: RecipeRequest) => {
+      setActiveRequest(req);
+      setViewMode('generator');
+      // Trigger generation immediately
+      runAdminGeneration(req.item, req.requirements);
+  };
+
   const handleVariation = async (type: string) => {
     if (!generatedRecipe) return;
-    if (!checkUsage()) return;
+    if (!isAdmin && !checkUsage()) return; 
 
     setLoading(true);
     setLoadingText(`Creating ${type} variation...`);
@@ -149,7 +230,6 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
     try {
       const variant = await generateRecipeVariation(user.id, generatedRecipe, type);
       setGeneratedRecipe(variant);
-      incrementUsage();
     } catch (e) {
       setError(`Failed to create ${type} variation.`);
     } finally {
@@ -169,7 +249,6 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
     reader.onload = (event) => {
       const text = event.target?.result as string;
       if (text) {
-        // Use ingredient import for now as proxy for data
         const result = ingredientService.importFromCSV(user.id, text);
         if (result.success) {
           setImportStatus(result.message);
@@ -187,20 +266,39 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
     if (generatedRecipe) {
       setIsSaving(true);
       
-      // Identify target restaurant (if selected) or default to user
-      const restaurant = restaurants.find(r => r.id === selectedRestaurantId);
-      
-      // Simulate delay for visual feedback
       setTimeout(() => {
-        const recipeToSave = {
-            ...generatedRecipe,
-            assignedRestaurantId: selectedRestaurantId,
-            assignedRestaurantName: restaurant?.restaurantName
-        };
-
-        storageService.saveRecipe(user.id, recipeToSave);
-        setSavedRecipes(storageService.getSavedRecipes(user.id));
-        setImportStatus(restaurant ? `Sent to ${restaurant.restaurantName} DB!` : "Recipe saved to library!");
+        if (isAdmin && activeRequest) {
+            // Admin fulfilling request
+            const recipeToSave = { ...generatedRecipe };
+            // Save to REQUESTER'S library
+            storageService.saveRecipe(activeRequest.userId, recipeToSave);
+            
+            // Mark Request Complete
+            const completedReq: RecipeRequest = { 
+                ...activeRequest, 
+                status: 'completed', 
+                completedDate: new Date().toISOString() 
+            };
+            storageService.updateRecipeRequest(completedReq);
+            
+            refreshRequests();
+            setActiveRequest(null);
+            setImportStatus(`Sent to ${activeRequest.userName}!`);
+            setViewMode('requests');
+            setGeneratedRecipe(null);
+        } else {
+            // Regular Save
+            const restaurant = restaurants.find(r => r.id === selectedRestaurantId);
+            const recipeToSave = {
+                ...generatedRecipe,
+                assignedRestaurantId: selectedRestaurantId,
+                assignedRestaurantName: restaurant?.restaurantName
+            };
+            storageService.saveRecipe(user.id, recipeToSave);
+            setSavedRecipes(storageService.getSavedRecipes(user.id));
+            setImportStatus(restaurant ? `Sent to ${restaurant.restaurantName} DB!` : "Recipe saved to library!");
+        }
+        
         setIsSaving(false);
         setTimeout(() => setImportStatus(null), 2000);
       }, 600);
@@ -213,6 +311,10 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       setPosPushStatus(null);
       setError(null);
       setSelectedRestaurantId('');
+      if (isAdmin && activeRequest) {
+          setViewMode('requests');
+          setActiveRequest(null);
+      }
   };
 
   const handlePushToPOS = () => {
@@ -220,7 +322,6 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       setIsPushing(true);
       const restaurant = restaurants.find(r => r.id === selectedRestaurantId);
 
-      // Simulate network request
       setTimeout(() => {
           const request: POSChangeRequest = {
               id: `req_${Date.now()}`,
@@ -240,17 +341,120 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       }, 1000);
   };
 
-  if (![UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.OWNER].includes(user.role)) {
-    return (
-      <div className="h-[calc(100vh-6rem)] flex flex-col items-center justify-center bg-white rounded-xl border border-slate-200 shadow-sm">
-        <Lock size={32} className="text-slate-400 mb-4" />
-        <h2 className="text-2xl font-bold text-slate-800">Restricted Access</h2>
-      </div>
-    );
-  }
-
   return (
-    <div className="h-[calc(100vh-6rem)] flex flex-col gap-4">
+    <div className="h-[calc(100vh-6rem)] flex flex-col gap-4 relative">
+      {/* Requirement Form Modal */}
+      {isFormOpen && formItem && (
+          <div className="absolute inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+              <div className="bg-white dark:bg-slate-900 rounded-xl w-full max-w-lg shadow-2xl border border-slate-200 dark:border-slate-800 animate-scale-in overflow-hidden">
+                  <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+                      <div>
+                          <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2">
+                              <FileSignature className="text-emerald-600" size={20} /> 
+                              {isAdmin ? 'Generate Recipe' : 'Request Recipe'}
+                          </h3>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">
+                             {isAdmin ? 'Immediate AI Generation' : 'Send to admin for review & generation'}
+                          </p>
+                      </div>
+                      <button onClick={() => setIsFormOpen(false)} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full text-slate-500">
+                          <X size={20} />
+                      </button>
+                  </div>
+                  
+                  <form onSubmit={handleFormSubmit} className="p-6 space-y-4">
+                      <div>
+                          <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Cuisine Style</label>
+                          <div className="relative">
+                              <UtensilsCrossed size={16} className="absolute left-3 top-3 text-slate-400" />
+                              <input 
+                                  type="text" 
+                                  required
+                                  placeholder="e.g. Italian, Indian Fusion, keto-friendly..."
+                                  value={formData.cuisine}
+                                  onChange={e => setFormData({...formData, cuisine: e.target.value})}
+                                  className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none"
+                              />
+                          </div>
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {['Italian', 'Indian', 'Mexican', 'Asian', 'Healthy', 'Continental'].map(c => (
+                                <button
+                                    key={c}
+                                    type="button"
+                                    onClick={() => setFormData({...formData, cuisine: c})}
+                                    className="px-2 py-1 text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded hover:bg-emerald-50 hover:text-emerald-600 border border-transparent hover:border-emerald-200 transition-colors"
+                                >
+                                    {c}
+                                </button>
+                            ))}
+                          </div>
+                      </div>
+
+                      <div>
+                          <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Dietary Restrictions</label>
+                          <div className="flex flex-wrap gap-2">
+                              {['Vegetarian', 'Vegan', 'Gluten-Free', 'Dairy-Free', 'Keto', 'Nut-Free', 'Halal', 'Low-Carb'].map(opt => {
+                                  const isSelected = formData.dietary.includes(opt);
+                                  return (
+                                      <button
+                                          key={opt}
+                                          type="button"
+                                          onClick={() => {
+                                              setFormData(prev => ({
+                                                  ...prev,
+                                                  dietary: isSelected 
+                                                      ? prev.dietary.filter(d => d !== opt)
+                                                      : [...prev.dietary, opt]
+                                              }));
+                                          }}
+                                          className={`py-1.5 px-3 text-xs font-bold rounded-lg border transition-all ${
+                                              isSelected 
+                                              ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-500 text-emerald-700 dark:text-emerald-400' 
+                                              : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50'
+                                          }`}
+                                      >
+                                          {opt}
+                                      </button>
+                                  );
+                              })}
+                          </div>
+                      </div>
+
+                      <div>
+                          <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Preparation Notes</label>
+                          <div className="relative">
+                              <AlignLeft size={16} className="absolute left-3 top-3 text-slate-400" />
+                              <textarea 
+                                  rows={3}
+                                  placeholder="E.g. Use almond milk instead of dairy, make it spicy, target food cost < 25%..."
+                                  value={formData.notes}
+                                  onChange={e => setFormData({...formData, notes: e.target.value})}
+                                  className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none resize-none"
+                              />
+                          </div>
+                      </div>
+
+                      <div className="pt-4 flex justify-end gap-3 border-t border-slate-100 dark:border-slate-800 mt-2">
+                          <button 
+                              type="button" 
+                              onClick={() => setIsFormOpen(false)}
+                              className="px-4 py-2 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                          >
+                              Cancel
+                          </button>
+                          <button 
+                              type="submit"
+                              className="px-6 py-2 bg-slate-900 dark:bg-emerald-600 text-white text-sm font-bold rounded-lg hover:opacity-90 flex items-center gap-2 shadow-lg shadow-emerald-500/20"
+                          >
+                              {isAdmin ? <Sparkles size={16} fill="currentColor" /> : <Inbox size={16} />} 
+                              {isAdmin ? 'Generate Recipe' : 'Submit Request'}
+                          </button>
+                      </div>
+                  </form>
+              </div>
+          </div>
+      )}
+
       {/* Top Bar */}
       <div className="flex justify-between items-center">
         <div className="flex gap-2">
@@ -258,13 +462,30 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                 onClick={() => setViewMode('generator')}
                 className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${viewMode === 'generator' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`}
             >
-                AI Generator
+                {isAdmin ? (activeRequest ? 'Fulfilling Request' : 'AI Generator') : 'Request Recipe'}
             </button>
             <button 
                 onClick={() => setViewMode('saved')}
                 className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${viewMode === 'saved' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`}
             >
                 Saved Library ({savedRecipes.length})
+            </button>
+            
+            <button 
+                onClick={() => setViewMode('requests')}
+                className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-2 ${viewMode === 'requests' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`}
+            >
+                {isAdmin ? (
+                    <>
+                        Request Queue
+                        {adminQueue.length > 0 && <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{adminQueue.length}</span>}
+                    </>
+                ) : (
+                    <>
+                        My Requests
+                        {myRequests.filter(r => r.status === 'pending').length > 0 && <span className="bg-yellow-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{myRequests.filter(r => r.status === 'pending').length}</span>}
+                    </>
+                )}
             </button>
         </div>
         
@@ -276,11 +497,57 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
         )}
       </div>
 
-      {viewMode === 'saved' ? (
+      {viewMode === 'requests' && (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 overflow-y-auto flex-1 animate-fade-in">
+              <h2 className="text-xl font-bold text-slate-800 mb-4">{isAdmin ? 'Customer Request Queue' : 'My Recipe Requests'}</h2>
+              
+              <div className="space-y-3">
+                  {(isAdmin ? adminQueue : myRequests).length === 0 ? (
+                      <p className="text-slate-500 text-center py-8">No pending requests found.</p>
+                  ) : (
+                      (isAdmin ? adminQueue : myRequests).map((req, i) => (
+                          <div key={i} className="flex justify-between items-center p-4 border border-slate-100 rounded-lg hover:border-slate-300 transition-colors bg-slate-50">
+                              <div className="flex items-start gap-4">
+                                  <div className={`p-3 rounded-full ${req.status === 'completed' ? 'bg-emerald-100 text-emerald-600' : 'bg-yellow-100 text-yellow-600'}`}>
+                                      {req.status === 'completed' ? <CheckCircle2 size={20} /> : <Clock3 size={20} />}
+                                  </div>
+                                  <div>
+                                      <h4 className="font-bold text-slate-800">{req.item.name}</h4>
+                                      <p className="text-xs text-slate-500">Requested by: <span className="font-semibold">{req.userName}</span> • {new Date(req.requestDate).toLocaleString()}</p>
+                                      {isAdmin && <p className="text-xs text-slate-600 mt-1 italic max-w-lg bg-white p-1 rounded border border-slate-100">{req.requirements}</p>}
+                                  </div>
+                              </div>
+                              
+                              <div>
+                                  {req.status === 'completed' ? (
+                                      <span className="px-3 py-1 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-full">Completed</span>
+                                  ) : (
+                                      isAdmin ? (
+                                          <button 
+                                            onClick={() => handleFulfillRequest(req)}
+                                            className="px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded hover:bg-emerald-600 transition-colors flex items-center gap-2"
+                                          >
+                                              <Sparkles size={14} fill="currentColor" /> Generate
+                                          </button>
+                                      ) : (
+                                          <span className="px-3 py-1 bg-yellow-100 text-yellow-700 text-xs font-bold rounded-full flex items-center gap-1">
+                                              <Clock size={12} /> Pending Admin Review
+                                          </span>
+                                      )
+                                  )}
+                              </div>
+                          </div>
+                      ))
+                  )}
+              </div>
+          </div>
+      )}
+
+      {viewMode === 'saved' && (
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 overflow-y-auto flex-1 animate-fade-in">
               <h2 className="text-xl font-bold text-slate-800 mb-4">Your Saved Recipes</h2>
               {savedRecipes.length === 0 ? (
-                  <p className="text-slate-500">No saved recipes yet. Generate one and click Save!</p>
+                  <p className="text-slate-500">No saved recipes yet. {isAdmin ? 'Generate' : 'Request'} one!</p>
               ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                       {savedRecipes.map((recipe, idx) => (
@@ -311,7 +578,9 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                   </div>
               )}
           </div>
-      ) : (
+      )} 
+      
+      {viewMode === 'generator' && (
       <div className="flex gap-6 h-full overflow-hidden">
         {/* List */}
         <div className="w-1/3 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden animate-fade-in">
@@ -333,20 +602,30 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                     />
                 </div>
                 
+                {limitReached && !isAdmin && (
+                    <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg text-xs text-amber-800 flex items-center gap-2 animate-fade-in">
+                        <Lock size={14} className="shrink-0" />
+                        <span>
+                            Plan limit reached ({savedRecipes.length}/{planLimit}).
+                        </span>
+                    </div>
+                )}
+
                 <div className="relative">
                     <input 
                         type="text" 
                         value={customItemName}
                         onChange={(e) => setCustomItemName(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleGenerateCustom()}
-                        placeholder="Create new: e.g. Butter Chicken"
-                        className="w-full pl-8 pr-8 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
+                        onKeyDown={(e) => e.key === 'Enter' && handleGenerateCustomClick()}
+                        placeholder={isAdmin ? "Generate for: Butter Chicken" : "Request for: Butter Chicken"}
+                        disabled={limitReached && !isAdmin}
+                        className="w-full pl-8 pr-8 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all disabled:bg-slate-100 disabled:cursor-not-allowed"
                     />
                     <Search className="absolute left-2.5 top-2.5 text-slate-400" size={14} />
                     <button 
-                        onClick={handleGenerateCustom}
-                        disabled={!customItemName || loading}
-                        className="absolute right-1.5 top-1.5 p-1 bg-slate-100 hover:bg-emerald-500 hover:text-white rounded text-slate-400 transition-colors disabled:opacity-50"
+                        onClick={handleGenerateCustomClick}
+                        disabled={!customItemName || loading || (limitReached && !isAdmin)}
+                        className="absolute right-1.5 top-1.5 p-1 bg-slate-100 hover:bg-emerald-500 hover:text-white rounded text-slate-400 transition-colors disabled:opacity-50 disabled:hover:bg-slate-100 disabled:hover:text-slate-400"
                     >
                         {loading && customItemName ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
                     </button>
@@ -370,11 +649,13 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                 menuItems.map((item) => (
                     <div 
                     key={item.sku_id}
-                    onClick={() => handleGenerateRecipe(item)}
-                    className={`p-4 rounded-lg cursor-pointer transition-all border ${
+                    onClick={() => (!limitReached || isAdmin) && handleGenerateClick(item)}
+                    className={`p-4 rounded-lg transition-all border ${
                         selectedSku === item.sku_id 
                         ? 'bg-yellow-50 border-yellow-200 ring-1 ring-yellow-300' 
-                        : 'bg-white border-transparent hover:bg-slate-50 hover:border-slate-200'
+                        : (limitReached && !isAdmin)
+                            ? 'bg-slate-50 border-transparent opacity-60 cursor-not-allowed'
+                            : 'bg-white border-transparent hover:bg-slate-50 hover:border-slate-200 cursor-pointer'
                     }`}
                     >
                     <div className="flex justify-between items-start">
@@ -392,35 +673,46 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
             {!selectedSku ? (
             <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
                 <ChefHat size={48} className="mb-4 opacity-50" />
-                <p>Select an item or type a name to generate a recipe card</p>
-                {!user.isTrial && (
-                    <p className="text-xs mt-2 text-emerald-600">Plan Limit: {savedRecipes.length} / {PLANS[user.plan].recipeLimit} Recipes</p>
+                <p>Select an item or type a name to {isAdmin ? 'generate' : 'request'} a recipe card</p>
+                {!user.isTrial && !isAdmin && (
+                    <p className={`text-xs mt-2 ${limitReached ? 'text-red-500 font-bold' : 'text-emerald-600'}`}>
+                        Plan Limit: {savedRecipes.length} / {PLANS[user.plan].recipeLimit} Recipes
+                    </p>
                 )}
             </div>
             ) : (
             <div className="h-full flex flex-col">
                 {/* Header */}
-                <div className="p-6 border-b border-slate-200 bg-white">
+                <div className={`p-6 border-b border-slate-200 ${isAdmin && activeRequest ? 'bg-yellow-50' : 'bg-white'}`}>
                 <div className="flex justify-between items-start">
-                    <h2 className="text-2xl font-bold text-slate-800">
-                        {generatedRecipe ? generatedRecipe.name : (menuItems.find(m => m.sku_id === selectedSku)?.name || customItemName || 'New Recipe')}
-                    </h2>
+                    <div>
+                        <h2 className="text-2xl font-bold text-slate-800">
+                            {generatedRecipe ? generatedRecipe.name : (menuItems.find(m => m.sku_id === selectedSku)?.name || customItemName || 'New Recipe')}
+                        </h2>
+                        {activeRequest && (
+                             <p className="text-xs text-yellow-700 font-bold flex items-center gap-1 mt-1">
+                                 <UserCheck size={12} /> Fulfilling request for: {activeRequest.userName}
+                             </p>
+                        )}
+                    </div>
                     {generatedRecipe && (
                          <div className="flex gap-2 flex-col items-end">
-                             {/* Restaurant Selection Dropdown */}
-                             <div className="flex items-center gap-2 mb-1">
-                                <Building2 size={16} className="text-slate-400" />
-                                <select 
-                                    value={selectedRestaurantId}
-                                    onChange={(e) => setSelectedRestaurantId(e.target.value)}
-                                    className="text-xs p-1.5 border border-slate-200 rounded-md bg-slate-50 text-slate-600 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                                >
-                                    <option value="">Select Restaurant / Outlet</option>
-                                    {restaurants.map(r => (
-                                        <option key={r.id} value={r.id}>{r.restaurantName || r.name}</option>
-                                    ))}
-                                </select>
-                             </div>
+                             {/* Restaurant Selection Dropdown (Only for regular generation, not fulfillment) */}
+                             {!activeRequest && (
+                                 <div className="flex items-center gap-2 mb-1">
+                                    <Building2 size={16} className="text-slate-400" />
+                                    <select 
+                                        value={selectedRestaurantId}
+                                        onChange={(e) => setSelectedRestaurantId(e.target.value)}
+                                        className="text-xs p-1.5 border border-slate-200 rounded-md bg-slate-50 text-slate-600 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                                    >
+                                        <option value="">Select Restaurant / Outlet</option>
+                                        {restaurants.map(r => (
+                                            <option key={r.id} value={r.id}>{r.restaurantName || r.name}</option>
+                                        ))}
+                                    </select>
+                                 </div>
+                             )}
 
                              <div className="flex gap-2">
                                 <button
@@ -449,10 +741,10 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                     onClick={handleSaveRecipe}
                                     disabled={isSaving}
                                     className="text-sm font-bold text-slate-600 hover:text-emerald-600 flex items-center gap-1 border border-slate-200 px-3 py-1.5 rounded hover:border-emerald-200 transition-colors disabled:opacity-50"
-                                    title={selectedRestaurantId ? "Send to Restaurant Database" : "Save to Library"}
+                                    title={activeRequest ? "Send to User" : selectedRestaurantId ? "Send to Restaurant Database" : "Save to Library"}
                                 >
                                     {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                                    {isSaving ? 'Sending...' : selectedRestaurantId ? 'Send to DB' : 'Save'}
+                                    {isSaving ? 'Saving...' : activeRequest ? 'Send to User' : selectedRestaurantId ? 'Send to DB' : 'Save'}
                                 </button>
                              </div>
                          </div>
@@ -550,36 +842,46 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                 <h3 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
                                     <ChefHat size={18} className="text-slate-600"/> Preparation
                                 </h3>
-                                <ol className="list-decimal pl-5 space-y-3 text-sm text-slate-700">
+                                <ol className="list-decimal pl-5 space-y-2 marker:font-bold marker:text-slate-400">
                                     {generatedRecipe.preparation_steps.map((step, i) => (
-                                        <li key={i} className="pl-2 leading-relaxed">{step}</li>
+                                        <li key={i} className="text-slate-700 leading-relaxed">{step}</li>
                                     ))}
                                 </ol>
                            </div>
 
-                           <div className="grid grid-cols-2 gap-6 pt-4 border-t border-slate-100">
-                               <div>
-                                    <span className="text-xs font-bold text-slate-400 uppercase block mb-2">Allergens</span>
+                           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-6 border-t border-slate-100">
+                                <div>
+                                     <h3 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
+                                        <div className="w-1.5 h-1.5 bg-slate-800 rounded-full"></div> Equipment
+                                    </h3>
                                     <div className="flex flex-wrap gap-2">
-                                        {generatedRecipe.allergens && generatedRecipe.allergens.length > 0 ? generatedRecipe.allergens.map(a => (
-                                            <span key={a} className="px-2 py-1 bg-red-50 text-red-600 rounded-md text-xs font-medium border border-red-100">{a}</span>
-                                        )) : <span className="text-xs text-slate-400">None detected</span>}
+                                        {generatedRecipe.equipment_needed.map((eq, i) => (
+                                            <span key={i} className="px-3 py-1 bg-slate-100 text-slate-600 text-xs rounded-full border border-slate-200">
+                                                {eq}
+                                            </span>
+                                        ))}
                                     </div>
-                               </div>
-                               <div>
-                                   <span className="text-xs font-bold text-slate-400 uppercase block mb-2">Equipment Needed</span>
-                                   <div className="flex flex-wrap gap-2">
-                                        {generatedRecipe.equipment_needed && generatedRecipe.equipment_needed.length > 0 ? generatedRecipe.equipment_needed.map(e => (
-                                            <span key={e} className="px-2 py-1 bg-slate-100 text-slate-600 rounded-md text-xs font-medium border border-slate-200">{e}</span>
-                                        )) : <span className="text-xs text-slate-400">Standard Kitchen Kit</span>}
+                                </div>
+                                <div>
+                                     <h3 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
+                                        <AlertCircle size={16} className="text-amber-500"/> Allergens & Info
+                                    </h3>
+                                    <div className="flex flex-wrap gap-2 mb-2">
+                                        {generatedRecipe.allergens.map((alg, i) => (
+                                            <span key={i} className="px-3 py-1 bg-amber-50 text-amber-700 text-xs font-bold rounded-full border border-amber-100">
+                                                {alg}
+                                            </span>
+                                        ))}
                                     </div>
-                               </div>
+                                    <div className="flex items-center gap-2 text-xs text-slate-500 mt-2">
+                                        <Clock size={14} /> Shelf Life: {generatedRecipe.shelf_life_hours} hours
+                                    </div>
+                                </div>
                            </div>
                         </div>
                     ) : (
-                        <div className="h-full flex flex-col items-center justify-center text-slate-400 opacity-60">
-                             <ChefHat size={64} className="mb-4 text-slate-300" />
-                             <p>Select an item from the menu to generate a recipe card</p>
+                        <div className="flex items-center justify-center h-full text-slate-400">
+                            Select an item to view details
                         </div>
                     )}
                 </div>

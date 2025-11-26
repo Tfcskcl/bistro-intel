@@ -44,12 +44,15 @@ const parseJSON = <T>(text: string | undefined): T => {
     }
 };
 
-export const generateRecipeCard = async (userId: string, item: MenuItem): Promise<RecipeCard> => {
+export const generateRecipeCard = async (userId: string, item: MenuItem, requirements?: string): Promise<RecipeCard> => {
   const ai = getClient();
   const currentIngredients = ingredientService.getAll(userId);
 
   const prompt = `
     Generate a standardized recipe card for SKU: ${item.sku_id} with name "${item.name}".
+    
+    Specific Customer Requirements & Context:
+    ${requirements || 'Standard preparation style.'}
     
     Context Data:
     Menu Item: ${JSON.stringify(item)}
@@ -175,13 +178,22 @@ export const generateStrategy = async (role: string, context: string): Promise<S
     User Request: ${context}
     
     Assume a generic restaurant scenario if no specific data is provided, but prioritize actionable advice.
+    Provide a comprehensive strategic analysis covering up to 12 months.
     
     Output as valid JSON:
     {
       "summary": ["string"],
       "causes": ["string"],
       "action_plan": [{"initiative": "string", "impact_estimate": "string", "cost_estimate": "string", "priority": "High|Medium|Low"}],
-      "seasonal_menu_suggestions": [{"type": "add|remove", "item": "string", "reason": "string"}]
+      "seasonal_menu_suggestions": [{"type": "add|remove", "item": "string", "reason": "string"}],
+      "roadmap": [
+        {
+          "phase_name": "string",
+          "duration": "string", 
+          "steps": ["string"],
+          "milestone": "string"
+        }
+      ]
     }
   `;
 

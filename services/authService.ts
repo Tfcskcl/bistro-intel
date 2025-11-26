@@ -37,11 +37,12 @@ const DEMO_USERS: (User & {password: string})[] = [
     email: 'owner@bistro.com',
     password: 'pass',
     role: UserRole.OWNER,
-    plan: PlanType.PRO,
+    plan: PlanType.PRO_PLUS, // Unlocked all options
     restaurantName: "The Golden Spoon",
     location: "Mumbai, Bandra",
     cuisineType: "Modern European",
-    joinedDate: "2023-09-15"
+    joinedDate: "2023-09-15",
+    isTrial: false
   },
   {
     id: 'demo_admin',
@@ -53,7 +54,8 @@ const DEMO_USERS: (User & {password: string})[] = [
     restaurantName: "The Golden Spoon",
     location: "Mumbai, Bandra",
     cuisineType: "Modern European",
-    joinedDate: "2023-09-20"
+    joinedDate: "2023-09-20",
+    isTrial: false
   },
   {
     id: 'sa_info_bistro',
@@ -65,7 +67,8 @@ const DEMO_USERS: (User & {password: string})[] = [
     restaurantName: "BistroHQ",
     location: "Indore",
     cuisineType: "HQ",
-    joinedDate: "2023-01-01"
+    joinedDate: "2023-01-01",
+    isTrial: false
   },
   {
     id: 'sa_amit',
@@ -77,7 +80,8 @@ const DEMO_USERS: (User & {password: string})[] = [
     restaurantName: "BistroHQ",
     location: "Indore",
     cuisineType: "HQ",
-    joinedDate: "2023-01-01"
+    joinedDate: "2023-01-01",
+    isTrial: false
   },
   {
     id: 'sa_info_chef',
@@ -89,7 +93,8 @@ const DEMO_USERS: (User & {password: string})[] = [
     restaurantName: "BistroHQ",
     location: "Indore",
     cuisineType: "HQ",
-    joinedDate: "2023-01-01"
+    joinedDate: "2023-01-01",
+    isTrial: false
   }
 ];
 
@@ -142,10 +147,9 @@ export const authService = {
         const mockUsers = getMockUsers();
         let updated = false;
         DEMO_USERS.forEach(demoUser => {
-            if (!mockUsers[demoUser.id]) {
-                mockUsers[demoUser.id] = demoUser;
-                updated = true;
-            }
+            // Always update demo users to ensure latest config (like plan changes)
+            mockUsers[demoUser.id] = demoUser;
+            updated = true;
         });
         if (updated) {
             localStorage.setItem(MOCK_DB_USERS_KEY, JSON.stringify(mockUsers));
@@ -213,9 +217,12 @@ export const authService = {
   },
 
   login: async (email: string, password: string): Promise<User> => {
+    const cleanEmail = email.trim();
+    const cleanPassword = password.trim();
+
     if (isFirebaseConfigured && auth) {
         try {
-            const userCredential = await signInWithEmailAndPassword(auth, email, password);
+            const userCredential = await signInWithEmailAndPassword(auth, cleanEmail, cleanPassword);
             const uid = userCredential.user.uid;
             const userProfile = await authService.getUserProfile(uid);
             if (!userProfile) throw new Error("User profile not found in database.");
@@ -230,13 +237,12 @@ export const authService = {
         const mockUsers = getMockUsers();
         
         // 1. Check if it's a hardcoded Demo User first (Priority)
-        // This ensures super admins always work even if local storage is stale
-        const demoUser = DEMO_USERS.find(u => u.email.toLowerCase() === email.toLowerCase());
+        const demoUser = DEMO_USERS.find(u => u.email.toLowerCase() === cleanEmail.toLowerCase());
         
         if (demoUser) {
-            if (demoUser.password === password) {
+            if (demoUser.password === cleanPassword) {
                 // Force update/save in mock DB to ensure latest details persist
-                saveMockUser(demoUser, password);
+                saveMockUser(demoUser, cleanPassword);
                 const { password: _, ...safeUser } = demoUser;
                 localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(safeUser));
                 notifyObservers(safeUser as User);
@@ -245,9 +251,9 @@ export const authService = {
         }
 
         // 2. Fallback to normal mock DB users (signups)
-        const storedUser = Object.values(mockUsers).find(u => u.email.toLowerCase() === email.toLowerCase());
+        const storedUser = Object.values(mockUsers).find(u => u.email.toLowerCase() === cleanEmail.toLowerCase());
         
-        if (storedUser && storedUser.password === password) {
+        if (storedUser && storedUser.password === cleanPassword) {
              const { password: _, ...safeUser } = storedUser;
              localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(safeUser));
              notifyObservers(safeUser as User);
@@ -287,7 +293,7 @@ export const authService = {
             const { password, ...safeUser } = user;
             return safeUser as User;
         }
-        // Fallback to demo users list if not found in LS (e.g. fresh browser)
+        // Fallback to demo users list if not found in LS
         const demoUser = DEMO_USERS.find(u => u.id === uid);
         if (demoUser) {
              const { password, ...safeUser } = demoUser;
@@ -299,8 +305,6 @@ export const authService = {
 
   getAllUsers: async (): Promise<User[]> => {
       if (isFirebaseConfigured && db) {
-          // NOTE: Listing all users is restricted in Client SDK. 
-          // We return empty for now unless using a specific query or Admin SDK.
           console.warn("getAllUsers requires Admin SDK or custom collection query.");
           return []; 
       } else {

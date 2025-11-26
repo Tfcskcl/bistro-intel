@@ -37,6 +37,17 @@ export interface RecipeCard extends MenuItem {
   assignedRestaurantName?: string;
 }
 
+export interface RecipeRequest {
+    id: string;
+    userId: string;
+    userName: string;
+    item: MenuItem;
+    requirements: string;
+    status: 'pending' | 'completed';
+    requestDate: string;
+    completedDate?: string;
+}
+
 export interface SOP {
   sop_id: string;
   title: string;
@@ -50,11 +61,30 @@ export interface SOP {
   quick_troubleshooting: string;
 }
 
+export interface SOPRequest {
+    id: string;
+    userId: string;
+    userName: string;
+    topic: string;
+    details?: string;
+    status: 'pending' | 'completed';
+    requestDate: string;
+    completedDate?: string;
+}
+
+export interface RoadmapPhase {
+    phase_name: string;
+    duration: string;
+    steps: string[];
+    milestone: string;
+}
+
 export interface StrategyReport {
   summary: string[];
   causes: string[];
   action_plan: { initiative: string; impact_estimate: string; cost_estimate: string; priority: 'High' | 'Medium' | 'Low' }[];
   seasonal_menu_suggestions: { type: 'add' | 'remove'; item: string; reason: string }[];
+  roadmap: RoadmapPhase[];
 }
 
 export interface ImplementationGuide {

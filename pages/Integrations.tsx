@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { UploadCloud, Database, CheckCircle2, Server, Loader2, X, RefreshCw, FileSpreadsheet, Download, Settings, Key, AlertTriangle, ArrowRight, ShieldCheck, BookOpen, Copy, ExternalLink, Save } from 'lucide-react';
+import { UploadCloud, Database, CheckCircle2, Server, Loader2, X, RefreshCw, FileSpreadsheet, Download, Settings, Key, AlertTriangle, ArrowRight, ShieldCheck, BookOpen, Copy, ExternalLink, Save, Receipt } from 'lucide-react';
 import { storageService } from '../services/storageService';
 import { POSChangeRequest, User, UserRole } from '../types';
 import { authService } from '../services/authService';
@@ -84,6 +84,7 @@ export const Integrations: React.FC = () => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const purchaseInputRef = useRef<HTMLInputElement>(null);
+  const expenseInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
       if (currentUser) {
@@ -145,6 +146,10 @@ export const Integrations: React.FC = () => {
   const handlePurchaseClick = () => {
       purchaseInputRef.current?.click();
   };
+  
+  const handleExpenseClick = () => {
+      expenseInputRef.current?.click();
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: string) => {
       if (e.target.files && e.target.files.length > 0) {
@@ -157,6 +162,7 @@ export const Integrations: React.FC = () => {
               setUploadSuccess(`${type}: ${fileName} processed successfully.`);
               if (fileInputRef.current) fileInputRef.current.value = '';
               if (purchaseInputRef.current) purchaseInputRef.current.value = '';
+              if (expenseInputRef.current) expenseInputRef.current.value = '';
           }, 2000);
       }
   };
@@ -474,6 +480,25 @@ export const Integrations: React.FC = () => {
                         onChange={(e) => handleFileChange(e, 'Purchase Logs')}
                         className="hidden" 
                         accept=".csv,.xlsx"
+                    />
+                </div>
+
+                {/* Expense Upload */}
+                <div 
+                    onClick={handleExpenseClick}
+                    className="p-6 border-2 border-dashed border-slate-200 rounded-xl hover:bg-slate-50 hover:border-purple-300 transition-all cursor-pointer group text-center"
+                >
+                    <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
+                        <Receipt size={24} />
+                    </div>
+                    <h4 className="font-bold text-slate-700">Upload Expenses & Salaries</h4>
+                    <p className="text-xs text-slate-400 mt-1">PDF, Images, Excel, etc.</p>
+                    <input 
+                        type="file" 
+                        ref={expenseInputRef}
+                        onChange={(e) => handleFileChange(e, 'Operational Expenses')}
+                        className="hidden" 
+                        accept=".pdf,image/*,.csv,.xlsx,.doc,.docx"
                     />
                 </div>
             </div>

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { DollarSign, ShoppingBag, Utensils, AlertTriangle, Users, Clock, TrendingUp, Activity, MapPin, Globe, Eye, UserX, UserPlus, Zap, Edit, Save, Brain, Database, ArrowRight, X, ChevronRight, Search, Mail, Phone, Calendar, Shield, ShieldCheck, Trash2, Terminal, UploadCloud, FileText, CheckCircle2 } from 'lucide-react';
+import { DollarSign, ShoppingBag, Utensils, AlertTriangle, Users, Clock, TrendingUp, Activity, MapPin, Globe, Eye, UserX, UserPlus, Zap, Edit, Save, Brain, Database, ArrowRight, X, ChevronRight, Search, Mail, Phone, Calendar, Shield, ShieldCheck, Trash2, Terminal, UploadCloud, FileText, CheckCircle2, Sliders, Cpu, Layers } from 'lucide-react';
 import { StatCard } from '../components/StatCard';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { User, UserRole, PlanType, VisitorSession, PlanConfig } from '../types';
@@ -114,6 +114,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
       const [trainingStatus, setTrainingStatus] = useState<'idle' | 'training' | 'complete'>('idle');
       const [trainingProgress, setTrainingProgress] = useState(0);
       const [trainingLogs, setTrainingLogs] = useState<string[]>([]);
+      const [trainingConfig, setTrainingConfig] = useState({
+          epochs: 20,
+          learningRate: 0.001,
+          batchSize: 64,
+          temperature: 0.7
+      });
+      const [activeDatasets, setActiveDatasets] = useState<string[]>(['sales', 'recipes']);
+      
       const logsEndRef = useRef<HTMLDivElement>(null);
       
       // File Upload State for Training
@@ -247,35 +255,56 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
           }
       };
 
+      const toggleDataset = (id: string) => {
+          setActiveDatasets(prev => 
+              prev.includes(id) ? prev.filter(d => d !== id) : [...prev, id]
+          );
+      };
+
       const startTraining = () => {
           setTrainingStatus('training');
           setTrainingProgress(0);
-          setTrainingLogs(['Initializing training sequence...', 'Connecting to data lake...']);
+          setTrainingLogs([
+              'Initializing Training Sequence...', 
+              `Configuration: Epochs=${trainingConfig.epochs}, Batch=${trainingConfig.batchSize}, LR=${trainingConfig.learningRate}`,
+              `Selected Datasets: [${activeDatasets.join(', ')}]`,
+              'Connecting to Vector Database...'
+          ]);
           
           let progress = 0;
+          let currentEpoch = 1;
+
           const interval = setInterval(() => {
               progress += Math.floor(Math.random() * 4) + 1;
+              
               if (progress >= 100) {
                   clearInterval(interval);
                   setTrainingStatus('complete');
                   setTrainingProgress(100);
-                  setTrainingLogs(prev => [...prev, 'Weights updated.', 'Validation score: 98.4%', 'Training Complete.']);
+                  setTrainingLogs(prev => [...prev, `Epoch ${trainingConfig.epochs}/${trainingConfig.epochs} Complete.`, 'Validating Model...', 'Weights updated successfully. Accuracy: 98.4%']);
               } else {
                   setTrainingProgress(progress);
-                  if (Math.random() > 0.6) {
+                  
+                  // Simulate Epoch Progression
+                  if (progress > (currentEpoch / trainingConfig.epochs) * 100 && currentEpoch < trainingConfig.epochs) {
+                      currentEpoch++;
+                      setTrainingLogs(prev => [...prev, `Epoch ${currentEpoch-1}/${trainingConfig.epochs} finished. Loss: ${(Math.random() * 0.5).toFixed(4)}`]);
+                  }
+
+                  // Random Logs
+                  if (Math.random() > 0.8) {
                       const msgs = [
-                          'Vectorizing recipe data...',
-                          'Processing sales anomalies...',
-                          'Optimizing neural weights...',
-                          'Ingesting user feedback...',
-                          'Calibrating loss function...',
-                          'Syncing with global model...'
+                          'Optimizing gradients...',
+                          'Backpropagating loss...',
+                          'Shuffling batch data...',
+                          'Normalizing input vectors...',
+                          'Dropping out neurons (0.2)...'
                       ];
                       
                       // Inject custom file logs occasionally
-                      if (customTrainingFiles.length > 0 && Math.random() > 0.7) {
+                      if (customTrainingFiles.length > 0 && Math.random() > 0.85) {
                           const randomFile = customTrainingFiles[Math.floor(Math.random() * customTrainingFiles.length)];
-                          setTrainingLogs(prev => [...prev, `Ingesting custom dataset: ${randomFile.name}...`, `Parsing ${randomFile.size} of data...`]);
+                          setTrainingLogs(prev => [...prev, `Ingesting custom dataset chunk: ${randomFile.name}...`]);
                       } else {
                           setTrainingLogs(prev => [...prev, msgs[Math.floor(Math.random() * msgs.length)]]);
                       }
@@ -713,7 +742,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
             {/* --- TAB CONTENT: PLANS --- */}
             {activeTab === 'plans' && (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-fade-in">
-                    {Object.entries(plans).map(([key, plan]) => {
+                    {(Object.entries(plans) as [string, PlanConfig][]).map(([key, plan]) => {
                         const planType = key as PlanType;
                         const isEditing = editingPlan === planType;
                         return (
@@ -782,115 +811,219 @@ export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
 
             {/* --- TAB CONTENT: TRAINING --- */}
             {activeTab === 'training' && (
-                <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden animate-fade-in">
-                    <div className="p-8 text-center max-w-3xl mx-auto">
-                        <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center mx-auto mb-6">
-                            <Brain size={32} />
-                        </div>
-                        <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Train the AI Model</h2>
-                        <p className="text-slate-500 dark:text-slate-400 mb-8">
-                            Enhance the AI's accuracy by feeding it anonymized, aggregated data from live user sessions, recipes, and sales trends.
-                        </p>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in">
+                    {/* Left Column: Configuration */}
+                    <div className="lg:col-span-1 space-y-6">
                         
-                        {trainingStatus === 'idle' ? (
-                            <div className="mb-8">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8 text-left">
-                                    {[
-                                        { label: 'Sales Patterns', desc: 'Seasonality & trend data from 500+ outlets', count: '12.5MB' },
-                                        { label: 'Recipe Correlations', desc: 'Ingredient pairings and costing logic', count: '8.2MB' },
-                                        { label: 'User Interactions', desc: 'Common strategy queries and corrections', count: '4.1MB' },
-                                        { label: 'Market Prices', desc: 'Real-time ingredient pricing scrape', count: '1.2MB' }
-                                    ].map((item, i) => (
-                                        <label key={i} className="flex items-start gap-3 p-4 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer">
-                                            <input type="checkbox" defaultChecked className="mt-1 w-4 h-4 text-blue-600 rounded focus:ring-blue-500" />
-                                            <div>
-                                                <div className="font-bold text-slate-800 dark:text-slate-200">{item.label}</div>
-                                                <div className="text-xs text-slate-500 mt-0.5">{item.desc}</div>
-                                            </div>
-                                            <div className="ml-auto text-xs font-mono font-bold text-slate-400">{item.count}</div>
-                                        </label>
-                                    ))}
-                                    
-                                    {/* Custom Uploaded Files */}
-                                    {customTrainingFiles.map((file, i) => (
-                                        <label key={`custom-${i}`} className="flex items-start gap-3 p-4 border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/10 rounded-xl cursor-pointer">
-                                            <input type="checkbox" defaultChecked className="mt-1 w-4 h-4 text-emerald-600 rounded focus:ring-emerald-500" />
-                                            <div>
-                                                <div className="font-bold text-emerald-800 dark:text-emerald-300">{file.name}</div>
-                                                <div className="text-xs text-emerald-600 dark:text-emerald-500 mt-0.5 flex items-center gap-1">
-                                                    <CheckCircle2 size={10} /> Ready to ingest
-                                                </div>
-                                            </div>
-                                            <div className="ml-auto text-xs font-mono font-bold text-slate-400">{file.size}</div>
-                                        </label>
-                                    ))}
-                                </div>
-
-                                {/* File Upload Area */}
-                                <div 
-                                    onClick={() => fileInputRef.current?.click()}
-                                    className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl p-6 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer group mb-8"
-                                >
-                                    <div className="flex flex-col items-center gap-2">
-                                        <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 group-hover:text-blue-600 transition-colors">
-                                            <UploadCloud size={20} />
+                        {/* Data Ingestion */}
+                        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm p-6">
+                            <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2 mb-4">
+                                <Database size={18} className="text-blue-500" /> Data Sources
+                            </h3>
+                            <div className="space-y-3">
+                                {[
+                                    { id: 'sales', label: 'Sales Patterns', desc: 'Seasonality data', size: '12.5MB' },
+                                    { id: 'recipes', label: 'Recipe Logic', desc: 'Ingredient pairings', size: '8.2MB' },
+                                    { id: 'interactions', label: 'User Queries', desc: 'Strategy corrections', size: '4.1MB' },
+                                    { id: 'market', label: 'Market Prices', desc: 'Real-time scrape', size: '1.2MB' }
+                                ].map((item) => (
+                                    <div 
+                                        key={item.id} 
+                                        onClick={() => toggleDataset(item.id)}
+                                        className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
+                                            activeDatasets.includes(item.id) 
+                                            ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' 
+                                            : 'bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-700 hover:border-slate-300'
+                                        }`}
+                                    >
+                                        <div className={`w-4 h-4 rounded border flex items-center justify-center ${
+                                            activeDatasets.includes(item.id) ? 'bg-blue-500 border-blue-500 text-white' : 'bg-white border-slate-300'
+                                        }`}>
+                                            {activeDatasets.includes(item.id) && <CheckCircle2 size={10} />}
                                         </div>
-                                        <p className="text-sm font-bold text-slate-600 dark:text-slate-300">Upload Custom Training Data</p>
-                                        <p className="text-xs text-slate-400">Supports .csv, .json, .pdf (Max 50MB)</p>
+                                        <div className="flex-1">
+                                            <div className="text-sm font-bold text-slate-700 dark:text-slate-200">{item.label}</div>
+                                            <div className="text-[10px] text-slate-500">{item.desc}</div>
+                                        </div>
+                                        <div className="text-[10px] font-mono font-bold text-slate-400">{item.size}</div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Custom Upload */}
+                            <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                                <p className="text-xs font-bold text-slate-400 uppercase mb-2">Custom Datasets</p>
+                                {customTrainingFiles.map((file, i) => (
+                                    <div key={i} className="flex items-center gap-2 text-xs text-emerald-600 bg-emerald-50 dark:bg-emerald-900/10 p-2 rounded mb-2 border border-emerald-100 dark:border-emerald-800">
+                                        <CheckCircle2 size={12} /> {file.name}
+                                    </div>
+                                ))}
+                                <button 
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="w-full py-2 border border-dashed border-slate-300 dark:border-slate-700 rounded-lg text-xs font-bold text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-center gap-2 transition-colors"
+                                >
+                                    <UploadCloud size={14} /> Upload CSV/JSON
+                                </button>
+                                <input 
+                                    type="file" 
+                                    ref={fileInputRef} 
+                                    className="hidden" 
+                                    onChange={handleTrainingFileUpload}
+                                    accept=".csv,.json,.pdf,.txt"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Hyperparameters */}
+                        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm p-6">
+                            <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2 mb-4">
+                                <Sliders size={18} className="text-emerald-500" /> Hyperparameters
+                            </h3>
+                            <div className="space-y-5">
+                                <div>
+                                    <div className="flex justify-between text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">
+                                        <span>Epochs</span>
+                                        <span className="text-emerald-600">{trainingConfig.epochs}</span>
                                     </div>
                                     <input 
-                                        type="file" 
-                                        ref={fileInputRef} 
-                                        className="hidden" 
-                                        onChange={handleTrainingFileUpload}
-                                        accept=".csv,.json,.pdf,.txt"
+                                        type="range" min="1" max="100" step="1"
+                                        value={trainingConfig.epochs}
+                                        onChange={e => setTrainingConfig({...trainingConfig, epochs: parseInt(e.target.value)})}
+                                        className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                                    />
+                                </div>
+                                <div>
+                                    <div className="flex justify-between text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">
+                                        <span>Learning Rate</span>
+                                        <span className="text-emerald-600">{trainingConfig.learningRate}</span>
+                                    </div>
+                                    <input 
+                                        type="range" min="0.0001" max="0.01" step="0.0001"
+                                        value={trainingConfig.learningRate}
+                                        onChange={e => setTrainingConfig({...trainingConfig, learningRate: parseFloat(e.target.value)})}
+                                        className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                                    />
+                                </div>
+                                <div>
+                                    <div className="flex justify-between text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">
+                                        <span>Batch Size</span>
+                                        <span className="text-emerald-600">{trainingConfig.batchSize}</span>
+                                    </div>
+                                    <select 
+                                        value={trainingConfig.batchSize}
+                                        onChange={e => setTrainingConfig({...trainingConfig, batchSize: parseInt(e.target.value)})}
+                                        className="w-full p-2 text-xs border border-slate-200 dark:border-slate-700 rounded bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-white"
+                                    >
+                                        <option value="16">16</option>
+                                        <option value="32">32</option>
+                                        <option value="64">64</option>
+                                        <option value="128">128</option>
+                                    </select>
+                                </div>
+                                 <div>
+                                    <div className="flex justify-between text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">
+                                        <span>Creativity (Temp)</span>
+                                        <span className="text-emerald-600">{trainingConfig.temperature}</span>
+                                    </div>
+                                    <input 
+                                        type="range" min="0.1" max="1.5" step="0.1"
+                                        value={trainingConfig.temperature}
+                                        onChange={e => setTrainingConfig({...trainingConfig, temperature: parseFloat(e.target.value)})}
+                                        className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-500"
                                     />
                                 </div>
                             </div>
-                        ) : trainingStatus === 'training' ? (
-                            <div className="mb-8 text-left">
-                                <div className="h-4 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mb-2">
-                                    <div 
-                                        className="h-full bg-blue-600 transition-all duration-200"
-                                        style={{ width: `${trainingProgress}%` }}
-                                    ></div>
-                                </div>
-                                <p className="text-sm font-bold text-blue-600 animate-pulse text-center mb-4">Processing vector embeddings... {trainingProgress}%</p>
-                                
-                                {/* Terminal Logs */}
-                                <div className="bg-slate-950 rounded-lg p-4 font-mono text-xs text-green-400 h-48 overflow-y-auto border border-slate-800 shadow-inner">
-                                    <div className="flex items-center gap-2 mb-2 pb-2 border-b border-slate-800 text-slate-500">
-                                        <Terminal size={12} /> Training Log Stream
-                                    </div>
-                                    <div className="space-y-1">
-                                        {trainingLogs.map((log, i) => (
-                                            <div key={i} className="animate-fade-in">&gt; {log}</div>
-                                        ))}
-                                        <div ref={logsEndRef} className="animate-pulse">&gt; _</div>
-                                    </div>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-300 p-6 rounded-xl border border-emerald-100 dark:border-emerald-800 mb-8">
-                                <div className="text-lg font-bold flex items-center justify-center gap-2 mb-2">
-                                    <Zap size={20} fill="currentColor"/> Training Complete!
-                                </div>
-                                <p>The model has been updated with the latest live data. Accuracy improved by ~4.2%.</p>
-                                <div className="mt-4 p-4 bg-slate-900 rounded-lg text-left font-mono text-xs text-green-400 max-h-32 overflow-y-auto">
-                                    {trainingLogs.slice(-5).map((log, i) => <div key={i}>&gt; {log}</div>)}
-                                </div>
-                            </div>
-                        )}
+                        </div>
 
                         <button 
                             onClick={trainingStatus === 'idle' ? startTraining : () => setTrainingStatus('idle')}
-                            disabled={trainingStatus === 'training'}
-                            className="px-8 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold rounded-lg hover:opacity-90 disabled:opacity-50 transition-all flex items-center justify-center gap-2 mx-auto"
+                            disabled={trainingStatus === 'training' || activeDatasets.length === 0}
+                            className={`w-full py-3 font-bold rounded-lg flex items-center justify-center gap-2 shadow-lg transition-all ${
+                                trainingStatus === 'idle' 
+                                ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:opacity-90' 
+                                : trainingStatus === 'training'
+                                    ? 'bg-slate-800 text-slate-400 cursor-not-allowed'
+                                    : 'bg-emerald-500 text-white'
+                            }`}
                         >
-                            {trainingStatus === 'idle' ? <><Database size={18} /> Start Training Process</> : 
+                            {trainingStatus === 'idle' ? <><Cpu size={18} /> Start Training</> : 
                              trainingStatus === 'training' ? <><Activity className="animate-spin" size={18}/> Training...</> :
-                             'Done'}
+                             'Training Complete'}
                         </button>
+                    </div>
+
+                    {/* Right Column: Console & Viz */}
+                    <div className="lg:col-span-2 space-y-6">
+                        
+                        {/* Status Card */}
+                        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm p-8 flex flex-col items-center justify-center text-center min-h-[200px]">
+                            {trainingStatus === 'idle' ? (
+                                <>
+                                    <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/20 text-blue-500 rounded-full flex items-center justify-center mb-4">
+                                        <Brain size={32} />
+                                    </div>
+                                    <h2 className="text-xl font-bold text-slate-800 dark:text-white">Ready to Train</h2>
+                                    <p className="text-slate-500 dark:text-slate-400 mt-2 max-w-md">
+                                        Configure your dataset and hyperparameters on the left, then initialize the neural network update.
+                                    </p>
+                                </>
+                            ) : trainingStatus === 'training' ? (
+                                <>
+                                     <div className="relative w-20 h-20 mb-6">
+                                         <svg className="w-full h-full transform -rotate-90">
+                                             <circle cx="40" cy="40" r="36" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-slate-100 dark:text-slate-800" />
+                                             <circle cx="40" cy="40" r="36" stroke="currentColor" strokeWidth="8" fill="transparent" strokeDasharray={226} strokeDashoffset={226 - (226 * trainingProgress) / 100} className="text-blue-500 transition-all duration-300 ease-linear" />
+                                         </svg>
+                                         <div className="absolute inset-0 flex items-center justify-center font-bold text-xl text-blue-600">
+                                             {trainingProgress}%
+                                         </div>
+                                     </div>
+                                     <h2 className="text-xl font-bold text-slate-800 dark:text-white animate-pulse">Training Model...</h2>
+                                     <p className="text-slate-500 dark:text-slate-400 mt-2">Optimization in progress. Do not close this tab.</p>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 rounded-full flex items-center justify-center mb-4 animate-scale-in">
+                                        <Zap size={32} fill="currentColor" />
+                                    </div>
+                                    <h2 className="text-xl font-bold text-emerald-700 dark:text-emerald-400">Model Updated Successfully</h2>
+                                    <p className="text-slate-500 dark:text-slate-400 mt-2">
+                                        Version <span className="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">v2.4.1</span> is now live across all 500+ nodes.
+                                    </p>
+                                </>
+                            )}
+                        </div>
+
+                        {/* Terminal */}
+                        <div className="bg-slate-950 rounded-xl overflow-hidden border border-slate-800 shadow-2xl flex flex-col h-[400px]">
+                            <div className="px-4 py-2 bg-slate-900 border-b border-slate-800 flex items-center gap-2">
+                                <Terminal size={14} className="text-slate-400" />
+                                <span className="text-xs font-mono font-bold text-slate-400">training_console.log</span>
+                                <div className="ml-auto flex gap-1.5">
+                                    <div className="w-2.5 h-2.5 rounded-full bg-red-500/50"></div>
+                                    <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/50"></div>
+                                    <div className="w-2.5 h-2.5 rounded-full bg-green-500/50"></div>
+                                </div>
+                            </div>
+                            <div className="flex-1 p-4 font-mono text-xs text-emerald-400 overflow-y-auto space-y-1">
+                                {trainingLogs.length === 0 ? (
+                                    <span className="text-slate-600 opacity-50 select-none">&gt; Waiting for command...</span>
+                                ) : (
+                                    <>
+                                        {trainingLogs.map((log, i) => (
+                                            <div key={i} className="animate-fade-in break-words">
+                                                <span className="text-slate-500 mr-2">[{new Date().toLocaleTimeString()}]</span>
+                                                {log}
+                                            </div>
+                                        ))}
+                                        {trainingStatus === 'training' && (
+                                            <div ref={logsEndRef} className="animate-pulse text-emerald-600">&gt; _</div>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+                        </div>
+
                     </div>
                 </div>
             )}

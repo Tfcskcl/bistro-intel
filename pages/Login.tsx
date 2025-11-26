@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { ArrowRight, AlertCircle, CheckCircle2, ArrowLeft, Mail, KeyRound, Store, MapPin, ChefHat, ShieldCheck, User as UserIcon, Shield, FileText, Upload, Loader2 } from 'lucide-react';
 import { User, UserRole, PlanType } from '../types';
@@ -56,7 +57,6 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
         const user = await authService.login(email, password);
         
         // CHECK: If this is a Demo Account or new user, seed data if empty
-        // We use the ID returned by Firebase
         storageService.seedDemoData(user.id);
 
         onLogin(user);
@@ -96,14 +96,14 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
     setSuccessMsg(null);
   };
 
-  const fillCredentials = (role: 'owner' | 'admin' | 'super') => {
+  const fillCredentials = (role: 'owner' | 'admin' | 'super_admin') => {
     if (role === 'owner') {
       setEmail('owner@bistro.com');
       setPassword('pass');
     } else if (role === 'admin') {
       setEmail('admin@bistro.com');
       setPassword('pass');
-    } else {
+    } else if (role === 'super_admin') {
       setEmail('info@bistroconnect.in');
       setPassword('Bistro@2403');
     }
@@ -355,21 +355,9 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
             <div className="flex gap-2 justify-center">
               <button 
                 onClick={() => fillCredentials('owner')}
-                className="px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-medium text-slate-600 dark:text-slate-300 transition-colors flex items-center gap-1.5"
+                className="px-6 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-medium text-slate-600 dark:text-slate-300 transition-colors flex items-center gap-1.5"
               >
                 <UserIcon size={12} /> F&B Entrepreneur
-              </button>
-              <button 
-                onClick={() => fillCredentials('admin')}
-                className="px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-medium text-slate-600 dark:text-slate-300 transition-colors flex items-center gap-1.5"
-              >
-                <Shield size={12} /> Admin
-              </button>
-              <button 
-                onClick={() => fillCredentials('super')}
-                className="px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-xs font-medium text-slate-600 dark:text-slate-300 transition-colors flex items-center gap-1.5 border border-slate-200 dark:border-slate-700"
-              >
-                <ShieldCheck size={12} className="text-emerald-600 dark:text-emerald-400" /> Super Admin
               </button>
             </div>
           </div>

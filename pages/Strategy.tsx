@@ -2,7 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import { generateStrategy, generateImplementationPlan } from '../services/geminiService';
 import { StrategyReport, UserRole, User, PlanType, ImplementationGuide } from '../types';
-import { Send, Loader2, User as UserIcon, Briefcase, TrendingUp, Lock, HelpCircle, ArrowRight, Play, LifeBuoy, CheckCircle2, Clock, X, BookOpen, UserCheck, Calendar, Zap, ChevronDown, Trash2, Sparkles } from 'lucide-react';
+import { Send, Loader2, User as UserIcon, Briefcase, TrendingUp, Lock, HelpCircle, ArrowRight, Play, LifeBuoy, CheckCircle2, Clock, X, BookOpen, UserCheck, Calendar, Zap, ChevronDown, Trash2, Sparkles, Activity, Target, AlertTriangle, ArrowUpRight, ArrowDownRight, Lightbulb, Map } from 'lucide-react';
+import { 
+  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend 
+} from 'recharts';
 
 interface StrategyProps {
     user: User;
@@ -32,6 +35,14 @@ const ROLE_SPECIFIC_PROMPTS = {
         "Revenue forecast for Q4",
         "Compare outlet performance"
     ]
+};
+
+const COLORS = {
+  High: '#ef4444', // red-500
+  Medium: '#f59e0b', // amber-500
+  Low: '#3b82f6', // blue-500
+  add: '#10b981', // emerald-500
+  remove: '#ef4444' // red-500
 };
 
 export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
@@ -200,6 +211,21 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
   
   const updateActionStatus = (index: number, status: 'idle' | 'in_progress' | 'completed') => {
       setActionStates(prev => ({ ...prev, [index]: status }));
+  };
+
+  // Chart Data Helpers
+  const getPriorityData = () => {
+      if (!report) return [];
+      const counts = (report.action_plan || []).reduce((acc, item) => {
+          acc[item.priority] = (acc[item.priority] || 0) + 1;
+          return acc;
+      }, {} as Record<string, number>);
+
+      return [
+          { name: 'High', value: counts['High'] || 0, color: COLORS.High },
+          { name: 'Medium', value: counts['Medium'] || 0, color: COLORS.Medium },
+          { name: 'Low', value: counts['Low'] || 0, color: COLORS.Low }
+      ].filter(d => d.value > 0);
   };
 
   return (
@@ -372,7 +398,7 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
       )}
 
       {/* Header / Role Selector */}
-      <div className="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+      <div className="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between z-20">
         <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
             <div className="p-2 bg-emerald-100 text-emerald-700 rounded-lg">
@@ -395,8 +421,8 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                 </div>
             )}
             </div>
-            <div className="h-6 w-px bg-slate-300 mx-2"></div>
-            <p className="text-sm text-slate-500 italic hidden sm:block">"Ask me about sales, costs, or seasonal strategy..."</p>
+            <div className="h-6 w-px bg-slate-300 mx-2 hidden sm:block"></div>
+            <p className="text-sm text-slate-500 italic hidden sm:block">"Ask me about sales, costs, or long-term strategy..."</p>
         </div>
         
         {user.isTrial && (
@@ -408,17 +434,20 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
       </div>
 
       {/* Chat Area */}
-      <div className="flex-1 overflow-y-auto p-6 bg-slate-50 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-8 bg-slate-50 custom-scrollbar">
         {!report && !loading && (
           <div className="h-full flex flex-col items-center justify-center p-4">
-            <div className="text-slate-400 opacity-60 mb-8 flex flex-col items-center">
-                <TrendingUp size={64} className="mb-4" />
-                <p className="text-lg font-medium">Ready to analyze your business data</p>
+            <div className="text-slate-400 opacity-60 mb-8 flex flex-col items-center animate-fade-in-up">
+                <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-6">
+                    <TrendingUp size={40} className="text-slate-400" />
+                </div>
+                <p className="text-lg font-medium text-slate-500">Strategic Business Intelligence</p>
+                <p className="text-sm text-slate-400 mt-2 max-w-sm text-center">BistroIntel processes your sales, menu, and inventory to suggest profitable strategies.</p>
             </div>
             
-            <div className="w-full max-w-3xl">
+            <div className="w-full max-w-4xl animate-fade-in-up" style={{ animationDelay: '100ms' }}>
                 <div className="flex items-center gap-2 mb-4 justify-center">
-                    <HelpCircle size={16} className="text-slate-400" />
+                    <HelpCircle size={16} className="text-emerald-500" />
                     <p className="text-sm font-bold text-slate-500 uppercase tracking-wide">Common Strategy Queries</p>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -426,13 +455,15 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                         <button 
                             key={idx}
                             onClick={() => handleSend(faq.prompt)}
-                            className="text-left p-4 bg-white border border-slate-200 rounded-xl hover:border-emerald-400 hover:shadow-md transition-all group"
+                            className="text-left p-6 bg-white border border-slate-200 rounded-xl hover:border-emerald-400 hover:shadow-lg transition-all group relative overflow-hidden"
                         >
-                            <h4 className="font-bold text-slate-700 group-hover:text-emerald-700 mb-1 flex items-center justify-between">
+                            <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity bg-emerald-500 rounded-bl-2xl">
+                                <Sparkles size={24} className="text-white" />
+                            </div>
+                            <h4 className="font-bold text-slate-700 group-hover:text-emerald-700 mb-2 flex items-center justify-between pr-8">
                                 {faq.question}
-                                <ArrowRight size={16} className="opacity-0 group-hover:opacity-100 transition-opacity text-emerald-500"/>
                             </h4>
-                            <p className="text-xs text-slate-500 line-clamp-2">{faq.prompt}</p>
+                            <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">{faq.prompt}</p>
                         </button>
                     ))}
                 </div>
@@ -442,112 +473,251 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
 
         {loading && (
            <div className="flex justify-center items-center h-full">
-             <div className="flex flex-col items-center gap-3">
-               <Loader2 className="animate-spin text-emerald-600" size={32} />
-               <p className="text-slate-500 animate-pulse">Analyzing sales, purchases, and employee data...</p>
+             <div className="flex flex-col items-center gap-4 bg-white p-8 rounded-2xl shadow-xl border border-slate-100 animate-scale-in">
+               <Loader2 className="animate-spin text-emerald-600" size={40} />
+               <div>
+                   <p className="text-slate-800 font-bold text-lg text-center">Analyzing Data Points...</p>
+                   <p className="text-slate-500 text-sm mt-1 animate-pulse text-center">Reviewing sales, purchases, and employee logs</p>
+               </div>
              </div>
            </div>
         )}
 
         {report && (
-          <div className="max-w-3xl mx-auto space-y-6 animate-fade-in">
-            {/* Summary */}
-            <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
-              <h3 className="text-lg font-bold text-slate-800 mb-4 border-b border-slate-100 pb-2">Executive Summary</h3>
-              <ul className="space-y-2">
-                {(report.summary || []).map((item, i) => (
-                  <li key={i} className="flex items-start gap-2 text-slate-700">
-                    <span className="text-emerald-500 mt-1.5">•</span>
-                    {item}
-                  </li>
-                ))}
-              </ul>
+          <div className="max-w-6xl mx-auto space-y-8 animate-fade-in pb-20">
+            
+            {/* Header */}
+            <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 bg-emerald-600 text-white rounded-lg shadow-lg shadow-emerald-500/30">
+                    <Target size={24} />
+                </div>
+                <div>
+                    <h2 className="text-2xl font-bold text-slate-900">Strategic Analysis Report</h2>
+                    <p className="text-sm text-slate-500">Generated for: {role.replace('_', ' ')} • {new Date().toLocaleDateString()}</p>
+                </div>
             </div>
 
+            {/* Top Row: Executive Summary & Priority Chart */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                {/* Executive Summary */}
+                <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden flex flex-col">
+                   <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"></div>
+                   
+                   <div className="p-6 border-b border-slate-100 flex items-center gap-2">
+                       <Sparkles className="text-emerald-500" size={20} />
+                       <h3 className="text-lg font-bold text-slate-800">Executive Summary</h3>
+                   </div>
+                   
+                   <div className="p-6 flex-1">
+                       <ul className="space-y-4">
+                           {(report.summary || []).map((item, i) => (
+                               <li key={i} className="flex gap-4">
+                                   <div className="mt-1 w-6 h-6 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-xs font-bold shrink-0 border border-slate-200">
+                                       {i+1}
+                                   </div>
+                                   <p className="text-slate-700 leading-relaxed font-medium">{item}</p>
+                               </li>
+                           ))}
+                       </ul>
+                   </div>
+                </div>
+
+                {/* Priority Breakdown Chart */}
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col">
+                    <div className="p-6 border-b border-slate-100">
+                        <h4 className="text-sm font-bold text-slate-500 uppercase tracking-wide">Initiative Priority</h4>
+                    </div>
+                    <div className="flex-1 min-h-[250px] relative">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie
+                                    data={getPriorityData()}
+                                    cx="50%"
+                                    cy="50%"
+                                    innerRadius={60}
+                                    outerRadius={80}
+                                    paddingAngle={5}
+                                    dataKey="value"
+                                >
+                                    {getPriorityData().map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={entry.color} />
+                                    ))}
+                                </Pie>
+                                <RechartsTooltip 
+                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                                />
+                                <Legend verticalAlign="bottom" height={36}/>
+                            </PieChart>
+                        </ResponsiveContainer>
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="text-center">
+                                <span className="text-3xl font-bold text-slate-800">{(report.action_plan || []).length}</span>
+                                <p className="text-xs text-slate-400 font-bold uppercase">Actions</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Diagnosis: Root Causes */}
+            {report.causes && report.causes.length > 0 && (
+                <div className="bg-amber-50 rounded-2xl border border-amber-100 p-6 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-4 opacity-10">
+                        <Activity size={120} className="text-amber-500" />
+                    </div>
+                    <div className="relative z-10">
+                        <h3 className="text-lg font-bold text-amber-900 mb-4 flex items-center gap-2">
+                           <Activity size={20} /> Diagnostic: Root Causes
+                        </h3>
+                        <div className="grid md:grid-cols-2 gap-4">
+                            {report.causes.map((cause, i) => (
+                                <div key={i} className="bg-white/80 p-4 rounded-xl border border-amber-200/50 flex gap-3 items-start">
+                                    <AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" />
+                                    <p className="text-sm text-amber-900 font-medium">{cause}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Strategic Roadmap (12-Month) */}
+            {report.roadmap && report.roadmap.length > 0 && (
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div className="p-6 border-b border-slate-100 flex items-center gap-2 bg-gradient-to-r from-slate-50 to-white">
+                        <Map size={20} className="text-indigo-600" />
+                        <h3 className="text-lg font-bold text-slate-900">12-Month Strategic Roadmap</h3>
+                    </div>
+                    <div className="p-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 relative">
+                            {/* Connector Line (Desktop) */}
+                            <div className="hidden lg:block absolute top-6 left-0 right-0 h-0.5 bg-indigo-100 z-0 mx-12"></div>
+                            
+                            {report.roadmap.map((phase, idx) => (
+                                <div key={idx} className="relative z-10 bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col h-full hover:border-indigo-300 transition-colors">
+                                    <div className="w-12 h-12 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center font-bold text-indigo-600 mb-4 mx-auto lg:mx-0">
+                                        {idx + 1}
+                                    </div>
+                                    <div className="text-center lg:text-left mb-4">
+                                        <h4 className="text-lg font-bold text-slate-900">{phase.phase_name}</h4>
+                                        <p className="text-sm font-semibold text-indigo-600">{phase.duration}</p>
+                                    </div>
+                                    
+                                    <div className="flex-1 space-y-2 mb-4">
+                                        {phase.steps.slice(0, 3).map((step, sIdx) => (
+                                            <div key={sIdx} className="flex gap-2 items-start text-xs text-slate-600">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-1 shrink-0"></span>
+                                                {step}
+                                            </div>
+                                        ))}
+                                    </div>
+                                    
+                                    <div className="pt-3 border-t border-slate-100 text-xs">
+                                        <span className="font-bold text-slate-500 uppercase">Milestone:</span>
+                                        <p className="text-slate-800 font-medium mt-1">{phase.milestone}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Action Plan */}
-            <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
-              <h3 className="text-lg font-bold text-slate-800 mb-4 border-b border-slate-100 pb-2 flex items-center gap-2">
-                <Briefcase size={20} className="text-blue-600"/> 90-Day Action Plan
-              </h3>
-              <div className="space-y-4">
+            <div>
+              <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                    <Briefcase size={22} className="text-blue-600"/> Actionable Initiatives
+                  </h3>
+                  <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-full">
+                      {(report.action_plan || []).length} Initiatives Identified
+                  </span>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                 {(report.action_plan || []).map((action, i) => (
-                  <div key={i} className={`p-4 rounded-lg border transition-all ${
-                        actionStates[i] === 'in_progress' ? 'bg-emerald-50/50 border-emerald-200' : 
-                        actionStates[i] === 'completed' ? 'bg-slate-50 border-slate-200 opacity-75' :
-                        'bg-slate-50 border-slate-100'
+                  <div key={i} className={`flex flex-col rounded-xl border shadow-sm transition-all hover:shadow-md bg-white ${
+                        actionStates[i] === 'completed' ? 'opacity-60 grayscale' : ''
                   }`}>
-                    <div className="flex items-start gap-4">
-                         <div className={`shrink-0 w-16 text-center py-1 rounded text-xs font-bold border ${
-                            actionStates[i] === 'completed' ? 'bg-slate-200 text-slate-600 border-slate-300' :
+                    {/* Card Header */}
+                    <div className="p-5 border-b border-slate-100 flex justify-between items-start gap-3">
+                        <h4 className={`font-bold text-slate-800 leading-snug ${actionStates[i] === 'completed' ? 'line-through' : ''}`}>
+                            {action.initiative}
+                        </h4>
+                        <span className={`shrink-0 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider border ${
                             action.priority === 'High' ? 'bg-red-50 text-red-700 border-red-200' :
-                            action.priority === 'Medium' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
+                            action.priority === 'Medium' ? 'bg-amber-50 text-amber-700 border-amber-200' :
                             'bg-blue-50 text-blue-700 border-blue-200'
                         }`}>
-                        {actionStates[i] === 'completed' ? 'Done' : action.priority}
-                        </div>
-                        <div className="flex-1">
-                        <h4 className={`font-semibold text-slate-800 ${actionStates[i] === 'completed' ? 'line-through text-slate-500' : ''}`}>{action.initiative}</h4>
-                        <div className="flex gap-6 mt-2 text-sm text-slate-500">
-                            <span className="flex items-center gap-1">
-                            <span className="font-semibold text-emerald-600">Est. Impact:</span> {action.impact_estimate}
-                            </span>
-                            <span className="flex items-center gap-1">
-                            <span className="font-semibold text-orange-600">Cost:</span> {action.cost_estimate}
-                            </span>
-                        </div>
+                            {action.priority}
+                        </span>
+                    </div>
+
+                    {/* Card Metrics */}
+                    <div className="p-5 flex-1 space-y-4">
+                        <div className="grid grid-cols-2 gap-2">
+                            <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                <p className="text-[10px] text-slate-400 uppercase font-bold mb-1">Impact</p>
+                                <p className="text-xs font-bold text-emerald-600 leading-tight">{action.impact_estimate}</p>
+                            </div>
+                            <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                <p className="text-[10px] text-slate-400 uppercase font-bold mb-1">Cost</p>
+                                <p className="text-xs font-bold text-slate-700 leading-tight">{action.cost_estimate}</p>
+                            </div>
                         </div>
                     </div>
                     
-                    {/* Action Buttons */}
-                    <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-200/60">
-                        <div className="flex items-center gap-3">
+                    {/* Card Actions */}
+                    <div className="p-4 border-t border-slate-100 bg-slate-50/50 rounded-b-xl">
+                        <div className="flex flex-col gap-3">
+                            {/* Implementation Button */}
                             {actionStates[i] === 'in_progress' ? (
-                                <div className="flex items-center gap-3">
-                                    <span className="flex items-center gap-2 text-sm font-bold text-emerald-700 bg-emerald-100 px-3 py-1.5 rounded-lg">
-                                        <Clock size={16} /> Implementation In Progress
-                                    </span>
-                                    <button 
-                                        onClick={() => handleStartImplementationClick(i, action.initiative)}
-                                        className="text-xs text-slate-500 hover:text-emerald-600 underline"
-                                    >
-                                        View Roadmap
-                                    </button>
-                                </div>
+                                <button 
+                                    onClick={() => handleStartImplementationClick(i, action.initiative)}
+                                    className="w-full py-2 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-lg flex items-center justify-center gap-2 border border-emerald-200"
+                                >
+                                    <Clock size={14} /> View Roadmap
+                                </button>
                             ) : actionStates[i] === 'help_requested' ? (
-                                <span className="flex items-center gap-2 text-sm font-bold text-blue-700 bg-blue-100 px-3 py-1.5 rounded-lg">
-                                    <CheckCircle2 size={16} /> Assistance Requested
-                                </span>
+                                <div className="w-full py-2 bg-blue-100 text-blue-700 text-xs font-bold rounded-lg flex items-center justify-center gap-2 border border-blue-200">
+                                    <CheckCircle2 size={14} /> Expert Assigned
+                                </div>
                             ) : actionStates[i] === 'completed' ? (
-                                <span className="flex items-center gap-2 text-sm font-bold text-slate-600 bg-slate-200 px-3 py-1.5 rounded-lg">
-                                    <CheckCircle2 size={16} /> Completed
-                                </span>
+                                <div className="w-full py-2 bg-slate-200 text-slate-600 text-xs font-bold rounded-lg flex items-center justify-center gap-2">
+                                    <CheckCircle2 size={14} /> Done
+                                </div>
                             ) : (
-                                <>
+                                <div className="flex gap-2">
                                     <button 
                                         onClick={() => handleStartImplementationClick(i, action.initiative)}
-                                        className="flex items-center gap-2 px-3 py-1.5 bg-slate-900 text-white text-xs font-bold rounded hover:bg-emerald-600 transition-colors"
+                                        className="flex-1 py-2 bg-slate-900 text-white text-xs font-bold rounded-lg hover:bg-emerald-600 transition-colors flex items-center justify-center gap-1 shadow-sm"
                                     >
-                                        <Play size={14} fill="currentColor" /> Start Implementation
+                                        <Play size={12} fill="currentColor" /> Start
                                     </button>
                                     <button 
                                         onClick={() => openAssistanceModal(i, action.initiative)}
-                                        className="flex items-center gap-2 px-3 py-1.5 bg-white text-slate-600 border border-slate-300 text-xs font-bold rounded hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-colors"
+                                        className="py-2 px-3 bg-white border border-slate-200 text-slate-600 hover:text-blue-600 hover:border-blue-200 rounded-lg transition-colors"
+                                        title="Ask Expert"
                                     >
-                                        <LifeBuoy size={14} /> Need Assistance
+                                        <LifeBuoy size={16} />
                                     </button>
-                                </>
+                                </div>
                             )}
-                        </div>
 
-                        {/* Status Toggle Dropdown */}
-                        <div className="relative group">
-                            <button className="flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-800">
-                                Status: {actionStates[i] === 'completed' ? 'Completed' : actionStates[i] === 'in_progress' ? 'In Progress' : 'Idle'} <ChevronDown size={12}/>
-                            </button>
-                            <div className="absolute right-0 bottom-full mb-1 w-32 bg-white border border-slate-200 rounded-lg shadow-lg hidden group-hover:block z-10">
-                                <button onClick={() => updateActionStatus(i, 'idle')} className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 text-slate-700">Idle</button>
-                                <button onClick={() => updateActionStatus(i, 'in_progress')} className="w-full text-left px-3 py-2 text-xs hover:bg-emerald-50 text-emerald-700">In Progress</button>
-                                <button onClick={() => updateActionStatus(i, 'completed')} className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 text-slate-700">Completed</button>
+                            {/* Status Toggle */}
+                            <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium pt-1">
+                                <span>Status:</span>
+                                <div className="flex gap-1">
+                                    {['idle', 'in_progress', 'completed'].map((s) => (
+                                        <button 
+                                            key={s}
+                                            onClick={() => updateActionStatus(i, s as any)}
+                                            className={`w-2 h-2 rounded-full transition-all ${actionStates[i] === s ? (s === 'completed' ? 'bg-slate-400 scale-125' : s === 'in_progress' ? 'bg-emerald-500 scale-125' : 'bg-slate-300 scale-125') : 'bg-slate-200 hover:bg-slate-300'}`}
+                                            title={s.replace('_', ' ')}
+                                        />
+                                    ))}
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -556,20 +726,56 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
               </div>
             </div>
             
-            {/* Seasonal */}
+            {/* Seasonal Menu Suggestions */}
             {(report.seasonal_menu_suggestions || []).length > 0 && (
-                <div className="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
-                    <h3 className="text-lg font-bold text-slate-800 mb-4 border-b border-slate-100 pb-2">Seasonal Menu Changes</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {(report.seasonal_menu_suggestions || []).map((item, i) => (
-                             <div key={i} className={`p-3 rounded border ${item.type === 'add' ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'}`}>
-                                 <div className="flex items-center justify-between mb-1">
-                                     <span className="font-bold text-slate-800">{item.item}</span>
-                                     <span className={`text-xs font-bold uppercase px-2 py-0.5 rounded ${item.type === 'add' ? 'bg-emerald-200 text-emerald-800' : 'bg-red-200 text-red-800'}`}>{item.type}</span>
-                                 </div>
-                                 <p className="text-xs text-slate-600">{item.reason}</p>
-                             </div>
-                        ))}
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                    <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+                        <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                            <Lightbulb size={20} className="text-yellow-500" /> Seasonal Menu Strategy
+                        </h3>
+                        {/* Legend */}
+                        <div className="flex gap-4 text-xs font-bold">
+                            <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-500"></div> Add</div>
+                            <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-red-500"></div> Remove</div>
+                        </div>
+                    </div>
+                    
+                    <div className="grid md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-100">
+                        {/* Additions */}
+                        <div className="p-6">
+                            <h4 className="text-xs font-bold text-emerald-600 uppercase mb-4 flex items-center gap-2">
+                                <ArrowUpRight size={16} /> Recommended Additions
+                            </h4>
+                            <div className="space-y-4">
+                                {(report.seasonal_menu_suggestions || []).filter(s => s.type === 'add').map((item, i) => (
+                                    <div key={i} className="flex gap-3 items-start">
+                                        <div className="mt-1 w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></div>
+                                        <div>
+                                            <p className="font-bold text-slate-800 text-sm">{item.item}</p>
+                                            <p className="text-xs text-slate-500 mt-1">{item.reason}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Removals */}
+                        <div className="p-6">
+                             <h4 className="text-xs font-bold text-red-600 uppercase mb-4 flex items-center gap-2">
+                                <ArrowDownRight size={16} /> Suggested Removals
+                            </h4>
+                            <div className="space-y-4">
+                                {(report.seasonal_menu_suggestions || []).filter(s => s.type === 'remove').map((item, i) => (
+                                    <div key={i} className="flex gap-3 items-start">
+                                        <div className="mt-1 w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></div>
+                                        <div>
+                                            <p className="font-bold text-slate-800 text-sm">{item.item}</p>
+                                            <p className="text-xs text-slate-500 mt-1">{item.reason}</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
@@ -578,7 +784,7 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
       </div>
 
       {/* Input */}
-      <div className="p-4 bg-white border-t border-slate-200">
+      <div className="p-4 bg-white border-t border-slate-200 z-30">
         <div className="max-w-4xl mx-auto space-y-3">
             {/* Quick Chips */}
             <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
@@ -600,22 +806,22 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                    placeholder="Type instructions for the AI assistant..."
-                    className="flex-1 px-4 py-3 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+                    placeholder="Enter your business goal or challenge (e.g. 'Increase delivery revenue by 20%')..."
+                    className="flex-1 px-4 py-3 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none shadow-sm"
                 />
                 <button 
                     onClick={handleClear}
                     title="Clear Chat"
-                    className="px-3 py-3 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                    className="px-3 py-3 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-100"
                 >
                     <Trash2 size={20} />
                 </button>
                 <button 
                     onClick={() => handleSend()}
                     disabled={loading || !query}
-                    className="px-4 py-3 bg-slate-900 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50 transition-colors"
+                    className="px-6 py-3 bg-slate-900 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50 transition-colors font-bold shadow-lg shadow-slate-900/20"
                 >
-                    <Send size={20} />
+                    {loading ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />}
                 </button>
             </div>
         </div>

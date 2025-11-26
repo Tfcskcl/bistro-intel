@@ -102,6 +102,7 @@ const TESTIMONIALS = [
 
 export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
   const [activeLegal, setActiveLegal] = useState<LegalSection>(null);
+  const [showDemo, setShowDemo] = useState(false);
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-yellow-200">
@@ -156,7 +157,10 @@ export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
               >
                 Start Free Trial <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
               </button>
-              <button onClick={onGetStarted} className="px-8 py-4 bg-slate-800 text-white text-lg font-bold rounded-xl border border-slate-700 hover:bg-slate-700 transition-all flex items-center justify-center gap-2">
+              <button 
+                onClick={() => setShowDemo(true)}
+                className="px-8 py-4 bg-slate-800 text-white text-lg font-bold rounded-xl border border-slate-700 hover:bg-slate-700 transition-all flex items-center justify-center gap-2 hover:shadow-lg"
+              >
                 <PlayCircle size={20} /> Watch Demo
               </button>
             </div>
@@ -452,6 +456,32 @@ export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
               © 2024 BistroIntelligence Inc. All rights reserved.
           </div>
       </footer>
+
+      {/* Demo Video Modal */}
+      {showDemo && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/90 backdrop-blur-md animate-fade-in">
+          <div className="relative w-full max-w-5xl aspect-video bg-black rounded-2xl shadow-2xl overflow-hidden border border-slate-700">
+            <button 
+              onClick={() => setShowDemo(false)}
+              className="absolute top-4 right-4 p-2 bg-black/50 hover:bg-slate-800 text-white rounded-full z-10 transition-all backdrop-blur-sm border border-white/10"
+            >
+              <X size={24} />
+            </button>
+            <div className="w-full h-full flex items-center justify-center text-white bg-slate-800">
+                <iframe 
+                    width="100%" 
+                    height="100%" 
+                    src="https://www.youtube.com/embed/LXb3EKWsInQ?autoplay=1&mute=1&loop=1&playlist=LXb3EKWsInQ" 
+                    title="BistroIntelligence Demo" 
+                    frameBorder="0" 
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                    allowFullScreen
+                    className="w-full h-full"
+                ></iframe>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Legal Modal */}
       {activeLegal && (

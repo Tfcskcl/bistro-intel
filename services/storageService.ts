@@ -1,10 +1,12 @@
 
-import { RecipeCard, SOP, AppNotification, UserRole, POSChangeRequest, MenuItem, PlanConfig, PlanType } from '../types';
+import { RecipeCard, SOP, AppNotification, UserRole, POSChangeRequest, MenuItem, PlanConfig, PlanType, RecipeRequest, SOPRequest } from '../types';
 import { MOCK_MENU, MOCK_SALES_DATA, MOCK_INGREDIENT_PRICES, PLANS as DEFAULT_PLANS } from '../constants';
 import { ingredientService } from './ingredientService';
 
 const getKey = (userId: string, key: string) => `bistro_${userId}_${key}`;
 const PLANS_KEY = 'bistro_system_plans';
+const GLOBAL_RECIPE_REQUESTS_KEY = 'bistro_global_recipe_requests';
+const GLOBAL_SOP_REQUESTS_KEY = 'bistro_global_sop_requests';
 
 // Seed Notifications for new users (Generic welcome)
 const WELCOME_NOTIFICATION: AppNotification = {
@@ -76,6 +78,27 @@ export const storageService = {
         return storageService.getItem<RecipeCard[]>(userId, 'saved_recipes', []);
     },
 
+    // --- RECIPE REQUESTS (GLOBAL/ADMIN ACCESS) ---
+    getAllRecipeRequests: (): RecipeRequest[] => {
+        const stored = localStorage.getItem(GLOBAL_RECIPE_REQUESTS_KEY);
+        return stored ? JSON.parse(stored) : [];
+    },
+
+    saveRecipeRequest: (request: RecipeRequest) => {
+        const requests = storageService.getAllRecipeRequests();
+        requests.push(request);
+        localStorage.setItem(GLOBAL_RECIPE_REQUESTS_KEY, JSON.stringify(requests));
+    },
+
+    updateRecipeRequest: (updatedRequest: RecipeRequest) => {
+        const requests = storageService.getAllRecipeRequests();
+        const index = requests.findIndex(r => r.id === updatedRequest.id);
+        if (index >= 0) {
+            requests[index] = updatedRequest;
+            localStorage.setItem(GLOBAL_RECIPE_REQUESTS_KEY, JSON.stringify(requests));
+        }
+    },
+
     // --- SOPS ---
     saveSOP: (userId: string, sop: SOP) => {
         const sops = storageService.getSavedSOPs(userId);
@@ -90,6 +113,27 @@ export const storageService = {
 
     getSavedSOPs: (userId: string): SOP[] => {
         return storageService.getItem<SOP[]>(userId, 'saved_sops', []);
+    },
+
+    // --- SOP REQUESTS ---
+    getAllSOPRequests: (): SOPRequest[] => {
+        const stored = localStorage.getItem(GLOBAL_SOP_REQUESTS_KEY);
+        return stored ? JSON.parse(stored) : [];
+    },
+
+    saveSOPRequest: (request: SOPRequest) => {
+        const requests = storageService.getAllSOPRequests();
+        requests.push(request);
+        localStorage.setItem(GLOBAL_SOP_REQUESTS_KEY, JSON.stringify(requests));
+    },
+
+    updateSOPRequest: (updatedRequest: SOPRequest) => {
+        const requests = storageService.getAllSOPRequests();
+        const index = requests.findIndex(r => r.id === updatedRequest.id);
+        if (index >= 0) {
+            requests[index] = updatedRequest;
+            localStorage.setItem(GLOBAL_SOP_REQUESTS_KEY, JSON.stringify(requests));
+        }
     },
 
     // --- POS REQUESTS ---
