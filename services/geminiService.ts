@@ -1,24 +1,13 @@
-
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { SYSTEM_INSTRUCTION } from "../constants";
 import { RecipeCard, SOP, StrategyReport, ImplementationGuide, MenuItem } from "../types";
 import { ingredientService } from "./ingredientService";
 
-let client: GoogleGenAI | null = null;
-
-const getClient = (): GoogleGenAI => {
-  if (!client) {
-    const apiKey = (typeof process !== 'undefined' && process.env && process.env.API_KEY) 
-      ? process.env.API_KEY 
-      : '';
-      
-    if (!apiKey) {
-      console.warn("API_KEY not found in environment variables. AI features may fail.");
-    }
-    
-    client = new GoogleGenAI({ apiKey });
+const getApiKey = (): string => {
+  if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+    return process.env.API_KEY;
   }
-  return client;
+  return '';
 };
 
 // Helper to clean AI output before parsing
@@ -45,7 +34,44 @@ const parseJSON = <T>(text: string | undefined): T => {
 };
 
 export const generateRecipeCard = async (userId: string, item: MenuItem, requirements?: string): Promise<RecipeCard> => {
-  const ai = getClient();
+  const apiKey = getApiKey();
+  
+  if (!apiKey) {
+    console.warn("API Key missing. Returning mock data.");
+    await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate latency
+    return {
+      ...item,
+      yield: 4,
+      ingredients: item.ingredients.map(ing => ({
+        ...ing,
+        qty_per_serving: 100,
+        cost_per_unit: 100,
+        cost_per_serving: 25,
+        unit: ing.unit || 'g'
+      })),
+      preparation_steps: [
+        "Prepare all ingredients and equipment.",
+        `Combine ingredients for ${item.name}.`,
+        "Cook according to standard procedure (Simulated Step).",
+        "Garnish and serve immediately."
+      ],
+      equipment_needed: ["Chef's Knife", "Mixing Bowl", "Pan"],
+      portioning_guideline: "One standard serving",
+      allergens: ["Check ingredients"],
+      prep_time_min: item.prep_time_min || 15,
+      shelf_life_hours: 24,
+      food_cost_per_serving: (item.current_price || 100) * 0.3,
+      suggested_selling_price: item.current_price || 300,
+      tags: ["Mock Data", "Demo"],
+      human_summary: "This is a simulated recipe because the API Key is missing.",
+      reasoning: "Mock reasoning for demo purposes.",
+      confidence: "High",
+      category: item.category,
+      current_price: item.current_price
+    };
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
   const currentIngredients = ingredientService.getAll(userId);
 
   const prompt = `
@@ -97,7 +123,21 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
 };
 
 export const generateRecipeVariation = async (userId: string, originalRecipe: RecipeCard, variationType: string): Promise<RecipeCard> => {
-  const ai = getClient();
+  const apiKey = getApiKey();
+
+  if (!apiKey) {
+    console.warn("API Key missing. Returning mock variation.");
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    return {
+      ...originalRecipe,
+      name: `${variationType} - ${originalRecipe.name}`,
+      human_summary: `This is a simulated ${variationType} variation.`,
+      tags: [...(originalRecipe.tags || []), variationType, "Mock"],
+      reasoning: "Mock variation logic."
+    };
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
   const currentIngredients = ingredientService.getAll(userId);
 
   const prompt = `
@@ -135,7 +175,30 @@ export const generateRecipeVariation = async (userId: string, originalRecipe: Re
 };
 
 export const generateSOP = async (topic: string): Promise<SOP> => {
-  const ai = getClient();
+  const apiKey = getApiKey();
+
+  if (!apiKey) {
+    console.warn("API Key missing. Returning mock SOP.");
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    return {
+      sop_id: `mock-sop-${Date.now()}`,
+      title: topic,
+      scope: "General Operations (Demo)",
+      prerequisites: "None",
+      materials_equipment: ["Checklist", "Standard Tools"],
+      stepwise_procedure: [
+        { step_no: 1, action: "Identify requirements.", responsible_role: "Staff" },
+        { step_no: 2, action: "Execute procedure according to safety standards.", responsible_role: "Staff" },
+        { step_no: 3, action: "Verify results and log completion.", responsible_role: "Supervisor" }
+      ],
+      critical_control_points: ["Ensure safety compliance at all times."],
+      monitoring_checklist: ["Procedure completed", "Area cleaned", "Logged in system"],
+      kpis: ["100% Adherence"],
+      quick_troubleshooting: "Contact manager if issues arise."
+    };
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
   const prompt = `
     Create an SOP for "${topic}" for a modern cafe bistro.
     
@@ -172,7 +235,31 @@ export const generateSOP = async (topic: string): Promise<SOP> => {
 };
 
 export const generateStrategy = async (role: string, context: string): Promise<StrategyReport> => {
-  const ai = getClient();
+  const apiKey = getApiKey();
+
+  if (!apiKey) {
+    console.warn("API Key missing. Returning mock strategy.");
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    return {
+      summary: [
+        "This is a simulated strategy report for demonstration purposes.",
+        "To get real AI insights, please configure a valid API Key."
+      ],
+      causes: ["Missing API Configuration", "Demo Mode Active"],
+      action_plan: [
+        { initiative: "Configure API Key", impact_estimate: "Enable Real AI", cost_estimate: "None", priority: "High" },
+        { initiative: "Explore Demo Features", impact_estimate: "High Learning", cost_estimate: "None", priority: "Medium" }
+      ],
+      seasonal_menu_suggestions: [
+        { type: "add", item: "Demo Special Salad", reason: "High margin item for testing." }
+      ],
+      roadmap: [
+        { phase_name: "Setup", duration: "1 Day", steps: ["Add API Key"], milestone: "Full Access" }
+      ]
+    };
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
   const prompt = `
     Role Context: I am the ${role}.
     User Request: ${context}
@@ -215,7 +302,32 @@ export const generateStrategy = async (role: string, context: string): Promise<S
 };
 
 export const generateImplementationPlan = async (initiative: string): Promise<ImplementationGuide> => {
-    const ai = getClient();
+    const apiKey = getApiKey();
+
+    if (!apiKey) {
+      console.warn("API Key missing. Returning mock plan.");
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      return {
+        objective: `Implement: ${initiative} (Demo)`,
+        estimated_timeline: "2 Weeks",
+        phases: [
+          {
+            phase_name: "Preparation",
+            steps: ["Analyze requirements", "Assemble team"],
+            resources_needed: ["Time", "Personnel"],
+            kpi_to_track: "Readiness Score"
+          },
+          {
+            phase_name: "Execution",
+            steps: ["Launch initiative", "Monitor progress"],
+            resources_needed: ["Budget"],
+            kpi_to_track: "Completion Rate"
+          }
+        ]
+      };
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
     const prompt = `
       Create a detailed implementation guide for: "${initiative}".
       
