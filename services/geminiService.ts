@@ -386,7 +386,7 @@ export const generateImplementationPlan = async (initiative: string): Promise<Im
     }
 };
 
-export const generateMarketingVideo = async (imageBase64: string, prompt: string, aspectRatio: '16:9' | '9:16'): Promise<string> => {
+export const generateMarketingVideo = async (images: string[], prompt: string, aspectRatio: '16:9' | '9:16'): Promise<string> => {
   const apiKey = getApiKey();
   if (!apiKey) {
       throw new Error("API Key required for video generation");
@@ -396,19 +396,45 @@ export const generateMarketingVideo = async (imageBase64: string, prompt: string
   const ai = new GoogleGenAI({ apiKey });
 
   try {
-      let operation = await ai.models.generateVideos({
-          model: 'veo-3.1-fast-generate-preview',
-          prompt: prompt || 'Cinematic food shot', 
-          image: {
-              imageBytes: imageBase64,
-              mimeType: 'image/png', 
-          },
-          config: {
-              numberOfVideos: 1,
-              resolution: '720p',
-              aspectRatio: aspectRatio
-          }
-      });
+      let operation;
+
+      if (images.length > 1) {
+          // Multiple images -> Use veo-3.1-generate-preview
+          // Using hardcoded strings instead of imported Enums to avoid browser issues
+          const referenceImagesPayload: any[] = images.map(img => ({
+              image: {
+                  imageBytes: img,
+                  mimeType: 'image/png'
+              },
+              referenceType: 'ASSET'
+          }));
+
+          operation = await ai.models.generateVideos({
+              model: 'veo-3.1-generate-preview',
+              prompt: prompt,
+              config: {
+                  numberOfVideos: 1,
+                  referenceImages: referenceImagesPayload,
+                  resolution: '720p',
+                  aspectRatio: '16:9' // Fixed for this model
+              }
+          });
+      } else {
+          // Single image -> Use veo-3.1-fast-generate-preview
+          operation = await ai.models.generateVideos({
+              model: 'veo-3.1-fast-generate-preview',
+              prompt: prompt || 'Cinematic food shot', 
+              image: {
+                  imageBytes: images[0],
+                  mimeType: 'image/png', 
+              },
+              config: {
+                  numberOfVideos: 1,
+                  resolution: '720p',
+                  aspectRatio: aspectRatio
+              }
+          });
+      }
 
       // Poll for completion
       while (!operation.done) {
@@ -422,7 +448,7 @@ export const generateMarketingVideo = async (imageBase64: string, prompt: string
           throw new Error("Video generation completed but no URI returned.");
       }
 
-      // Append API key for fetching the actual bytes
+      // Note: Typically we return the blob URL for immediate viewing
       const response = await fetch(`${downloadLink}&key=${apiKey}`);
       const blob = await response.blob();
       return URL.createObjectURL(blob);
@@ -430,4 +456,45 @@ export const generateMarketingVideo = async (imageBase64: string, prompt: string
   } catch (error: any) {
       throw new Error(formatError(error));
   }
+};
+
+export const generateMarketingImage = async (prompt: string, aspectRatio: string): Promise<string> => {
+    const apiKey = getApiKey();
+    if (!apiKey) {
+        throw new Error("API Key required for image generation");
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
+
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-3-pro-image-preview',
+            contents: {
+                parts: [{ text: prompt }]
+            },
+            config: {
+                imageConfig: {
+                    aspectRatio: aspectRatio,
+                    imageSize: "1K"
+                }
+            }
+        });
+
+        let base64Image = '';
+        for (const part of response.candidates[0].content.parts) {
+            if (part.inlineData) {
+                base64Image = part.inlineData.data;
+                break;
+            }
+        }
+
+        if (!base64Image) {
+            throw new Error("No image generated. Please try again.");
+        }
+
+        return `data:image/png;base64,${base64Image}`;
+
+    } catch (error: any) {
+        throw new Error(formatError(error));
+    }
 };

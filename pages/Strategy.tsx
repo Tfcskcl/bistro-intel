@@ -2,9 +2,9 @@
 import React, { useState, useEffect } from 'react';
 import { generateStrategy, generateImplementationPlan } from '../services/geminiService';
 import { StrategyReport, UserRole, User, PlanType, ImplementationGuide } from '../types';
-import { Send, Loader2, User as UserIcon, Briefcase, TrendingUp, Lock, HelpCircle, ArrowRight, Play, LifeBuoy, CheckCircle2, Clock, X, BookOpen, UserCheck, Calendar, Zap, ChevronDown, Trash2, Sparkles, Activity, Target, AlertTriangle, ArrowUpRight, ArrowDownRight, Lightbulb, Map } from 'lucide-react';
+import { Send, Loader2, User as UserIcon, Briefcase, TrendingUp, Lock, HelpCircle, ArrowRight, Play, LifeBuoy, CheckCircle2, Clock, X, BookOpen, UserCheck, Calendar, Zap, ChevronDown, Trash2, Sparkles, Activity, Target, AlertTriangle, ArrowUpRight, ArrowDownRight, Lightbulb, Map, BarChart2, PieChart as PieChartIcon, ScatterChart as ScatterChartIcon, Info } from 'lucide-react';
 import { 
-  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend 
+  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend, ScatterChart, Scatter, ZAxis
 } from 'recharts';
 
 interface StrategyProps {
@@ -55,6 +55,10 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
   // Track status of individual action items
   const [actionStates, setActionStates] = useState<ActionState>({});
   
+  // Chart Visualisation State
+  const [vizMode, setVizMode] = useState<'priority' | 'impact'>('priority');
+  const [chartType, setChartType] = useState<'pie' | 'bar'>('pie');
+
   // Assistance Modal State
   const [assistanceTarget, setAssistanceTarget] = useState<{index: number, title: string} | null>(null);
   const [assistanceMsg, setAssistanceMsg] = useState('');
@@ -231,6 +235,27 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
           { name: 'Medium', value: counts['Medium'] || 0, color: COLORS.Medium },
           { name: 'Low', value: counts['Low'] || 0, color: COLORS.Low }
       ].filter(d => d.value > 0);
+  };
+
+  // Scatter Data Helper (Effort vs Impact)
+  // Mocking numeric values based on string descriptions for demo purposes
+  const getImpactData = () => {
+      if (!report) return [];
+      return (report.action_plan || []).map((action, idx) => {
+          // Heuristic: convert High/Med/Low strings to numbers for charts
+          const impactScore = action.priority === 'High' ? 30 : action.priority === 'Medium' ? 20 : 10;
+          // Randomize slightly to prevent overlapping dots
+          const finalImpact = impactScore + Math.floor(Math.random() * 5);
+          const finalCost = Math.floor(Math.random() * 30) + 5; // 5-35 range
+          
+          return {
+              name: action.initiative,
+              x: finalCost, // Cost/Effort
+              y: finalImpact, // Impact
+              z: 10, // Bubble Size
+              priority: action.priority
+          };
+      });
   };
 
   return (
@@ -541,39 +566,130 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                    </div>
                 </div>
 
-                {/* Priority Breakdown Chart */}
+                {/* Priority & Impact Breakdown Charts */}
                 <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col">
-                    <div className="p-6 border-b border-slate-100">
-                        <h4 className="text-sm font-bold text-slate-500 uppercase tracking-wide">Initiative Priority</h4>
-                    </div>
-                    <div className="flex-1 min-h-[250px] relative">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Pie
-                                    data={getPriorityData()}
-                                    cx="50%"
-                                    cy="50%"
-                                    innerRadius={60}
-                                    outerRadius={80}
-                                    paddingAngle={5}
-                                    dataKey="value"
-                                >
-                                    {getPriorityData().map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={entry.color} />
-                                    ))}
-                                </Pie>
-                                <RechartsTooltip 
-                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                                />
-                                <Legend verticalAlign="bottom" height={36}/>
-                            </PieChart>
-                        </ResponsiveContainer>
-                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                            <div className="text-center">
-                                <span className="text-3xl font-bold text-slate-800">{(report.action_plan || []).length}</span>
-                                <p className="text-xs text-slate-400 font-bold uppercase">Actions</p>
-                            </div>
+                    <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+                        <h4 className="text-sm font-bold text-slate-500 uppercase tracking-wide">
+                            {vizMode === 'priority' ? 'Initiative Priority' : 'Impact vs Effort'}
+                        </h4>
+                        
+                        {/* Viz Toolbar */}
+                        <div className="flex bg-slate-100 rounded-lg p-1 gap-1">
+                             <button 
+                                onClick={() => setVizMode('priority')}
+                                className={`p-1.5 rounded transition-colors ${vizMode === 'priority' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                title="Priority Breakdown"
+                             >
+                                <PieChartIcon size={14} />
+                             </button>
+                             <button 
+                                onClick={() => setVizMode('impact')}
+                                className={`p-1.5 rounded transition-colors ${vizMode === 'impact' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                title="Impact Matrix"
+                             >
+                                <ScatterChartIcon size={14} />
+                             </button>
                         </div>
+                    </div>
+
+                    <div className="flex-1 min-h-[250px] relative p-4">
+                        {vizMode === 'priority' ? (
+                            <>
+                                <div className="absolute top-2 right-4 z-10 flex gap-2">
+                                     <button 
+                                        onClick={() => setChartType('pie')}
+                                        className={`text-[10px] font-bold px-2 py-0.5 rounded border ${chartType === 'pie' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-white text-slate-500 border-slate-200'}`}
+                                     >
+                                         Pie
+                                     </button>
+                                     <button 
+                                        onClick={() => setChartType('bar')}
+                                        className={`text-[10px] font-bold px-2 py-0.5 rounded border ${chartType === 'bar' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-white text-slate-500 border-slate-200'}`}
+                                     >
+                                         Bar
+                                     </button>
+                                </div>
+
+                                <ResponsiveContainer width="100%" height="100%">
+                                    {chartType === 'pie' ? (
+                                        <PieChart>
+                                            <Pie
+                                                data={getPriorityData()}
+                                                cx="50%"
+                                                cy="50%"
+                                                innerRadius={60}
+                                                outerRadius={80}
+                                                paddingAngle={5}
+                                                dataKey="value"
+                                            >
+                                                {getPriorityData().map((entry, index) => (
+                                                    <Cell key={`cell-${index}`} fill={entry.color} />
+                                                ))}
+                                            </Pie>
+                                            <RechartsTooltip 
+                                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                                            />
+                                            <Legend verticalAlign="bottom" height={36}/>
+                                        </PieChart>
+                                    ) : (
+                                        <BarChart data={getPriorityData()}>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
+                                            <XAxis dataKey="name" tick={{fontSize: 10}} axisLine={false} tickLine={false} />
+                                            <YAxis tick={{fontSize: 10}} axisLine={false} tickLine={false} />
+                                            <RechartsTooltip cursor={{fill: 'transparent'}} contentStyle={{ borderRadius: '8px' }} />
+                                            <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                                                {getPriorityData().map((entry, index) => (
+                                                    <Cell key={`cell-${index}`} fill={entry.color} />
+                                                ))}
+                                            </Bar>
+                                        </BarChart>
+                                    )}
+                                </ResponsiveContainer>
+                                {chartType === 'pie' && (
+                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none pb-8">
+                                        <div className="text-center">
+                                            <span className="text-3xl font-bold text-slate-800">{(report.action_plan || []).length}</span>
+                                            <p className="text-xs text-slate-400 font-bold uppercase">Actions</p>
+                                        </div>
+                                    </div>
+                                )}
+                            </>
+                        ) : (
+                            // Impact vs Effort Scatter Chart
+                            <div className="h-full w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 0 }}>
+                                        <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
+                                        <XAxis type="number" dataKey="x" name="Cost/Effort" tick={false} label={{ value: 'Cost/Effort', position: 'insideBottom', offset: -5, fontSize: 10 }} />
+                                        <YAxis type="number" dataKey="y" name="Impact" tick={false} label={{ value: 'Impact', angle: -90, position: 'insideLeft', fontSize: 10 }} />
+                                        <ZAxis type="number" dataKey="z" range={[60, 200]} />
+                                        <RechartsTooltip 
+                                            cursor={{ strokeDasharray: '3 3' }} 
+                                            content={({ active, payload }) => {
+                                                if (active && payload && payload.length) {
+                                                    const data = payload[0].payload;
+                                                    return (
+                                                        <div className="bg-white p-2 border border-slate-200 shadow-lg rounded text-xs">
+                                                            <p className="font-bold text-slate-800">{data.name}</p>
+                                                            <p className="text-slate-500">Priority: {data.priority}</p>
+                                                        </div>
+                                                    );
+                                                }
+                                                return null;
+                                            }}
+                                        />
+                                        <Scatter name="Initiatives" data={getImpactData()} fill="#10b981">
+                                             {getImpactData().map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={entry.priority === 'High' ? COLORS.High : entry.priority === 'Medium' ? COLORS.Medium : COLORS.Low} />
+                                            ))}
+                                        </Scatter>
+                                    </ScatterChart>
+                                </ResponsiveContainer>
+                                <div className="text-center text-[10px] text-slate-400 mt-[-10px]">
+                                    Top-Right: High Impact, High Cost • Top-Left: High Impact, Low Cost (Quick Wins)
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

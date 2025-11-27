@@ -1,4 +1,7 @@
-import { RecipeCard, SOP, AppNotification, UserRole, POSChangeRequest, MenuItem, PlanConfig, PlanType, RecipeRequest, SOPRequest } from '../types';
+
+
+
+import { RecipeCard, SOP, AppNotification, UserRole, POSChangeRequest, MenuItem, PlanConfig, PlanType, RecipeRequest, SOPRequest, MarketingRequest } from '../types';
 import { MOCK_MENU, MOCK_SALES_DATA, MOCK_INGREDIENT_PRICES, PLANS as DEFAULT_PLANS } from '../constants';
 import { ingredientService } from './ingredientService';
 
@@ -6,6 +9,7 @@ const getKey = (userId: string, key: string) => `bistro_${userId}_${key}`;
 const PLANS_KEY = 'bistro_system_plans';
 const GLOBAL_RECIPE_REQUESTS_KEY = 'bistro_global_recipe_requests';
 const GLOBAL_SOP_REQUESTS_KEY = 'bistro_global_sop_requests';
+const GLOBAL_MARKETING_REQUESTS_KEY = 'bistro_global_marketing_requests';
 const GLOBAL_NOTIFICATIONS_KEY = 'bistro_global_notifications';
 
 // Seed Notifications for new users (Generic welcome)
@@ -219,6 +223,38 @@ export const storageService = {
         if (index >= 0) {
             requests[index] = updatedRequest;
             localStorage.setItem(GLOBAL_SOP_REQUESTS_KEY, JSON.stringify(requests));
+        }
+    },
+
+    // --- MARKETING REQUESTS (VIDEO & IMAGE) ---
+    getAllMarketingRequests: (): MarketingRequest[] => {
+        const stored = localStorage.getItem(GLOBAL_MARKETING_REQUESTS_KEY);
+        return stored ? JSON.parse(stored) : [];
+    },
+
+    saveMarketingRequest: (request: MarketingRequest) => {
+        const requests = storageService.getAllMarketingRequests();
+        requests.push(request);
+        localStorage.setItem(GLOBAL_MARKETING_REQUESTS_KEY, JSON.stringify(requests));
+
+        // Send Notification to Super Admin
+        storageService.sendSystemNotification({
+            id: `notif_mkt_${request.id}`,
+            title: `New ${request.type === 'image' ? 'Image' : 'Video'} Request`,
+            message: `${request.userName} requested a ${request.type} generation.`,
+            type: 'info',
+            read: false,
+            date: new Date().toISOString(),
+            role: [UserRole.SUPER_ADMIN, UserRole.ADMIN]
+        });
+    },
+
+    updateMarketingRequest: (updatedRequest: MarketingRequest) => {
+        const requests = storageService.getAllMarketingRequests();
+        const index = requests.findIndex(r => r.id === updatedRequest.id);
+        if (index >= 0) {
+            requests[index] = updatedRequest;
+            localStorage.setItem(GLOBAL_MARKETING_REQUESTS_KEY, JSON.stringify(requests));
         }
     },
 

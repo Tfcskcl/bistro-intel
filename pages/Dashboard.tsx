@@ -1,12 +1,13 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { DollarSign, ShoppingBag, Utensils, AlertTriangle, Users, Clock, TrendingUp, Activity, MapPin, Globe, Eye, UserX, UserPlus, Zap, Edit, Save, Brain, Database, ArrowRight, X, ChevronRight, Search, Mail, Phone, Calendar, Shield, ShieldCheck, Trash2, Terminal, UploadCloud, FileText, CheckCircle2, Sliders, Cpu, Layers } from 'lucide-react';
+import { DollarSign, ShoppingBag, Utensils, AlertTriangle, Users, Clock, TrendingUp, Activity, MapPin, Globe, Eye, UserX, UserPlus, Zap, Edit, Save, Brain, Database, ArrowRight, X, ChevronRight, Search, Mail, Phone, Calendar, Shield, ShieldCheck, Trash2, Terminal, UploadCloud, FileText, CheckCircle2, Sliders, Cpu, Layers, Loader2 } from 'lucide-react';
 import { StatCard } from '../components/StatCard';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { User, UserRole, PlanType, VisitorSession, PlanConfig } from '../types';
 import { authService } from '../services/authService';
 import { storageService } from '../services/storageService';
 import { trackingService } from '../services/trackingService';
+import { MOCK_SALES_DATA } from '../constants';
 
 interface DashboardProps {
     user: User;
@@ -72,1125 +73,491 @@ const JourneyModal: React.FC<{ visitor: VisitorSession | null, onClose: () => vo
     );
 };
 
-export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
-  const [salesData, setSalesData] = useState<any[]>([]);
+// --- SUPER ADMIN DASHBOARD ---
+const SuperAdminDashboard: React.FC = () => {
+    const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'plans' | 'training'>('overview');
+    const [subscribers, setSubscribers] = useState<User[]>([]);
+    const [liveVisitors, setLiveVisitors] = useState<VisitorSession[]>([]);
+    const [stats, setStats] = useState({ activeNow: 0, totalVisitsToday: 0, bounceRate: '0%', checkoutDropoff: 0 });
+    const [error, setError] = useState<string | null>(null);
+    
+    // Journey Modal State
+    const [selectedVisitor, setSelectedVisitor] = useState<VisitorSession | null>(null);
 
-  useEffect(() => {
-    const data = storageService.getSalesData(user.id);
-    setSalesData(data);
-  }, [user.id]);
+    // Create Admin Modal State
+    const [showCreateUserModal, setShowCreateUserModal] = useState(false);
+    const [newUserForm, setNewUserForm] = useState({
+        name: '',
+        email: '',
+        password: '',
+        role: UserRole.ADMIN,
+        restaurantName: '',
+        location: ''
+    });
 
-  // --- SUPER ADMIN DASHBOARD LOGIC ---
-  const SuperAdminDashboard = () => {
-      const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'plans' | 'training'>('overview');
-      const [subscribers, setSubscribers] = useState<User[]>([]);
-      const [liveVisitors, setLiveVisitors] = useState<VisitorSession[]>([]);
-      const [stats, setStats] = useState({ activeNow: 0, totalVisitsToday: 0, bounceRate: '0%', checkoutDropoff: 0 });
-      const [liveNotification, setLiveNotification] = useState<{msg: string, loc: string} | null>(null);
-      const [error, setError] = useState<string | null>(null);
-      
-      // Journey Modal State
-      const [selectedVisitor, setSelectedVisitor] = useState<VisitorSession | null>(null);
+    // Manage User State
+    const [managingUser, setManagingUser] = useState<User | null>(null);
+    const [editForm, setEditForm] = useState<Partial<User>>({});
 
-      // Create Admin Modal State
-      const [showCreateUserModal, setShowCreateUserModal] = useState(false);
-      const [newUserForm, setNewUserForm] = useState({
-          name: '',
-          email: '',
-          password: '',
-          role: UserRole.ADMIN,
-          restaurantName: '',
-          location: ''
-      });
+    // Plan Editing State
+    const [plans, setPlans] = useState<Record<PlanType, PlanConfig>>(storageService.getPlans());
+    const [editingPlan, setEditingPlan] = useState<PlanType | null>(null);
 
-      // Manage User State
-      const [managingUser, setManagingUser] = useState<User | null>(null);
-      const [editForm, setEditForm] = useState<Partial<User>>({});
+    // AI Training State
+    const [trainingStatus, setTrainingStatus] = useState<'idle' | 'training' | 'complete'>('idle');
+    const [trainingLogs, setTrainingLogs] = useState<string[]>([]);
+    
+    const logsEndRef = useRef<HTMLDivElement>(null);
 
-      // Plan Editing State
-      const [plans, setPlans] = useState<Record<PlanType, PlanConfig>>(storageService.getPlans());
-      const [editingPlan, setEditingPlan] = useState<PlanType | null>(null);
+    useEffect(() => {
+        if (logsEndRef.current) {
+            logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+    }, [trainingLogs]);
 
-      // AI Training State
-      const [trainingStatus, setTrainingStatus] = useState<'idle' | 'training' | 'complete'>('idle');
-      const [trainingProgress, setTrainingProgress] = useState(0);
-      const [trainingLogs, setTrainingLogs] = useState<string[]>([]);
-      const [trainingConfig, setTrainingConfig] = useState({
-          epochs: 20,
-          learningRate: 0.001,
-          batchSize: 64,
-          temperature: 0.7
-      });
-      const [activeDatasets, setActiveDatasets] = useState<string[]>(['sales', 'recipes']);
-      
-      const logsEndRef = useRef<HTMLDivElement>(null);
-      
-      // File Upload State for Training
-      const [customTrainingFiles, setCustomTrainingFiles] = useState<{name: string, size: string, type: string}[]>([]);
-      const fileInputRef = useRef<HTMLInputElement>(null);
-
-      useEffect(() => {
-          if (logsEndRef.current) {
-              logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
-          }
-      }, [trainingLogs]);
-
-      useEffect(() => {
-          const fetchUsers = async () => {
-             setError(null);
-             try {
-                const users = await authService.getAllUsers();
-                setSubscribers(users);
-             } catch (err: any) {
-                console.error("Failed to fetch users", err);
-                setError("Unable to load user data. Please check your connection.");
-             }
-          };
-          fetchUsers();
-          
-          // Initial Load
-          updateTrackingData();
-      }, [activeTab]);
-
-      const updateTrackingData = () => {
-          setLiveVisitors(trackingService.getLiveVisitors());
-          setStats(trackingService.getVisitorStats());
-      };
-
-      const calculateRevenue = () => {
-          return subscribers.reduce((acc, curr) => {
-              // Simplified Revenue Calc
-              const price = plans[curr.plan]?.price || 0;
-              return acc + price;
-          }, 0);
-      };
-
-      const abandonedCheckouts = liveVisitors.filter(v => v.hasAbandonedCheckout);
-
-      // --- Plan Management Handlers ---
-      const handlePlanChange = (type: PlanType, field: keyof PlanConfig, value: any) => {
-          const updated = { ...plans, [type]: { ...plans[type], [field]: value } };
-          setPlans(updated);
-      };
-
-      const savePlans = () => {
-          storageService.savePlans(plans);
-          setEditingPlan(null);
-          alert("Plans updated successfully! Changes are live.");
-      };
-
-      // --- Create User Handlers ---
-      const handleCreateUser = async (e: React.FormEvent) => {
-          e.preventDefault();
-          try {
-              const newUser: User = {
-                  id: `created_${Date.now()}`,
-                  name: newUserForm.name,
-                  email: newUserForm.email,
-                  role: newUserForm.role,
-                  plan: PlanType.PRO, // Default plan for created admins
-                  restaurantName: newUserForm.restaurantName,
-                  location: newUserForm.location,
-                  joinedDate: new Date().toISOString().split('T')[0],
-                  isTrial: false
-              };
-              
-              await authService.registerUser(newUser, newUserForm.password);
-              
+    useEffect(() => {
+        const fetchUsers = async () => {
+           setError(null);
+           try {
               const users = await authService.getAllUsers();
               setSubscribers(users);
-              setShowCreateUserModal(false);
-              setNewUserForm({ name: '', email: '', password: '', role: UserRole.ADMIN, restaurantName: '', location: '' });
-              alert(`Successfully created new ${newUserForm.role === UserRole.ADMIN ? 'Admin' : 'User'}`);
-          } catch (err: any) {
-              alert(err.message || 'Failed to create user');
-          }
-      };
+           } catch (err: any) {
+              console.error("Failed to fetch users", err);
+              setError("Unable to load user data. Please check your connection.");
+           }
+        };
+        fetchUsers();
+        
+        // Initial Load
+        updateTrackingData();
+    }, [activeTab]);
 
-      // --- Manage User Handlers ---
-      const openManageUser = (user: User) => {
-          setManagingUser(user);
-          setEditForm(user);
-      };
+    const updateTrackingData = () => {
+        setLiveVisitors(trackingService.getLiveVisitors());
+        setStats(trackingService.getVisitorStats());
+    };
 
-      const handleSaveUserChanges = async () => {
-          if (!managingUser) return;
-          const updatedUser = { ...managingUser, ...editForm } as User;
-          await authService.updateUser(updatedUser);
-          const users = await authService.getAllUsers();
-          setSubscribers(users);
-          setManagingUser(null);
-          alert("User details updated successfully.");
-      };
+    const calculateRevenue = () => {
+        return subscribers.reduce((acc, curr) => {
+            // Simplified Revenue Calc
+            const price = plans[curr.plan]?.price || 0;
+            return acc + price;
+        }, 0);
+    };
 
-      const handleDeleteUser = async () => {
-          if (!managingUser) return;
-          if (confirm(`Are you sure you want to permanently delete ${managingUser.name}? This action cannot be undone.`)) {
-              await authService.deleteUser(managingUser.id);
-              const users = await authService.getAllUsers();
-              setSubscribers(users);
-              setManagingUser(null);
-          }
-      };
+    // --- Plan Management Handlers ---
+    const handlePlanChange = (type: PlanType, field: keyof PlanConfig, value: any) => {
+        const updated = { ...plans, [type]: { ...plans[type], [field]: value } };
+        setPlans(updated);
+    };
 
-      // --- AI Training Handlers ---
-      const handleTrainingFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-          if (e.target.files && e.target.files.length > 0) {
-              const file = e.target.files[0];
-              setCustomTrainingFiles(prev => [...prev, {
-                  name: file.name,
-                  size: (file.size / 1024).toFixed(1) + ' KB',
-                  type: file.type || 'Unknown'
-              }]);
-              // Reset input
-              if (fileInputRef.current) fileInputRef.current.value = '';
-          }
-      };
+    const savePlans = () => {
+        storageService.savePlans(plans);
+        setEditingPlan(null);
+        alert("Plans updated successfully! Changes are live.");
+    };
 
-      const toggleDataset = (id: string) => {
-          setActiveDatasets(prev => 
-              prev.includes(id) ? prev.filter(d => d !== id) : [...prev, id]
-          );
-      };
+    // --- Create User Handlers ---
+    const handleCreateUser = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            const newUser: User = {
+                id: `created_${Date.now()}`,
+                name: newUserForm.name,
+                email: newUserForm.email,
+                role: newUserForm.role,
+                plan: PlanType.PRO, // Default plan for created admins
+                restaurantName: newUserForm.restaurantName,
+                location: newUserForm.location,
+                joinedDate: new Date().toISOString().split('T')[0],
+                isTrial: false
+            };
+            
+            await authService.registerUser(newUser, newUserForm.password);
+            
+            const users = await authService.getAllUsers();
+            setSubscribers(users);
+            setShowCreateUserModal(false);
+            setNewUserForm({ name: '', email: '', password: '', role: UserRole.ADMIN, restaurantName: '', location: '' });
+            alert(`Successfully created new ${newUserForm.role === UserRole.ADMIN ? 'Admin' : 'User'}`);
+        } catch (err: any) {
+            alert(err.message || 'Failed to create user');
+        }
+    };
 
-      const startTraining = () => {
-          setTrainingStatus('training');
-          setTrainingProgress(0);
-          setTrainingLogs([
-              'Initializing Training Sequence...', 
-              `Configuration: Epochs=${trainingConfig.epochs}, Batch=${trainingConfig.batchSize}, LR=${trainingConfig.learningRate}`,
-              `Selected Datasets: [${activeDatasets.join(', ')}]`,
-              'Connecting to Vector Database...'
-          ]);
-          
-          let progress = 0;
-          let currentEpoch = 1;
+    // --- Manage User Handlers ---
+    const openManageUser = (user: User) => {
+        setManagingUser(user);
+        setEditForm(user);
+    };
 
-          const interval = setInterval(() => {
-              progress += Math.floor(Math.random() * 4) + 1;
-              
-              if (progress >= 100) {
-                  clearInterval(interval);
-                  setTrainingStatus('complete');
-                  setTrainingProgress(100);
-                  setTrainingLogs(prev => [...prev, `Epoch ${trainingConfig.epochs}/${trainingConfig.epochs} Complete.`, 'Validating Model...', 'Weights updated successfully. Accuracy: 98.4%']);
-              } else {
-                  setTrainingProgress(progress);
-                  
-                  // Simulate Epoch Progression
-                  if (progress > (currentEpoch / trainingConfig.epochs) * 100 && currentEpoch < trainingConfig.epochs) {
-                      currentEpoch++;
-                      setTrainingLogs(prev => [...prev, `Epoch ${currentEpoch-1}/${trainingConfig.epochs} finished. Loss: ${(Math.random() * 0.5).toFixed(4)}`]);
-                  }
+    const handleSaveUserChanges = async () => {
+        if (!managingUser) return;
+        const updatedUser = { ...managingUser, ...editForm } as User;
+        await authService.updateUser(updatedUser);
+        const users = await authService.getAllUsers();
+        setSubscribers(users);
+        setManagingUser(null);
+        alert("User details updated successfully.");
+    };
 
-                  // Random Logs
-                  if (Math.random() > 0.8) {
-                      const msgs = [
-                          'Optimizing gradients...',
-                          'Backpropagating loss...',
-                          'Shuffling batch data...',
-                          'Normalizing input vectors...',
-                          'Dropping out neurons (0.2)...'
-                      ];
-                      
-                      // Inject custom file logs occasionally
-                      if (customTrainingFiles.length > 0 && Math.random() > 0.85) {
-                          const randomFile = customTrainingFiles[Math.floor(Math.random() * customTrainingFiles.length)];
-                          setTrainingLogs(prev => [...prev, `Ingesting custom dataset chunk: ${randomFile.name}...`]);
-                      } else {
-                          setTrainingLogs(prev => [...prev, msgs[Math.floor(Math.random() * msgs.length)]]);
-                      }
-                  }
-              }
-          }, 300);
-      };
+    const handleDeleteUser = async () => {
+        if (!managingUser) return;
+        if (confirm(`Are you sure you want to permanently delete ${managingUser.name}? This action cannot be undone.`)) {
+            await authService.deleteUser(managingUser.id);
+            const users = await authService.getAllUsers();
+            setSubscribers(users);
+            setManagingUser(null);
+        }
+    };
 
-      return (
-        <div className="space-y-6 relative">
-            <JourneyModal visitor={selectedVisitor} onClose={() => setSelectedVisitor(null)} />
+    const startTraining = () => {
+        setTrainingStatus('training');
+        setTrainingLogs(['Initializing training sequence...']);
+        let step = 0;
+        const interval = setInterval(() => {
+            step++;
+            const logs = [
+                "Loading dataset: sales_history_v4.csv...",
+                "Normalizing ingredient vectors...",
+                `Epoch ${step}/20: Loss ${(Math.random() * 0.5).toFixed(4)} - Accuracy ${(0.7 + (step * 0.01)).toFixed(2)}`,
+            ];
+            setTrainingLogs(prev => [...prev, logs[step % logs.length]]);
+            
+            if (step >= 20) {
+                clearInterval(interval);
+                setTrainingStatus('complete');
+                setTrainingLogs(prev => [...prev, "Model Fine-Tuning Complete. Deployed to v2.4 endpoint."]);
+            }
+        }, 800);
+    };
 
-            {/* Error Banner */}
-            {error && (
-                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/50 p-4 rounded-lg flex items-center gap-3 animate-fade-in">
-                    <AlertTriangle className="text-red-600 dark:text-red-400" size={20} />
-                    <p className="text-red-800 dark:text-red-300 font-medium text-sm">{error}</p>
-                    <button onClick={() => setError(null)} className="ml-auto text-red-600 hover:text-red-800 text-xs font-bold uppercase">Dismiss</button>
+    return (
+        <div className="space-y-8 animate-fade-in max-w-7xl mx-auto">
+            {/* Header */}
+            <div className="flex justify-between items-end">
+                <div>
+                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <ShieldCheck className="text-emerald-500" /> Super Admin Console
+                    </h2>
+                    <p className="text-slate-500 dark:text-slate-400 mt-1">Manage subscribers, monitor live traffic, and fine-tune AI models.</p>
                 </div>
-            )}
-
-            {/* Create User Modal */}
-            {showCreateUserModal && (
-                <div className="fixed inset-0 bg-slate-900/80 z-50 flex items-center justify-center p-4 animate-fade-in">
-                    <div className="bg-white dark:bg-slate-900 rounded-xl max-w-md w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                                <UserPlus size={20} className="text-emerald-600"/> Create New Admin
-                            </h3>
-                            <button onClick={() => setShowCreateUserModal(false)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-500">
-                                <X size={20} />
-                            </button>
-                        </div>
-                        <form onSubmit={handleCreateUser} className="space-y-4">
-                            <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase">Full Name</label>
-                                <input 
-                                    type="text" required 
-                                    value={newUserForm.name} 
-                                    onChange={e => setNewUserForm({...newUserForm, name: e.target.value})}
-                                    className="w-full mt-1 p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase">Email Address</label>
-                                <input 
-                                    type="email" required 
-                                    value={newUserForm.email} 
-                                    onChange={e => setNewUserForm({...newUserForm, email: e.target.value})}
-                                    className="w-full mt-1 p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase">Password</label>
-                                <input 
-                                    type="password" required 
-                                    value={newUserForm.password} 
-                                    onChange={e => setNewUserForm({...newUserForm, password: e.target.value})}
-                                    className="w-full mt-1 p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded"
-                                />
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase">Role</label>
-                                    <select 
-                                        value={newUserForm.role}
-                                        onChange={e => setNewUserForm({...newUserForm, role: e.target.value as UserRole})}
-                                        className="w-full mt-1 p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-sm"
-                                    >
-                                        <option value={UserRole.ADMIN}>Admin</option>
-                                        <option value={UserRole.OWNER}>Owner</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase">Location</label>
-                                    <input 
-                                        type="text" 
-                                        value={newUserForm.location} 
-                                        onChange={e => setNewUserForm({...newUserForm, location: e.target.value})}
-                                        className="w-full mt-1 p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded"
-                                        placeholder="City"
-                                    />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase">Restaurant / Org Name</label>
-                                <input 
-                                    type="text" 
-                                    value={newUserForm.restaurantName} 
-                                    onChange={e => setNewUserForm({...newUserForm, restaurantName: e.target.value})}
-                                    className="w-full mt-1 p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded"
-                                />
-                            </div>
-                            <button type="submit" className="w-full py-2 bg-slate-900 dark:bg-emerald-600 text-white font-bold rounded-lg hover:opacity-90 mt-4">
-                                Create User
-                            </button>
-                        </form>
-                    </div>
+                <div className="flex bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-800">
+                    {['overview', 'users', 'plans', 'training'].map(tab => (
+                        <button
+                            key={tab}
+                            onClick={() => setActiveTab(tab as any)}
+                            className={`px-4 py-2 rounded-md text-sm font-bold capitalize transition-all ${
+                                activeTab === tab 
+                                ? 'bg-slate-900 text-white shadow-sm' 
+                                : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                            }`}
+                        >
+                            {tab}
+                        </button>
+                    ))}
                 </div>
-            )}
-
-            {/* Manage User Modal */}
-            {managingUser && (
-                <div className="fixed inset-0 bg-slate-900/80 z-50 flex items-center justify-center p-4 animate-fade-in">
-                    <div className="bg-white dark:bg-slate-900 rounded-xl max-w-md w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                                <Edit size={20} className="text-blue-600"/> Manage User
-                            </h3>
-                            <button onClick={() => setManagingUser(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-500">
-                                <X size={20} />
-                            </button>
-                        </div>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase">Full Name</label>
-                                <input 
-                                    type="text"
-                                    value={editForm.name || ''} 
-                                    onChange={e => setEditForm({...editForm, name: e.target.value})}
-                                    className="w-full mt-1 p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded"
-                                />
-                            </div>
-                            <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase">Email Address</label>
-                                <input 
-                                    type="email"
-                                    value={editForm.email || ''} 
-                                    onChange={e => setEditForm({...editForm, email: e.target.value})}
-                                    className="w-full mt-1 p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded"
-                                />
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase">Role</label>
-                                    <select 
-                                        value={editForm.role}
-                                        onChange={e => setEditForm({...editForm, role: e.target.value as UserRole})}
-                                        className="w-full mt-1 p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-sm"
-                                    >
-                                        <option value={UserRole.ADMIN}>Admin</option>
-                                        <option value={UserRole.OWNER}>Owner</option>
-                                        <option value={UserRole.SUPER_ADMIN}>Super Admin</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase">Plan</label>
-                                    <select 
-                                        value={editForm.plan}
-                                        onChange={e => setEditForm({...editForm, plan: e.target.value as PlanType})}
-                                        className="w-full mt-1 p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-sm"
-                                    >
-                                        <option value={PlanType.FREE}>Free</option>
-                                        <option value={PlanType.PRO}>Pro</option>
-                                        <option value={PlanType.PRO_PLUS}>Pro+</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase">Restaurant / Org</label>
-                                <input 
-                                    type="text" 
-                                    value={editForm.restaurantName || ''} 
-                                    onChange={e => setEditForm({...editForm, restaurantName: e.target.value})}
-                                    className="w-full mt-1 p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded"
-                                />
-                            </div>
-
-                            <div className="flex gap-3 pt-4 border-t border-slate-100 dark:border-slate-800 mt-4">
-                                <button 
-                                    onClick={handleDeleteUser}
-                                    className="flex-1 py-2 bg-red-50 text-red-600 border border-red-200 font-bold rounded-lg hover:bg-red-100 flex items-center justify-center gap-2"
-                                >
-                                    <Trash2 size={16} /> Delete
-                                </button>
-                                <button 
-                                    onClick={handleSaveUserChanges}
-                                    className="flex-[2] py-2 bg-slate-900 dark:bg-emerald-600 text-white font-bold rounded-lg hover:opacity-90 flex items-center justify-center gap-2"
-                                >
-                                    <Save size={16} /> Save Changes
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Live Notification Toast */}
-            {liveNotification && (
-                <div className="fixed bottom-6 right-6 bg-slate-900 text-white p-4 rounded-lg shadow-2xl z-50 animate-fade-in-up flex items-center gap-3 border border-slate-700">
-                    <div className="bg-emerald-500 rounded-full p-2 animate-pulse">
-                        <Globe size={16} />
-                    </div>
-                    <div>
-                        <p className="text-sm font-bold">{liveNotification.msg}</p>
-                        <p className="text-xs text-slate-400 flex items-center gap-1">
-                            <MapPin size={10} /> {liveNotification.loc}
-                        </p>
-                    </div>
-                </div>
-            )}
-
-            {/* Sub-Navigation */}
-            <div className="flex gap-2 border-b border-slate-200 dark:border-slate-800 pb-1 overflow-x-auto">
-                {[
-                    { id: 'overview', label: 'Overview & Traffic', icon: Activity },
-                    { id: 'users', label: 'User Management', icon: Users },
-                    { id: 'plans', label: 'Plans & Pricing', icon: DollarSign },
-                    { id: 'training', label: 'AI Model Training', icon: Brain },
-                ].map(tab => (
-                    <button
-                        key={tab.id}
-                        onClick={() => setActiveTab(tab.id as any)}
-                        className={`flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-t-lg border-b-2 transition-colors whitespace-nowrap ${
-                            activeTab === tab.id 
-                            ? 'border-emerald-500 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20' 
-                            : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'
-                        }`}
-                    >
-                        <tab.icon size={16} /> {tab.label}
-                    </button>
-                ))}
             </div>
 
-            {/* --- TAB CONTENT: OVERVIEW --- */}
             {activeTab === 'overview' && (
                 <>
-                    {/* Top Stats */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-fade-in">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                         <StatCard 
-                            label="Active Visitors Now" 
-                            value={stats.activeNow.toString()} 
-                            trend="Live View"
-                            trendUp={true}
-                            icon={Eye} 
-                            colorClass="text-emerald-500 bg-emerald-500" 
-                            isLive={true}
-                        />
-                        <StatCard 
-                            label="Checkout Drop-offs" 
-                            value={stats.checkoutDropoff.toString()} 
-                            trend="Requires Action"
-                            trendUp={false}
-                            icon={UserX} 
-                            colorClass="text-red-500 bg-red-500" 
-                        />
-                        <StatCard 
-                            label="Total Subscribers" 
-                            value={subscribers.length.toString()} 
-                            icon={Users} 
-                            colorClass="text-indigo-600 bg-indigo-600" 
-                        />
-                        <StatCard 
-                            label="Monthly Recurring Revenue" 
+                            label="Total Revenue" 
                             value={`₹${calculateRevenue().toLocaleString()}`} 
                             icon={DollarSign} 
-                            colorClass="text-emerald-600 bg-emerald-600" 
+                            colorClass="bg-emerald-500 text-emerald-500" 
+                            trend="+12%" 
+                            trendUp={true}
+                        />
+                        <StatCard 
+                            label="Active Subscribers" 
+                            value={subscribers.length.toString()} 
+                            icon={Users} 
+                            colorClass="bg-blue-500 text-blue-500" 
+                            trend="+5" 
+                            trendUp={true}
+                        />
+                        <StatCard 
+                            label="Live Visitors Now" 
+                            value={stats.activeNow.toString()} 
+                            icon={Activity} 
+                            colorClass="bg-red-500 text-red-500"
+                            isLive={true} 
+                        />
+                        <StatCard 
+                            label="AI Queries Today" 
+                            value="1,284" 
+                            icon={Brain} 
+                            colorClass="bg-purple-500 text-purple-500" 
+                            trend="+8%" 
+                            trendUp={true}
                         />
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in-up">
-                        {/* Live Traffic Feed */}
-                        <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-                            <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
-                                <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                                    <Globe size={20} className="text-blue-500" /> Live Visitor Traffic
-                                </h3>
-                                <div className="flex items-center gap-2 text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-3 py-1 rounded-full animate-pulse">
-                                    <div className="w-2 h-2 bg-emerald-500 rounded-full"></div> Real-time
-                                </div>
-                            </div>
-                            <div className="p-0 overflow-x-auto">
-                                <table className="w-full text-sm text-left">
-                                    <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-semibold">
-                                        <tr>
-                                            <th className="px-6 py-3">Visitor</th>
-                                            <th className="px-6 py-3">Location</th>
-                                            <th className="px-6 py-3">Current Page</th>
-                                            <th className="px-6 py-3">Device</th>
-                                            <th className="px-6 py-3">Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                                        {liveVisitors.length === 0 ? (
-                                            <tr>
-                                                <td colSpan={5} className="px-6 py-8 text-center text-slate-500">No active visitors.</td>
-                                            </tr>
-                                        ) : (
-                                            liveVisitors.slice(0, 8).map((visitor, i) => (
-                                                <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                                    <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-200">
-                                                        {visitor.userName || 'Guest'}
-                                                        {visitor.userId && <span className="block text-[10px] text-slate-400 font-mono">{visitor.userId}</span>}
-                                                    </td>
-                                                    <td className="px-6 py-4 text-slate-600 dark:text-slate-400">
-                                                        <div className="flex items-center gap-1.5">
-                                                            <MapPin size={14} className="text-slate-400" />
-                                                            {visitor.location}
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-6 py-4">
-                                                        <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2 py-1 rounded text-xs border border-slate-200 dark:border-slate-700">
-                                                            {visitor.pagesVisited[visitor.pagesVisited.length - 1]}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-6 py-4 text-slate-500 dark:text-slate-400 text-xs">{visitor.device}</td>
-                                                    <td className="px-6 py-4">
-                                                        {visitor.isOnline ? (
-                                                            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                                                                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div> Online
-                                                            </span>
-                                                        ) : (
-                                                            <span className="inline-flex items-center gap-1.5 text-xs text-slate-400">
-                                                                <div className="w-1.5 h-1.5 bg-slate-300 rounded-full"></div> Away
-                                                            </span>
-                                                        )}
-                                                    </td>
-                                                </tr>
-                                            ))
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
+                    {/* Live Traffic */}
+                    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                        <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
+                            <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                                <Globe size={18} className="text-blue-500" /> Live Visitor Traffic
+                            </h3>
+                            <button onClick={updateTrackingData} className="text-xs font-bold text-emerald-600 flex items-center gap-1 hover:bg-emerald-50 px-2 py-1 rounded">
+                                <Activity size={12} /> Refresh
+                            </button>
                         </div>
-
-                        {/* Abandoned Cart / Checkout */}
-                        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col">
-                            <div className="p-6 border-b border-slate-200 dark:border-slate-800">
-                                <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                                    <AlertTriangle size={20} className="text-amber-500" /> Abandoned Checkouts
-                                </h3>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Users who reached payment but didn't buy.</p>
-                            </div>
-                            <div className="flex-1 overflow-y-auto p-4 space-y-4 max-h-[400px]">
-                                {abandonedCheckouts.length === 0 ? (
-                                    <div className="text-center p-8 text-slate-400">No drop-offs recently!</div>
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                                <tr>
+                                    <th className="px-6 py-3">User / Location</th>
+                                    <th className="px-6 py-3">Current Page</th>
+                                    <th className="px-6 py-3">Device</th>
+                                    <th className="px-6 py-3">Status</th>
+                                    <th className="px-6 py-3 text-right">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                {liveVisitors.length === 0 ? (
+                                    <tr>
+                                        <td colSpan={5} className="px-6 py-8 text-center text-slate-400">No active visitors at the moment.</td>
+                                    </tr>
                                 ) : (
-                                    abandonedCheckouts.map((v, i) => (
-                                        <div key={i} className="p-4 rounded-lg bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30">
-                                            <div className="flex justify-between items-start mb-2">
-                                                <h4 className="font-bold text-slate-800 dark:text-slate-200 text-sm">{v.userName}</h4>
-                                                <span className="text-[10px] text-slate-400">{new Date(v.lastActive).toLocaleTimeString()}</span>
-                                            </div>
-                                            <p className="text-xs text-slate-600 dark:text-slate-400 mb-3 flex items-center gap-1">
-                                                <MapPin size={10} /> {v.location}
-                                            </p>
-                                            <div className="flex gap-2">
+                                    liveVisitors.map((v) => (
+                                        <tr key={v.sessionId} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                                            <td className="px-6 py-4">
+                                                <p className="font-bold text-slate-700 dark:text-slate-200">{v.userName || 'Guest'}</p>
+                                                <p className="text-xs text-slate-400 flex items-center gap-1"><MapPin size={10} /> {v.location}</p>
+                                            </td>
+                                            <td className="px-6 py-4 text-slate-600 dark:text-slate-300">
+                                                <span className="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded text-xs font-mono border border-slate-200 dark:border-slate-700">
+                                                    {v.pagesVisited[v.pagesVisited.length - 1] || '/'}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-slate-500 dark:text-slate-400">{v.device}</td>
+                                            <td className="px-6 py-4">
+                                                {v.hasAbandonedCheckout ? (
+                                                    <span className="text-xs font-bold text-red-600 bg-red-100 dark:bg-red-900/30 px-2 py-1 rounded-full">Checkout Dropoff</span>
+                                                ) : (
+                                                    <span className="text-xs font-bold text-emerald-600 bg-emerald-100 dark:bg-emerald-900/30 px-2 py-1 rounded-full flex items-center w-fit gap-1">
+                                                        <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span> Online
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
                                                 <button 
                                                     onClick={() => setSelectedVisitor(v)}
-                                                    className="flex-1 py-1.5 text-xs bg-slate-900 dark:bg-slate-700 text-white rounded font-medium hover:bg-slate-800 flex items-center justify-center gap-1"
+                                                    className="text-blue-600 hover:text-blue-800 dark:text-blue-400 text-xs font-bold"
                                                 >
-                                                    <Eye size={12} /> View Journey
+                                                    View Journey
                                                 </button>
-                                                <button className="flex-1 py-1.5 text-xs bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded font-medium hover:bg-slate-50">
-                                                    Send Email
-                                                </button>
-                                            </div>
-                                        </div>
+                                            </td>
+                                        </tr>
                                     ))
                                 )}
-                            </div>
-                        </div>
+                            </tbody>
+                        </table>
                     </div>
                 </>
             )}
 
-            {/* --- TAB CONTENT: USERS --- */}
-            {activeTab === 'users' && (
-                <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden animate-fade-in">
-                     <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
-                        <div className="flex items-center gap-4">
-                            <h3 className="text-lg font-bold text-slate-800 dark:text-white">Registered Userbase</h3>
-                            <button 
-                                onClick={() => setShowCreateUserModal(true)}
-                                className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700 shadow-sm"
-                            >
-                                <UserPlus size={14} /> Create Admin
-                            </button>
-                        </div>
-                        <div className="relative">
-                            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/>
-                            <input type="text" placeholder="Search users..." className="pl-9 pr-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 text-sm dark:bg-slate-900 dark:text-white"/>
-                        </div>
-                    </div>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm text-left">
-                             <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
-                                <tr>
-                                    <th className="px-6 py-4">Name / ID</th>
-                                    <th className="px-6 py-4">Contact</th>
-                                    <th className="px-6 py-4">Restaurant</th>
-                                    <th className="px-6 py-4">Role / Plan</th>
-                                    <th className="px-6 py-4">Joined</th>
-                                    <th className="px-6 py-4 text-right">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                                {subscribers.map((sub) => (
-                                    <tr key={sub.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                                        <td className="px-6 py-4">
-                                            <div className="font-bold text-slate-900 dark:text-white">{sub.name}</div>
-                                            <div className="text-xs text-slate-400 font-mono">{sub.id}</div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex flex-col gap-1 text-xs">
-                                                <span className="flex items-center gap-1.5"><Mail size={12}/> {sub.email}</span>
-                                                <span className="flex items-center gap-1.5 text-slate-400"><Phone size={12}/> --</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="text-slate-700 dark:text-slate-300 font-medium">{sub.restaurantName || 'N/A'}</div>
-                                            <div className="text-xs text-slate-500">{sub.location}</div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex flex-col gap-1 items-start">
-                                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${
-                                                    sub.role === UserRole.SUPER_ADMIN ? 'bg-indigo-50 text-indigo-700 border-indigo-200' :
-                                                    sub.role === UserRole.ADMIN ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                                                    'bg-slate-50 text-slate-600 border-slate-200'
-                                                }`}>
-                                                    {sub.role.replace('_', ' ')}
-                                                </span>
-                                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                                                    sub.plan === PlanType.PRO_PLUS ? 'bg-purple-100 text-purple-700' :
-                                                    sub.plan === PlanType.PRO ? 'bg-emerald-100 text-emerald-700' :
-                                                    'bg-slate-100 text-slate-600'
-                                                }`}>
-                                                    {sub.plan.replace('_', ' ')}
-                                                </span>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-slate-500 text-xs">
-                                            {sub.joinedDate || 'Unknown'}
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <button 
-                                                onClick={() => openManageUser(sub)}
-                                                className="text-emerald-600 hover:text-emerald-700 font-bold text-xs border border-emerald-200 rounded px-2 py-1 hover:bg-emerald-50"
-                                            >
-                                                Manage
-                                            </button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            )}
-
-            {/* ... rest of the component (plans, training tabs) remains the same */}
-            {/* --- TAB CONTENT: PLANS --- */}
-            {activeTab === 'plans' && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-fade-in">
-                    {(Object.entries(plans) as [string, PlanConfig][]).map(([key, plan]) => {
-                        const planType = key as PlanType;
-                        const isEditing = editingPlan === planType;
-                        return (
-                             <div key={key} className={`bg-white dark:bg-slate-900 p-6 rounded-xl border shadow-sm flex flex-col ${isEditing ? 'border-blue-500 ring-2 ring-blue-500/20' : 'border-slate-200 dark:border-slate-800'}`}>
-                                <div className="flex justify-between items-start mb-4">
-                                    <h3 className={`font-bold text-lg ${planType === PlanType.PRO_PLUS ? 'text-purple-600' : 'text-slate-800 dark:text-white'}`}>{plan.name}</h3>
-                                    <button 
-                                        onClick={() => isEditing ? savePlans() : setEditingPlan(planType)}
-                                        className={`p-2 rounded-lg transition-colors ${isEditing ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500 hover:text-blue-600'}`}
-                                    >
-                                        {isEditing ? <Save size={18} /> : <Edit size={18} />}
-                                    </button>
-                                </div>
-                                
-                                <div className="space-y-4 flex-1">
-                                    <div>
-                                        <label className="text-xs font-bold text-slate-400 uppercase">Description</label>
-                                        <input 
-                                            type="text"
-                                            disabled={!isEditing}
-                                            value={plan.description || ''}
-                                            onChange={(e) => handlePlanChange(planType, 'description', e.target.value)}
-                                            className="w-full mt-1 p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded text-sm text-slate-800 dark:text-white disabled:bg-transparent disabled:border-transparent disabled:p-0"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-xs font-bold text-slate-400 uppercase">Monthly Price (₹)</label>
-                                        <input 
-                                            type="number"
-                                            disabled={!isEditing}
-                                            value={plan.price}
-                                            onChange={(e) => handlePlanChange(planType, 'price', parseInt(e.target.value))}
-                                            className="w-full mt-1 p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded font-mono font-bold text-slate-800 dark:text-white disabled:bg-transparent disabled:border-transparent disabled:p-0 disabled:text-xl"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-xs font-bold text-slate-400 uppercase">Quarterly Price (₹)</label>
-                                        <input 
-                                            type="number"
-                                            disabled={!isEditing}
-                                            value={plan.quarterlyPrice}
-                                            onChange={(e) => handlePlanChange(planType, 'quarterlyPrice', parseInt(e.target.value))}
-                                            className="w-full mt-1 p-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded font-mono text-slate-600 dark:text-slate-300 disabled:bg-transparent disabled:border-transparent disabled:p-0"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">Features (Comma separated)</label>
-                                        {isEditing ? (
-                                            <textarea 
-                                                value={plan.features.join(', ')}
-                                                onChange={(e) => handlePlanChange(planType, 'features', e.target.value.split(',').map(s => s.trim()))}
-                                                className="w-full h-32 p-2 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded focus:ring-2 focus:ring-blue-500"
-                                            />
-                                        ) : (
-                                            <ul className="list-disc pl-5 space-y-1 text-sm text-slate-600 dark:text-slate-400">
-                                                {plan.features.map((f, i) => <li key={i}>{f}</li>)}
-                                            </ul>
-                                        )}
-                                    </div>
-                                </div>
-                             </div>
-                        );
-                    })}
-                </div>
-            )}
-
-            {/* --- TAB CONTENT: TRAINING --- */}
             {activeTab === 'training' && (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in">
-                    {/* Left Column: Configuration */}
-                    <div className="lg:col-span-1 space-y-6">
-                        
-                        {/* Data Ingestion */}
-                        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm p-6">
-                            <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2 mb-4">
-                                <Database size={18} className="text-blue-500" /> Data Sources
-                            </h3>
-                            <div className="space-y-3">
-                                {[
-                                    { id: 'sales', label: 'Sales Patterns', desc: 'Seasonality data', size: '12.5MB' },
-                                    { id: 'recipes', label: 'Recipe Logic', desc: 'Ingredient pairings', size: '8.2MB' },
-                                    { id: 'interactions', label: 'User Queries', desc: 'Strategy corrections', size: '4.1MB' },
-                                    { id: 'market', label: 'Market Prices', desc: 'Real-time scrape', size: '1.2MB' }
-                                ].map((item) => (
-                                    <div 
-                                        key={item.id} 
-                                        onClick={() => toggleDataset(item.id)}
-                                        className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
-                                            activeDatasets.includes(item.id) 
-                                            ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' 
-                                            : 'bg-slate-50 dark:bg-slate-800 border-slate-100 dark:border-slate-700 hover:border-slate-300'
-                                        }`}
-                                    >
-                                        <div className={`w-4 h-4 rounded border flex items-center justify-center ${
-                                            activeDatasets.includes(item.id) ? 'bg-blue-500 border-blue-500 text-white' : 'bg-white border-slate-300'
-                                        }`}>
-                                            {activeDatasets.includes(item.id) && <CheckCircle2 size={10} />}
-                                        </div>
-                                        <div className="flex-1">
-                                            <div className="text-sm font-bold text-slate-700 dark:text-slate-200">{item.label}</div>
-                                            <div className="text-[10px] text-slate-500">{item.desc}</div>
-                                        </div>
-                                        <div className="text-[10px] font-mono font-bold text-slate-400">{item.size}</div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                        <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                            <Database size={20} className="text-purple-600" /> Fine-Tuning Datasets
+                        </h3>
+                        <div className="space-y-3 mb-6">
+                            <div className="flex items-center justify-between p-3 border border-slate-200 dark:border-slate-700 rounded-lg">
+                                <div className="flex items-center gap-3">
+                                    <FileText className="text-slate-400" />
+                                    <div>
+                                        <p className="font-bold text-sm text-slate-700 dark:text-slate-200">Global Recipe DB</p>
+                                        <p className="text-xs text-slate-500">2.4GB • Updated yesterday</p>
                                     </div>
-                                ))}
+                                </div>
+                                <input type="checkbox" checked readOnly className="accent-emerald-500" />
                             </div>
-
-                            {/* Custom Upload */}
-                            <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
-                                <p className="text-xs font-bold text-slate-400 uppercase mb-2">Custom Datasets</p>
-                                {customTrainingFiles.map((file, i) => (
-                                    <div key={i} className="flex items-center gap-2 text-xs text-emerald-600 bg-emerald-50 dark:bg-emerald-900/10 p-2 rounded mb-2 border border-emerald-100 dark:border-emerald-800">
-                                        <CheckCircle2 size={12} /> {file.name}
+                            <div className="flex items-center justify-between p-3 border border-slate-200 dark:border-slate-700 rounded-lg">
+                                <div className="flex items-center gap-3">
+                                    <TrendingUp className="text-slate-400" />
+                                    <div>
+                                        <p className="font-bold text-sm text-slate-700 dark:text-slate-200">Sales Trends (Anonymized)</p>
+                                        <p className="text-xs text-slate-500">1.1GB • Live Sync</p>
                                     </div>
-                                ))}
-                                <button 
-                                    onClick={() => fileInputRef.current?.click()}
-                                    className="w-full py-2 border border-dashed border-slate-300 dark:border-slate-700 rounded-lg text-xs font-bold text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 flex items-center justify-center gap-2 transition-colors"
-                                >
-                                    <UploadCloud size={14} /> Upload CSV/JSON
-                                </button>
-                                <input 
-                                    type="file" 
-                                    ref={fileInputRef} 
-                                    className="hidden" 
-                                    onChange={handleTrainingFileUpload}
-                                    accept=".csv,.json,.pdf,.txt"
-                                />
+                                </div>
+                                <input type="checkbox" checked readOnly className="accent-emerald-500" />
                             </div>
                         </div>
-
-                        {/* Hyperparameters */}
-                        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm p-6">
-                            <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2 mb-4">
-                                <Sliders size={18} className="text-emerald-500" /> Hyperparameters
-                            </h3>
-                            <div className="space-y-5">
-                                <div>
-                                    <div className="flex justify-between text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">
-                                        <span>Epochs</span>
-                                        <span className="text-emerald-600">{trainingConfig.epochs}</span>
-                                    </div>
-                                    <input 
-                                        type="range" min="1" max="100" step="1"
-                                        value={trainingConfig.epochs}
-                                        onChange={e => setTrainingConfig({...trainingConfig, epochs: parseInt(e.target.value)})}
-                                        className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-                                    />
-                                </div>
-                                <div>
-                                    <div className="flex justify-between text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">
-                                        <span>Learning Rate</span>
-                                        <span className="text-emerald-600">{trainingConfig.learningRate}</span>
-                                    </div>
-                                    <input 
-                                        type="range" min="0.0001" max="0.01" step="0.0001"
-                                        value={trainingConfig.learningRate}
-                                        onChange={e => setTrainingConfig({...trainingConfig, learningRate: parseFloat(e.target.value)})}
-                                        className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-                                    />
-                                </div>
-                                <div>
-                                    <div className="flex justify-between text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">
-                                        <span>Batch Size</span>
-                                        <span className="text-emerald-600">{trainingConfig.batchSize}</span>
-                                    </div>
-                                    <select 
-                                        value={trainingConfig.batchSize}
-                                        onChange={e => setTrainingConfig({...trainingConfig, batchSize: parseInt(e.target.value)})}
-                                        className="w-full p-2 text-xs border border-slate-200 dark:border-slate-700 rounded bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-white"
-                                    >
-                                        <option value="16">16</option>
-                                        <option value="32">32</option>
-                                        <option value="64">64</option>
-                                        <option value="128">128</option>
-                                    </select>
-                                </div>
-                                 <div>
-                                    <div className="flex justify-between text-xs font-bold text-slate-600 dark:text-slate-300 mb-1">
-                                        <span>Creativity (Temp)</span>
-                                        <span className="text-emerald-600">{trainingConfig.temperature}</span>
-                                    </div>
-                                    <input 
-                                        type="range" min="0.1" max="1.5" step="0.1"
-                                        value={trainingConfig.temperature}
-                                        onChange={e => setTrainingConfig({...trainingConfig, temperature: parseFloat(e.target.value)})}
-                                        className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-                                    />
-                                </div>
+                        
+                        <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                            <Sliders size={20} className="text-blue-600" /> Hyperparameters
+                        </h3>
+                        <div className="grid grid-cols-2 gap-4 mb-6">
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 uppercase">Epochs</label>
+                                <input type="number" value={20} readOnly className="w-full mt-1 p-2 border rounded bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:text-white text-sm" />
+                            </div>
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 uppercase">Learning Rate</label>
+                                <input type="text" value="0.001" readOnly className="w-full mt-1 p-2 border rounded bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:text-white text-sm" />
                             </div>
                         </div>
 
                         <button 
-                            onClick={trainingStatus === 'idle' ? startTraining : () => setTrainingStatus('idle')}
-                            disabled={trainingStatus === 'training' || activeDatasets.length === 0}
-                            className={`w-full py-3 font-bold rounded-lg flex items-center justify-center gap-2 shadow-lg transition-all ${
-                                trainingStatus === 'idle' 
-                                ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:opacity-90' 
-                                : trainingStatus === 'training'
-                                    ? 'bg-slate-800 text-slate-400 cursor-not-allowed'
-                                    : 'bg-emerald-500 text-white'
-                            }`}
+                            onClick={startTraining}
+                            disabled={trainingStatus === 'training'}
+                            className="w-full py-3 bg-slate-900 dark:bg-emerald-600 text-white font-bold rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
                         >
-                            {trainingStatus === 'idle' ? <><Cpu size={18} /> Start Training</> : 
-                             trainingStatus === 'training' ? <><Activity className="animate-spin" size={18}/> Training...</> :
-                             'Training Complete'}
+                            {trainingStatus === 'training' ? <Loader2 className="animate-spin" /> : <Cpu size={20} />}
+                            {trainingStatus === 'training' ? 'Training in Progress...' : 'Start Fine-Tuning'}
                         </button>
                     </div>
 
-                    {/* Right Column: Console & Viz */}
-                    <div className="lg:col-span-2 space-y-6">
-                        
-                        {/* Status Card */}
-                        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm p-8 flex flex-col items-center justify-center text-center min-h-[200px]">
-                            {trainingStatus === 'idle' ? (
-                                <>
-                                    <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/20 text-blue-500 rounded-full flex items-center justify-center mb-4">
-                                        <Brain size={32} />
-                                    </div>
-                                    <h2 className="text-xl font-bold text-slate-800 dark:text-white">Ready to Train</h2>
-                                    <p className="text-slate-500 dark:text-slate-400 mt-2 max-w-md">
-                                        Configure your dataset and hyperparameters on the left, then initialize the neural network update.
-                                    </p>
-                                </>
-                            ) : trainingStatus === 'training' ? (
-                                <>
-                                     <div className="relative w-20 h-20 mb-6">
-                                         <svg className="w-full h-full transform -rotate-90">
-                                             <circle cx="40" cy="40" r="36" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-slate-100 dark:text-slate-800" />
-                                             <circle cx="40" cy="40" r="36" stroke="currentColor" strokeWidth="8" fill="transparent" strokeDasharray={226} strokeDashoffset={226 - (226 * trainingProgress) / 100} className="text-blue-500 transition-all duration-300 ease-linear" />
-                                         </svg>
-                                         <div className="absolute inset-0 flex items-center justify-center font-bold text-xl text-blue-600">
-                                             {trainingProgress}%
-                                         </div>
-                                     </div>
-                                     <h2 className="text-xl font-bold text-slate-800 dark:text-white animate-pulse">Training Model...</h2>
-                                     <p className="text-slate-500 dark:text-slate-400 mt-2">Optimization in progress. Do not close this tab.</p>
-                                </>
-                            ) : (
-                                <>
-                                    <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 rounded-full flex items-center justify-center mb-4 animate-scale-in">
-                                        <Zap size={32} fill="currentColor" />
-                                    </div>
-                                    <h2 className="text-xl font-bold text-emerald-700 dark:text-emerald-400">Model Updated Successfully</h2>
-                                    <p className="text-slate-500 dark:text-slate-400 mt-2">
-                                        Version <span className="font-mono bg-slate-100 dark:bg-slate-800 px-1 rounded">v2.4.1</span> is now live across all 500+ nodes.
-                                    </p>
-                                </>
-                            )}
+                    <div className="bg-black text-green-400 p-6 rounded-xl font-mono text-sm overflow-y-auto h-[500px] shadow-2xl border border-slate-800 relative">
+                        <div className="absolute top-4 right-4 flex gap-2">
+                            <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                            <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                            <div className="w-3 h-3 rounded-full bg-green-500"></div>
                         </div>
-
-                        {/* Terminal */}
-                        <div className="bg-slate-950 rounded-xl overflow-hidden border border-slate-800 shadow-2xl flex flex-col h-[400px]">
-                            <div className="px-4 py-2 bg-slate-900 border-b border-slate-800 flex items-center gap-2">
-                                <Terminal size={14} className="text-slate-400" />
-                                <span className="text-xs font-mono font-bold text-slate-400">training_console.log</span>
-                                <div className="ml-auto flex gap-1.5">
-                                    <div className="w-2.5 h-2.5 rounded-full bg-red-500/50"></div>
-                                    <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/50"></div>
-                                    <div className="w-2.5 h-2.5 rounded-full bg-green-500/50"></div>
-                                </div>
-                            </div>
-                            <div className="flex-1 p-4 font-mono text-xs text-emerald-400 overflow-y-auto space-y-1">
-                                {trainingLogs.length === 0 ? (
-                                    <span className="text-slate-600 opacity-50 select-none">&gt; Waiting for command...</span>
-                                ) : (
-                                    <>
-                                        {trainingLogs.map((log, i) => (
-                                            <div key={i} className="animate-fade-in break-words">
-                                                <span className="text-slate-500 mr-2">[{new Date().toLocaleTimeString()}]</span>
-                                                {log}
-                                            </div>
-                                        ))}
-                                        {trainingStatus === 'training' && (
-                                            <div ref={logsEndRef} className="animate-pulse text-emerald-600">&gt; _</div>
-                                        )}
-                                    </>
-                                )}
-                            </div>
-                        </div>
-
+                        <p className="mb-4 text-slate-500"># System Terminal - v2.4.1</p>
+                        {trainingLogs.map((log, i) => (
+                            <p key={i} className="mb-2">> {log}</p>
+                        ))}
+                        <div ref={logsEndRef} />
+                        {trainingStatus === 'training' && <span className="animate-pulse">_</span>}
                     </div>
                 </div>
             )}
-        </div>
-      );
-  };
 
-  const renderOwnerDashboard = () => {
-    if (salesData.length === 0) {
-      return (
-        <div className="flex flex-col items-center justify-center p-12 bg-white dark:bg-slate-900 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 text-center animate-fade-in">
-          <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-6 text-slate-400">
-            <Activity size={32} />
-          </div>
-          <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">Your Dashboard is Empty</h3>
-          <p className="text-slate-500 dark:text-slate-400 max-w-md mb-8">
-            Connect your POS or upload your sales data to see real-time insights, profitability analysis, and AI recommendations.
-          </p>
-          <div className="flex gap-4">
-             <button className="px-6 py-2 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 transition-colors">
-               Go to Data Integrations
-             </button>
-          </div>
+            {/* Journey Modal */}
+            {selectedVisitor && (
+                <JourneyModal visitor={selectedVisitor} onClose={() => setSelectedVisitor(null)} />
+            )}
         </div>
-      );
+    );
+};
+
+export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
+    if (user.role === UserRole.SUPER_ADMIN) {
+        return <SuperAdminDashboard />;
     }
 
-    const latestRevenue = salesData[salesData.length - 1]?.revenue || 0;
-    const totalRevenue = salesData.reduce((acc, curr) => acc + (curr.revenue || 0), 0);
-
     return (
-      <>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-fade-in">
-          <StatCard 
-            label="Total Revenue" 
-            value={`₹${totalRevenue.toLocaleString()}`} 
-            trend="12.5%" 
-            trendUp={true} 
-            icon={DollarSign} 
-            colorClass="text-emerald-600 bg-emerald-600" 
-          />
-          <StatCard 
-            label="Food Cost %" 
-            value="32.4%" 
-            trend="1.2%" 
-            trendUp={false} 
-            icon={Utensils} 
-            colorClass="text-orange-600 bg-orange-600" 
-          />
-          <StatCard 
-            label="Net Profit (Est)" 
-            value={`₹${(totalRevenue * 0.2).toLocaleString()}`} 
-            trend="8.1%" 
-            trendUp={true} 
-            icon={TrendingUp} 
-            colorClass="text-blue-600 bg-blue-600" 
-          />
-          <StatCard 
-            label="Critical Alerts" 
-            value="3" 
-            icon={AlertTriangle} 
-            colorClass="text-red-600 bg-red-600" 
-          />
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in-up">
-          <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm transition-colors duration-200">
-            <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">Revenue Trend</h3>
-            <div className="h-72 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={salesData}>
-                  <defs>
-                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/>
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#334155" opacity={0.3} />
-                  <XAxis dataKey="date" tick={{fontSize: 12, fill: '#64748b'}} tickLine={false} axisLine={false} />
-                  <YAxis tick={{fontSize: 12, fill: '#64748b'}} tickLine={false} axisLine={false} tickFormatter={(value) => `₹${value/1000}k`} />
-                  <Tooltip 
-                    contentStyle={{ backgroundColor: '#1e293b', borderRadius: '8px', border: '1px solid #334155', color: '#fff' }}
-                    itemStyle={{ color: '#fff' }}
-                    labelStyle={{ color: '#94a3b8' }}
-                    formatter={(value: number) => [`₹${value}`, 'Revenue']}
-                  />
-                  <Area type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorRevenue)" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm transition-colors duration-200">
-            <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">Financial Insights</h3>
-            <div className="space-y-4">
-              <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30 rounded-lg">
-                <div className="flex gap-2">
-                  <AlertTriangle className="text-red-500 dark:text-red-400 shrink-0" size={18} />
-                  <div>
-                    <h4 className="text-sm font-semibold text-red-800 dark:text-red-200">Margin Squeeze</h4>
-                    <p className="text-xs text-red-600 dark:text-red-300 mt-1">Check recent ingredient cost spikes.</p>
-                  </div>
+        <div className="space-y-8 animate-fade-in">
+            {/* Welcome Banner */}
+            <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white p-8 rounded-2xl shadow-lg relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -translate-y-1/2 translate-x-1/2"></div>
+                <div className="relative z-10">
+                    <h2 className="text-3xl font-bold mb-2">Welcome back, {user.name}</h2>
+                    <p className="text-slate-300">Here's what's happening at {user.restaurantName || 'your kitchen'} today.</p>
                 </div>
-              </div>
-               <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-900/30 rounded-lg">
-                <div className="flex gap-2">
-                  <DollarSign className="text-emerald-500 dark:text-emerald-400 shrink-0" size={18} />
-                  <div>
-                    <h4 className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">Growth Detected</h4>
-                    <p className="text-xs text-emerald-600 dark:text-emerald-300 mt-1">Revenue is up 12% week over week.</p>
-                  </div>
-                </div>
-              </div>
             </div>
-            <button className="w-full mt-4 py-2 text-sm text-emerald-600 dark:text-emerald-400 border border-emerald-600 dark:border-emerald-500 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors">
-              View Strategy Report
-            </button>
-          </div>
+
+            {/* Standard Stats Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <StatCard 
+                    label="Today's Revenue" 
+                    value="₹24,500" 
+                    trend="+12%" 
+                    trendUp={true} 
+                    icon={DollarSign} 
+                    colorClass="bg-emerald-500 text-emerald-500" 
+                />
+                <StatCard 
+                    label="Food Cost" 
+                    value="28.4%" 
+                    trend="-2.1%" 
+                    trendUp={true} 
+                    icon={Utensils} 
+                    colorClass="bg-blue-500 text-blue-500" 
+                />
+                <StatCard 
+                    label="Orders" 
+                    value="92" 
+                    trend="+5" 
+                    trendUp={true} 
+                    icon={ShoppingBag} 
+                    colorClass="bg-purple-500 text-purple-500" 
+                />
+                <StatCard 
+                    label="Low Stock Items" 
+                    value="3" 
+                    trend="Urgent" 
+                    trendUp={false} 
+                    icon={AlertTriangle} 
+                    colorClass="bg-amber-500 text-amber-500" 
+                />
+            </div>
+
+            {/* Main Chart Area */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                    <div className="flex justify-between items-center mb-6">
+                        <h3 className="font-bold text-slate-800 dark:text-white">Revenue Overview</h3>
+                        <select className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm px-3 py-1 outline-none text-slate-600 dark:text-slate-300">
+                            <option>Last 7 Days</option>
+                            <option>Last 30 Days</option>
+                        </select>
+                    </div>
+                    <div className="h-[300px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={MOCK_SALES_DATA}>
+                                <defs>
+                                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/>
+                                        <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.1} />
+                                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 12}} tickFormatter={(str) => new Date(str).getDate().toString()} />
+                                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12}} tickFormatter={(num) => `₹${num/1000}k`} />
+                                <Tooltip 
+                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
+                                    formatter={(value: number) => [`₹${value}`, 'Revenue']}
+                                />
+                                <Area type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorRevenue)" />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                    <h3 className="font-bold text-slate-800 dark:text-white mb-6">Quick Actions</h3>
+                    <div className="space-y-3">
+                        <button className="w-full p-3 flex items-center gap-3 bg-slate-50 dark:bg-slate-800 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors group">
+                            <div className="p-2 bg-white dark:bg-slate-700 rounded-lg shadow-sm text-emerald-600 group-hover:text-emerald-700">
+                                <Brain size={20} />
+                            </div>
+                            <div className="text-left">
+                                <p className="font-bold text-sm text-slate-700 dark:text-slate-200">Create New Recipe</p>
+                                <p className="text-xs text-slate-500">AI-assisted costing</p>
+                            </div>
+                            <ArrowRight size={16} className="ml-auto text-slate-400 group-hover:text-emerald-500" />
+                        </button>
+                        
+                        <button className="w-full p-3 flex items-center gap-3 bg-slate-50 dark:bg-slate-800 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors group">
+                            <div className="p-2 bg-white dark:bg-slate-700 rounded-lg shadow-sm text-blue-600 group-hover:text-blue-700">
+                                <UploadCloud size={20} />
+                            </div>
+                            <div className="text-left">
+                                <p className="font-bold text-sm text-slate-700 dark:text-slate-200">Upload Invoices</p>
+                                <p className="text-xs text-slate-500">Update inventory</p>
+                            </div>
+                            <ArrowRight size={16} className="ml-auto text-slate-400 group-hover:text-blue-500" />
+                        </button>
+
+                        <button className="w-full p-3 flex items-center gap-3 bg-slate-50 dark:bg-slate-800 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors group">
+                            <div className="p-2 bg-white dark:bg-slate-700 rounded-lg shadow-sm text-purple-600 group-hover:text-purple-700">
+                                <TrendingUp size={20} />
+                            </div>
+                            <div className="text-left">
+                                <p className="font-bold text-sm text-slate-700 dark:text-slate-200">Generate Report</p>
+                                <p className="text-xs text-slate-500">Weekly P&L Analysis</p>
+                            </div>
+                            <ArrowRight size={16} className="ml-auto text-slate-400 group-hover:text-purple-500" />
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
-      </>
     );
-  };
-
-  const renderAdminDashboard = () => (
-    <>
-       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard label="Orders Today" value="0" icon={ShoppingBag} colorClass="text-blue-600 bg-blue-600" />
-        <StatCard label="Avg Prep Time" value="--m" icon={Clock} colorClass="text-orange-600 bg-orange-600" />
-        <StatCard label="Staff Active" value="0/0" icon={Users} colorClass="text-purple-600 bg-purple-600" />
-        <StatCard label="Inventory Alerts" value="0" icon={AlertTriangle} colorClass="text-red-600 bg-red-600" />
-      </div>
-    </>
-  );
-
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-            <h2 className="text-2xl font-bold text-slate-800 dark:text-white">
-                {user.role === UserRole.SUPER_ADMIN ? 'Network Operations Center' : 
-                 user.role === UserRole.ADMIN ? 'Operations Dashboard' : 'Owner Overview'}
-            </h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-                {user.role === UserRole.SUPER_ADMIN ? 'Live visitor analytics and platform health' : `Welcome back, ${user.name}`}
-            </p>
-        </div>
-        {user.role !== UserRole.SUPER_ADMIN && salesData.length > 0 && (
-          <div className="flex gap-2">
-            <span className="px-3 py-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md text-sm text-slate-600 dark:text-slate-300">
-              Last 7 Days
-            </span>
-          </div>
-        )}
-      </div>
-
-      {user.role === UserRole.SUPER_ADMIN && <SuperAdminDashboard />}
-      {user.role === UserRole.OWNER && renderOwnerDashboard()}
-      {user.role === UserRole.ADMIN && renderAdminDashboard()}
-    </div>
-  );
 };

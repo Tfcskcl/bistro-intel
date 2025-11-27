@@ -1,5 +1,4 @@
 
-
 export interface Ingredient {
   ingredient_id: string;
   name: string;
@@ -71,6 +70,20 @@ export interface SOPRequest {
     status: 'pending' | 'completed';
     requestDate: string;
     completedDate?: string;
+}
+
+export interface MarketingRequest {
+    id: string;
+    userId: string;
+    userName: string;
+    type: 'video' | 'image';
+    prompt: string;
+    images?: string[]; // Array of base64 strings (for video ref)
+    aspectRatio: '16:9' | '9:16' | '1:1' | '4:3' | '3:4';
+    status: 'pending' | 'completed';
+    requestDate: string;
+    completedDate?: string;
+    outputUrl?: string; // URI for video or Base64/URL for image
 }
 
 export interface RoadmapPhase {
@@ -205,8 +218,14 @@ export interface RazorpayResponse {
 }
 
 declare global {
+    interface AIStudio {
+        hasSelectedApiKey(): Promise<boolean>;
+        openSelectKey(): Promise<void>;
+    }
+
     interface Window {
         Razorpay: new (options: RazorpayOptions) => { open: () => void };
+        // aistudio property is defined in external types as AIStudio
     }
 }
 

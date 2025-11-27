@@ -103,6 +103,7 @@ const TESTIMONIALS = [
 export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
   const [activeLegal, setActiveLegal] = useState<LegalSection>(null);
   const [showDemo, setShowDemo] = useState(false);
+  const [isQuarterly, setIsQuarterly] = useState(false);
   
   // ROI Calculator State
   const [revenue, setRevenue] = useState(1500000);
@@ -482,15 +483,30 @@ export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
       {/* Pricing */}
       <section className="py-24 bg-slate-50 border-t border-slate-200">
           <div className="max-w-7xl mx-auto px-6">
-            <div className="text-center mb-16">
+            <div className="text-center mb-12">
                 <h2 className="text-4xl font-bold text-slate-900">Simple, Transparent Pricing</h2>
                 <p className="text-lg text-slate-600 mt-2">Start for free. Upgrade as you scale.</p>
+            </div>
+
+            {/* Billing Toggle */}
+            <div className="flex items-center justify-center gap-3 mb-12">
+                <span className={`text-sm font-bold ${!isQuarterly ? 'text-slate-900' : 'text-slate-500'}`}>Monthly</span>
+                <button 
+                    onClick={() => setIsQuarterly(!isQuarterly)}
+                    className="w-12 h-6 bg-emerald-600 rounded-full relative transition-colors focus:outline-none"
+                >
+                    <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-transform duration-200 ${isQuarterly ? 'left-7' : 'left-1'}`}></div>
+                </button>
+                <span className={`text-sm font-bold ${isQuarterly ? 'text-slate-900' : 'text-slate-500'}`}>Quarterly</span>
+                <span className="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">Save ~10%</span>
             </div>
             
             <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
                 {Object.entries(PLANS).map(([key, plan]) => {
                     const isPro = key === 'PRO';
                     const isPlus = key === 'PRO_PLUS';
+                    const displayPrice = isQuarterly ? plan.quarterlyPrice : plan.price;
+                    
                     return (
                         <div key={key} className={`bg-white rounded-2xl p-8 flex flex-col relative transition-transform duration-300 hover:-translate-y-2 ${isPro ? 'border-2 border-yellow-400 shadow-2xl z-10 scale-105' : 'border border-slate-200 shadow-lg'}`}>
                             {isPro && (
@@ -501,8 +517,8 @@ export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
                             <div className="mb-6">
                                 <h3 className={`text-xl font-bold ${isPlus ? 'text-purple-600' : 'text-slate-900'}`}>{plan.name}</h3>
                                 <div className="flex items-baseline mt-4">
-                                    <span className="text-4xl font-extrabold text-slate-900">₹{plan.price}</span>
-                                    <span className="text-slate-500 font-medium ml-1">/mo</span>
+                                    <span className="text-4xl font-extrabold text-slate-900">₹{displayPrice.toLocaleString()}</span>
+                                    <span className="text-slate-500 font-medium ml-1">/{isQuarterly ? 'qtr' : 'mo'}</span>
                                 </div>
                                 <p className="text-xs text-slate-400 mt-2">+ Taxes applicable</p>
                             </div>
