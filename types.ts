@@ -133,7 +133,15 @@ export interface PlanConfig {
     quarterlyPrice: number;
     features: string[];
     color: string;
-    recipeLimit: number;
+    monthlyCredits: number;
+}
+
+export interface CreditTransaction {
+    id: string;
+    date: string;
+    amount: number;
+    type: 'credit' | 'debit'; // credit = added (purchase), debit = used
+    description: string;
 }
 
 export interface User {
@@ -153,9 +161,12 @@ export interface User {
   fssaiNumber?: string;
   menuFile?: string;
 
-  // Usage Tracking
+  // Usage Tracking & Credits
+  credits: number;
+  
+  // Legacy trial fields (deprecated but kept for compatibility)
   queriesUsed?: number;
-  queryLimit?: number; // For trial
+  queryLimit?: number; 
   isTrial?: boolean;
 }
 
@@ -222,6 +233,7 @@ export interface RazorpayResponse {
 declare global {
     interface Window {
         Razorpay: new (options: RazorpayOptions) => { open: () => void };
+        // aistudio: any; // Removed to avoid conflict with existing global definition
     }
 }
 

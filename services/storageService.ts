@@ -1,7 +1,9 @@
 
 
 
-import { RecipeCard, SOP, AppNotification, UserRole, POSChangeRequest, MenuItem, PlanConfig, PlanType, RecipeRequest, SOPRequest, MarketingRequest } from '../types';
+
+
+import { RecipeCard, SOP, AppNotification, UserRole, POSChangeRequest, MenuItem, PlanConfig, PlanType, RecipeRequest, SOPRequest, MarketingRequest, CreditTransaction } from '../types';
 import { MOCK_MENU, MOCK_SALES_DATA, MOCK_INGREDIENT_PRICES, PLANS as DEFAULT_PLANS } from '../constants';
 import { ingredientService } from './ingredientService';
 
@@ -46,6 +48,62 @@ export const storageService = {
 
     savePlans: (plans: Record<PlanType, PlanConfig>) => {
         localStorage.setItem(PLANS_KEY, JSON.stringify(plans));
+    },
+
+    // --- CREDITS & TRANSACTIONS ---
+    getUserCredits: (userId: string): number => {
+        // We sync credits from authService user object usually, but for direct storage access:
+        // This is a fallback or for admin views
+        const userKey = 'bistro_current_user_cache'; // Rough check if same user
+        // In a real app, this comes from DB. Here we rely on Auth State mostly.
+        // But let's assume we store credit balance separately for safer persistence in mock
+        return storageService.getItem<number>(userId, 'credits_balance', 0);
+    },
+
+    saveUserCredits: (userId: string, credits: number) => {
+        storageService.setItem(userId, 'credits_balance', credits);
+        // Also update Auth Service cache if possible or rely on re-fetch
+    },
+
+    getTransactions: (userId: string): CreditTransaction[] => {
+        return storageService.getItem<CreditTransaction[]>(userId, 'credit_transactions', []);
+    },
+
+    addTransaction: (userId: string, transaction: CreditTransaction) => {
+        const txs = storageService.getTransactions(userId);
+        txs.unshift(transaction);
+        storageService.setItem(userId, 'credit_transactions', txs);
+    },
+
+    deductCredits: (userId: string, amount: number, description: string): boolean => {
+        const current = storageService.getUserCredits(userId);
+        if (current < amount) return false;
+        
+        const newBalance = current - amount;
+        storageService.saveUserCredits(userId, newBalance);
+        
+        storageService.addTransaction(userId, {
+            id: `tx_${Date.now()}`,
+            date: new Date().toISOString(),
+            amount: amount,
+            type: 'debit',
+            description
+        });
+        return true;
+    },
+
+    addCredits: (userId: string, amount: number, description: string) => {
+        const current = storageService.getUserCredits(userId);
+        const newBalance = current + amount;
+        storageService.saveUserCredits(userId, newBalance);
+
+        storageService.addTransaction(userId, {
+            id: `tx_${Date.now()}`,
+            date: new Date().toISOString(),
+            amount: amount,
+            type: 'credit',
+            description
+        });
     },
 
     // --- MENU ---

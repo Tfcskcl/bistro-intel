@@ -1,11 +1,17 @@
 
+
+
+
+
 import React, { useState, useEffect } from 'react';
 import { generateStrategy, generateImplementationPlan } from '../services/geminiService';
 import { StrategyReport, UserRole, User, PlanType, ImplementationGuide } from '../types';
-import { Send, Loader2, User as UserIcon, Briefcase, TrendingUp, Lock, HelpCircle, ArrowRight, Play, LifeBuoy, CheckCircle2, Clock, X, BookOpen, UserCheck, Calendar, Zap, ChevronDown, Trash2, Sparkles, Activity, Target, AlertTriangle, ArrowUpRight, ArrowDownRight, Lightbulb, Map, BarChart2, PieChart as PieChartIcon, ScatterChart as ScatterChartIcon, Info } from 'lucide-react';
+import { Send, Loader2, User as UserIcon, Briefcase, TrendingUp, Lock, HelpCircle, ArrowRight, Play, LifeBuoy, CheckCircle2, Clock, X, BookOpen, UserCheck, Calendar, Zap, ChevronDown, Trash2, Sparkles, Activity, Target, AlertTriangle, ArrowUpRight, ArrowDownRight, Lightbulb, Map, BarChart2, PieChart as PieChartIcon, ScatterChart as ScatterChartIcon, Info, Wallet } from 'lucide-react';
 import { 
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend, ScatterChart, Scatter, ZAxis
 } from 'recharts';
+import { storageService } from '../services/storageService';
+import { CREDIT_COSTS } from '../constants';
 
 interface StrategyProps {
     user: User;
@@ -99,42 +105,35 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
   }, [role, user.role]);
 
   // Usage Logic
-  const checkUsage = (): boolean => {
-      if (user.isTrial) {
-          if ((user.queriesUsed || 0) >= (user.queryLimit || 10)) {
-              alert("Free Demo limit reached. Upgrade to Pro+ for unlimited AI Strategy.");
-              return false;
-          }
+  const checkCredits = (): boolean => {
+      if (user.role === UserRole.SUPER_ADMIN) return true;
+      const cost = CREDIT_COSTS.STRATEGY;
+      if (user.credits < cost) {
+          setError(`Insufficient Credits for Strategy AI. Cost: ${cost} CR. Balance: ${user.credits} CR.`);
+          return false;
       }
       return true;
   };
 
-  const incrementUsage = () => {
-      if (user.isTrial && onUserUpdate) {
-          const newUsage = (user.queriesUsed || 0) + 1;
-          onUserUpdate({ ...user, queriesUsed: newUsage });
+  const deductCredits = (amount: number = CREDIT_COSTS.STRATEGY, reason: string = 'AI Strategy Analysis') => {
+      if (user.role !== UserRole.SUPER_ADMIN && onUserUpdate) {
+          const success = storageService.deductCredits(user.id, amount, reason);
+          if (success) {
+              onUserUpdate({ ...user, credits: user.credits - amount });
+              return true;
+          }
+          return false;
       }
+      return true; // Super Admin bypass
   };
-
-  if (!user.isTrial && user.plan !== PlanType.PRO_PLUS) {
-    return (
-        <div className="h-[calc(100vh-6rem)] flex flex-col items-center justify-center bg-white rounded-xl border border-slate-200 shadow-sm">
-            <div className="bg-slate-100 p-4 rounded-full mb-4">
-                <Lock size={32} className="text-slate-400" />
-            </div>
-            <h2 className="text-2xl font-bold text-slate-800">Pro+ Feature Locked</h2>
-            <p className="text-slate-500 mt-2 max-w-md text-center">Advanced AI Strategy & Forecasting is exclusively available on the Pro+ Operations plan.</p>
-            <button className="mt-6 px-6 py-2 bg-slate-900 text-white rounded-lg font-bold hover:bg-slate-800">Upgrade to Pro+</button>
-        </div>
-    );
-  }
 
   const handleSend = async (textOverride?: string) => {
     const textToSend = textOverride || query;
     if (!textToSend) return;
-    if (!checkUsage()) return;
+    if (!checkCredits()) return;
     
-    // Update input to reflect what is being sent if triggered via click
+    deductCredits();
+
     if (textOverride) setQuery(textOverride);
 
     setLoading(true);
@@ -144,7 +143,6 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
     try {
       const data = await generateStrategy(role, textToSend);
       setReport(data);
-      incrementUsage();
     } catch (e: any) {
       setError(e.message || "Failed to generate strategy.");
     } finally {
@@ -169,8 +167,9 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
     if (!choiceModalOpen) return;
     const { index, title } = choiceModalOpen;
     
-    if (!checkUsage()) return;
-
+    // We treat roadmap generation as part of the initial strategy cost usually, or small extra?
+    // Let's assume free follow-up for now to keep it simple, or check small credit
+    
     setChoiceModalOpen(null);
     setRoadmapModalOpen(true);
     setLoadingPlan(true);
@@ -181,7 +180,6 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
         const plan = await generateImplementationPlan(title);
         setGeneratedPlan(plan);
         setActionStates(prev => ({ ...prev, [index]: 'in_progress' }));
-        incrementUsage();
     } catch (e: any) {
         setError(e.message || "Failed to generate implementation plan.");
         setRoadmapModalOpen(false);
@@ -193,11 +191,21 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
   // 2b. User Chooses "Expert Guided"
   const handleExpertGuided = () => {
     if (!choiceModalOpen) return;
-    const { index } = choiceModalOpen;
-    setChoiceModalOpen(null);
-    // Simulate Request
-    setActionStates(prev => ({ ...prev, [index]: 'help_requested' }));
-    alert("Expert assistance requested! Our team will contact you shortly.");
+    const { index, title } = choiceModalOpen;
+    
+    // Credit Check for Expert Connect
+    const cost = CREDIT_COSTS.EXPERT_CONNECT;
+    if (user.role !== UserRole.SUPER_ADMIN && user.credits < cost) {
+        alert(`Insufficient credits. Expert connection requires ${cost} credits. Current balance: ${user.credits} CR.`);
+        return;
+    }
+
+    // Deduct and Proceed
+    if (deductCredits(cost, `Expert Connect: ${title}`)) {
+        setChoiceModalOpen(null);
+        setActionStates(prev => ({ ...prev, [index]: 'help_requested' }));
+        alert(`Expert assistance requested! ${cost} credits deducted. Our team will contact you shortly.`);
+    }
   };
 
   const openAssistanceModal = (index: number, title: string) => {
@@ -237,22 +245,19 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
       ].filter(d => d.value > 0);
   };
 
-  // Scatter Data Helper (Effort vs Impact)
-  // Mocking numeric values based on string descriptions for demo purposes
+  // Scatter Data Helper
   const getImpactData = () => {
       if (!report) return [];
       return (report.action_plan || []).map((action, idx) => {
-          // Heuristic: convert High/Med/Low strings to numbers for charts
           const impactScore = action.priority === 'High' ? 30 : action.priority === 'Medium' ? 20 : 10;
-          // Randomize slightly to prevent overlapping dots
           const finalImpact = impactScore + Math.floor(Math.random() * 5);
-          const finalCost = Math.floor(Math.random() * 30) + 5; // 5-35 range
+          const finalCost = Math.floor(Math.random() * 30) + 5; 
           
           return {
               name: action.initiative,
-              x: finalCost, // Cost/Effort
-              y: finalImpact, // Impact
-              z: 10, // Bubble Size
+              x: finalCost, 
+              y: finalImpact, 
+              z: 10, 
               priority: action.priority
           };
       });
@@ -332,7 +337,9 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                         </div>
                         <h4 className="font-bold text-slate-800 mb-1">Expert Implementation</h4>
                         <p className="text-xs text-slate-500">Assign a Bistro expert to handle this for you.</p>
-                        <span className="inline-block mt-2 text-[10px] font-bold bg-blue-200 text-blue-800 px-2 py-0.5 rounded">ZERO COST ADD-ON</span>
+                        <span className="inline-block mt-2 text-[10px] font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded border border-blue-200">
+                            {CREDIT_COSTS.EXPERT_CONNECT} CREDITS
+                        </span>
                     </button>
                 </div>
 
@@ -455,12 +462,10 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
             <p className="text-sm text-slate-500 italic hidden sm:block">"Ask me about sales, costs, or long-term strategy..."</p>
         </div>
         
-        {user.isTrial && (
-            <div className="flex items-center gap-2 px-3 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400 rounded-full text-xs font-bold">
-                <Zap size={12} fill="currentColor" />
-                Demo: {user.queriesUsed || 0}/{user.queryLimit}
-            </div>
-        )}
+        <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-400 rounded-full text-xs font-bold">
+            <Wallet size={12} fill="currentColor" />
+            Credits: {user.credits}
+        </div>
       </div>
 
       {/* Chat Area */}
@@ -486,6 +491,7 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                 </div>
                 <p className="text-lg font-medium text-slate-500">Strategic Business Intelligence</p>
                 <p className="text-sm text-slate-400 mt-2 max-w-sm text-center">BistroIntel processes your sales, menu, and inventory to suggest profitable strategies.</p>
+                <p className="text-xs font-bold text-emerald-600 mt-2 bg-emerald-50 px-2 py-1 rounded">Cost: {CREDIT_COSTS.STRATEGY} Credits per Query</p>
             </div>
             
             <div className="w-full max-w-4xl animate-fade-in-up" style={{ animationDelay: '100ms' }}>
@@ -953,9 +959,10 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                 <button 
                     onClick={() => handleSend()}
                     disabled={loading || !query}
-                    className="px-6 py-3 bg-slate-900 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50 transition-colors font-bold shadow-lg shadow-slate-900/20"
+                    className="px-6 py-3 bg-slate-900 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50 transition-colors font-bold shadow-lg shadow-slate-900/20 flex items-center gap-2"
                 >
                     {loading ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />}
+                    {loading ? '' : `Ask (${CREDIT_COSTS.STRATEGY} CR)`}
                 </button>
             </div>
         </div>

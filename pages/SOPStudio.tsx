@@ -1,9 +1,12 @@
 
+
+
 import React, { useState, useEffect } from 'react';
 import { generateSOP } from '../services/geminiService';
 import { SOP, User, UserRole, SOPRequest } from '../types';
-import { FileText, Loader2, CheckSquare, AlertTriangle, PlayCircle, Lock, Save, Trash2, Zap, AlertCircle, Inbox, UserCheck, Clock3, CheckCircle2, Sparkles, Send } from 'lucide-react';
+import { FileText, Loader2, CheckSquare, AlertTriangle, PlayCircle, Lock, Save, Trash2, Zap, AlertCircle, Inbox, UserCheck, Clock3, CheckCircle2, Sparkles, Send, Wallet } from 'lucide-react';
 import { storageService } from '../services/storageService';
+import { CREDIT_COSTS } from '../constants';
 
 interface SOPStudioProps {
     user: User;
@@ -18,8 +21,6 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
   const [error, setError] = useState<string | null>(null);
   
   // View Modes
-  // For Admin: 'generator' | 'requests' | 'saved'
-  // For Owner: 'request-form' | 'requests' | 'saved'
   const [viewMode, setViewMode] = useState<'generator' | 'request-form' | 'saved' | 'requests'>('generator');
   
   const [savedSOPs, setSavedSOPs] = useState<SOP[]>([]);
@@ -51,20 +52,23 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
     }
   };
 
-  const checkUsage = (): boolean => {
-      if (user.isTrial) {
-          if ((user.queriesUsed || 0) >= (user.queryLimit || 10)) {
-              setError("Free Demo limit reached. Please upgrade to continue.");
-              return false;
-          }
+  const checkCredits = (): boolean => {
+      if (isAdmin) return true;
+      const cost = CREDIT_COSTS.SOP;
+      if (user.credits < cost) {
+          setError(`Insufficient Credits. SOP requires ${cost} credits. Balance: ${user.credits}.`);
+          return false;
       }
       return true;
   };
 
-  const incrementUsage = () => {
-      if (user.isTrial && onUserUpdate) {
-          const newUsage = (user.queriesUsed || 0) + 1;
-          onUserUpdate({ ...user, queriesUsed: newUsage });
+  const deductCredits = () => {
+      if (!isAdmin && onUserUpdate) {
+          const cost = CREDIT_COSTS.SOP;
+          const success = storageService.deductCredits(user.id, cost, 'SOP Request');
+          if (success) {
+              onUserUpdate({ ...user, credits: user.credits - cost });
+          }
       }
   };
 
@@ -72,18 +76,15 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!topic.trim()) return;
-    if (!checkUsage()) return;
-
+    
+    // Admins just generate, no credits deducted usually for them unless configured
     setLoading(true);
     setSop(null);
     setError(null);
     try {
-      // Append details to topic for better AI context if available
       const fullPrompt = details ? `${topic}. Context: ${details}` : topic;
       const result = await generateSOP(fullPrompt);
       setSop(result);
-      // Only increment usage for generation, not request creation
-      incrementUsage();
     } catch (err: any) {
       setError(err.message || "Failed to generate SOP.");
     } finally {
@@ -95,7 +96,9 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
   const handleRequestSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!topic.trim()) return;
-      if (!checkUsage()) return; // Even requests might count towards "activity" limits or demo limits
+      if (!checkCredits()) return;
+
+      deductCredits();
 
       const newRequest: SOPRequest = {
           id: `sop_req_${Date.now()}`,
@@ -111,7 +114,7 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
       refreshRequests();
       setTopic('');
       setDetails('');
-      alert("SOP Request sent! Our team will process it shortly.");
+      alert(`SOP Request sent! ${CREDIT_COSTS.SOP} credits deducted.`);
       setViewMode('requests');
   };
 
@@ -200,12 +203,10 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
                 </button>
             </div>
             
-            {user.isTrial && (
-                <div className="flex items-center gap-2 px-3 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400 rounded-full text-xs font-bold absolute right-8">
-                    <Zap size={12} fill="currentColor" />
-                    Demo: {user.queriesUsed || 0}/{user.queryLimit}
-                </div>
-            )}
+            <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-400 rounded-full text-xs font-bold absolute right-8">
+                <Wallet size={12} fill="currentColor" />
+                Credits: {user.credits}
+            </div>
       </div>
 
       {viewMode === 'requests' && (
@@ -279,7 +280,7 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
                           <button 
                              onClick={() => {
                                  setSop(s);
-                                 setViewMode('generator'); // Or a 'viewer' mode if we want to be strict, but reuse generator view for now
+                                 setViewMode('generator'); 
                              }}
                              className="w-full mt-4 py-2 border border-slate-200 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-50 hover:text-emerald-700 transition-colors"
                           >
@@ -299,7 +300,7 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
                     {isAdmin ? (activeRequest ? 'Fulfilling SOP Request' : 'SOP Studio Generator') : 'Request New SOP'}
                 </h2>
                 <p className="text-slate-500 mb-6">
-                    {isAdmin ? 'Create standardized operational procedures instantly.' : 'Tell us what process you need, and our admins will generate it for you.'}
+                    {isAdmin ? 'Create standardized operational procedures instantly.' : `Cost: ${CREDIT_COSTS.SOP} Credits. Our admins will generate it for you.`}
                 </p>
                 
                 {activeRequest && (
@@ -337,7 +338,7 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
                         className="mt-2 px-6 py-3 bg-slate-900 text-white rounded-lg font-bold hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all shadow-lg"
                     >
                         {loading ? <Loader2 className="animate-spin" size={20} /> : isAdmin ? <Sparkles size={20} fill="currentColor" /> : <Inbox size={20} />}
-                        {loading ? 'Processing...' : isAdmin ? 'Generate SOP' : 'Submit Request'}
+                        {loading ? 'Processing...' : isAdmin ? 'Generate SOP' : `Submit Request (${CREDIT_COSTS.SOP} CR)`}
                     </button>
                     
                     {error && (

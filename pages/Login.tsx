@@ -1,4 +1,7 @@
 
+
+
+
 import React, { useState } from 'react';
 import { ArrowRight, AlertCircle, CheckCircle2, ArrowLeft, Mail, KeyRound, Store, MapPin, ChefHat, ShieldCheck, User as UserIcon, Shield, FileText, Upload, Loader2 } from 'lucide-react';
 import { User, UserRole, PlanType } from '../types';
@@ -87,7 +90,8 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
           menuFile: menuFileName,
           isTrial: true,
           queriesUsed: 0,
-          queryLimit: 10
+          queryLimit: 10,
+          credits: 50 // Updated: Default starting credits for 3-day trial
         };
         const user = await authService.signup(newUser, password);
         onLogin(user);
@@ -138,7 +142,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
             </div>
           <p className="text-slate-400 mt-2 text-sm">
             {mode === 'login' ? 'Sign in to access your dashboard' : 
-             mode === 'signup' ? 'Start your 10-Query Free Demo' : 
+             mode === 'signup' ? 'Start your 3-Day Free Trial' : 
              'Reset your password'}
           </p>
         </div>
@@ -307,11 +311,11 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
             {mode === 'signup' && (
                 <div className="bg-emerald-50 dark:bg-emerald-900/20 p-3 rounded-lg border border-emerald-100 dark:border-emerald-800 text-center animate-fade-in">
                     <p className="text-xs font-bold text-emerald-800 dark:text-emerald-400 uppercase tracking-wide mb-1">
-                        Free Demo Included
+                        Free Trial Included
                     </p>
                     <p className="text-sm text-emerald-700 dark:text-emerald-300">
-                        Get instant full access (10 Queries). <br/>
-                        Upgrade to Pro+ for ₹24,999/mo later.
+                        Get instant full access for 3 Days. <br/>
+                        <span className="font-bold">50 Credits</span> loaded to your wallet.
                     </p>
                 </div>
             )}
@@ -327,7 +331,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
                 </>
               ) : (
                 mode === 'login' ? 'Login' : 
-                mode === 'signup' ? 'Start Free Demo' : 
+                mode === 'signup' ? 'Start Free Trial' : 
                 'Send Reset Link'
               )} 
               {!loading && (mode === 'forgot' ? <Mail size={18} /> : <ArrowRight size={18} />)}
@@ -350,7 +354,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
                     onClick={() => switchMode(mode === 'login' ? 'signup' : 'login')} 
                     className="ml-1 text-emerald-600 dark:text-emerald-400 font-bold hover:text-emerald-700 transition-colors"
                 >
-                    {mode === 'login' ? 'Start Demo' : 'Login'}
+                    {mode === 'login' ? 'Start Trial' : 'Login'}
                 </button>
               </p>
             )}

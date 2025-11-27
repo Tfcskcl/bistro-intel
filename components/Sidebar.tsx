@@ -1,4 +1,6 @@
 
+
+
 import React from 'react';
 import { LayoutDashboard, ChefHat, FileText, TrendingUp, Database, CreditCard, LogOut, Clapperboard } from 'lucide-react';
 import { AppView, User, PlanType, UserRole } from '../types';
@@ -26,7 +28,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
     { id: AppView.RECIPES, label: 'Recipe & Costing', icon: ChefHat, allowedRoles: [UserRole.OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN] },
     { id: AppView.SOP, label: 'SOP Studio', icon: FileText, allowedRoles: [UserRole.OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN] },
     { id: AppView.VIDEO, label: 'Marketing Studio', icon: Clapperboard, allowedRoles: [UserRole.OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN] },
-    { id: AppView.STRATEGY, label: 'Strategy AI', icon: TrendingUp, requiredPlan: PlanType.PRO_PLUS, allowedRoles: [UserRole.OWNER, UserRole.SUPER_ADMIN] },
+    // Strategy is now open to all plans via Credit System, but we can keep it marked or just open
+    { id: AppView.STRATEGY, label: 'Strategy AI', icon: TrendingUp, allowedRoles: [UserRole.OWNER, UserRole.SUPER_ADMIN] },
     { id: AppView.BILLING, label: 'Plans & Billing', icon: CreditCard, allowedRoles: [UserRole.OWNER] },
   ];
 
@@ -50,9 +53,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
 
           const Icon = item.icon;
           const isActive = currentView === item.id;
-          const isLocked = item.requiredPlan && 
-            ((item.requiredPlan === PlanType.PRO && user.plan === PlanType.FREE) ||
-            (item.requiredPlan === PlanType.PRO_PLUS && user.plan !== PlanType.PRO_PLUS));
+          
+          // Legacy lock logic removed in favor of Credit System
+          const isLocked = false; 
 
           return (
             <button
@@ -80,13 +83,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
                 <p className="text-xs text-slate-500 dark:text-slate-400">Role</p>
                 <span className="text-[10px] font-bold uppercase bg-slate-200 dark:bg-slate-700 px-1.5 rounded text-slate-600 dark:text-slate-300">{user.role.replace('_', ' ')}</span>
             </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Plan</p>
-            <p className={`text-sm font-bold ${
-                user.plan === PlanType.PRO_PLUS ? 'text-purple-600 dark:text-purple-400' :
-                user.plan === PlanType.PRO ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-600 dark:text-slate-300'
-            }`}>
-                {user.plan === PlanType.PRO_PLUS ? 'PRO+ Operations' :
-                 user.plan === PlanType.PRO ? 'PRO' : 'Basic Free'}
+            <p className="text-xs text-slate-500 dark:text-slate-400">Credits</p>
+            <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                {user.credits} CR
             </p>
         </div>
         <button onClick={onLogout} className="flex items-center gap-3 text-slate-500 hover:text-red-600 dark:text-slate-400 dark:hover:text-red-400 px-4 py-2 w-full transition-colors rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">

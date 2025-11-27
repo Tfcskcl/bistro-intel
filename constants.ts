@@ -14,33 +14,45 @@ Always:
 • Tone: professional, concise, operations-first. Units: INR, grams/ml/serving, dates ISO (YYYY-MM-DD).
 `;
 
+export const CREDIT_COSTS = {
+    RECIPE: 10,
+    SOP: 15,
+    STRATEGY: 12,
+    VIDEO: 50,
+    IMAGE: 20,
+    EXPERT_CONNECT: 50
+};
+
+export const RECHARGE_RATE = 10; // INR per credit
+export const MIN_RECHARGE_CREDITS = 20;
+
 export const PLANS = {
   [PlanType.FREE]: {
     name: 'Basic Starter',
-    description: 'Essential tools for single outlets to organize recipes and SOPs.',
+    description: 'Entry-level plan for single outlets.',
     price: 199,
-    quarterlyPrice: 549, // Approx 10% discount
-    features: ['1 AI Recipe Creation', 'Standard SOPs', 'Training Processes', 'Community Support'],
+    quarterlyPrice: 539, // Approx 10% discount
+    features: ['25 Credits / Month', 'Recipe Costing (10cr)', 'Standard SOPs (15cr)', 'Strategy Add-on Available'],
     color: 'slate',
-    recipeLimit: 1
+    monthlyCredits: 25
   },
   [PlanType.PRO]: {
-    name: 'Pro',
-    description: 'Advanced costing and training modules for growing restaurants.',
-    price: 9999,
-    quarterlyPrice: 26999, // Approx 10% discount
-    features: ['30 AI Recipe Creations', 'Advanced SOP Generator', 'Training Modules', 'Inventory Management', 'Priority Support'],
+    name: 'Pro Growth',
+    description: 'For growing restaurants needing regular operational updates.',
+    price: 3999,
+    quarterlyPrice: 10799, 
+    features: ['500 Credits / Month', 'Advanced Recipe Gen', 'SOP Studio Access', 'Strategy Add-on Available', 'Priority Support'],
     color: 'emerald',
-    recipeLimit: 30
+    monthlyCredits: 500
   },
   [PlanType.PRO_PLUS]: {
     name: 'Pro+ Operations',
-    description: 'Unlimited AI strategy and forecasting for scaling F&B brands.',
+    description: 'High-volume intelligence for scaling F&B brands.',
     price: 24999,
-    quarterlyPrice: 67499, // Approx 10% discount
-    features: ['Unlimited Recipes', 'AI Strategy & Forecasting', 'Multi-outlet Management', 'Dedicated Account Manager'],
+    quarterlyPrice: 67499,
+    features: ['2600 Credits / Month', 'Included AI Strategy', 'Multi-outlet Management', 'Dedicated Account Manager'],
     color: 'purple',
-    recipeLimit: 9999
+    monthlyCredits: 2600
   }
 };
 

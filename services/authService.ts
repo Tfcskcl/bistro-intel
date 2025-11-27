@@ -1,4 +1,7 @@
 
+
+
+
 import { User, UserRole, PlanType } from '../types';
 import { auth, db, isFirebaseConfigured } from './firebase';
 import { 
@@ -9,6 +12,8 @@ import {
   onAuthStateChanged
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { PLANS } from '../constants';
+import { storageService } from './storageService';
 
 const STORAGE_USER_KEY = 'bistro_current_user_cache';
 const MOCK_DB_USERS_KEY = 'bistro_mock_users_db'; // For local storage mock DB
@@ -42,7 +47,8 @@ const DEMO_USERS: (User & {password: string})[] = [
     location: "Mumbai, Bandra",
     cuisineType: "Modern European",
     joinedDate: "2023-09-15",
-    isTrial: false
+    isTrial: false,
+    credits: 2600
   },
   {
     id: 'demo_admin',
@@ -55,7 +61,8 @@ const DEMO_USERS: (User & {password: string})[] = [
     location: "Mumbai, Bandra",
     cuisineType: "Modern European",
     joinedDate: "2023-09-20",
-    isTrial: false
+    isTrial: false,
+    credits: 500
   },
   {
     id: 'sa_info_bistro',
@@ -68,7 +75,8 @@ const DEMO_USERS: (User & {password: string})[] = [
     location: "Indore",
     cuisineType: "HQ",
     joinedDate: "2023-01-01",
-    isTrial: false
+    isTrial: false,
+    credits: 99999
   },
   {
     id: 'sa_amit',
@@ -81,7 +89,8 @@ const DEMO_USERS: (User & {password: string})[] = [
     location: "Indore",
     cuisineType: "HQ",
     joinedDate: "2023-01-01",
-    isTrial: false
+    isTrial: false,
+    credits: 99999
   },
   {
     id: 'sa_info_chef',
@@ -94,7 +103,8 @@ const DEMO_USERS: (User & {password: string})[] = [
     location: "Indore",
     cuisineType: "HQ",
     joinedDate: "2023-01-01",
-    isTrial: false
+    isTrial: false,
+    credits: 99999
   }
 ];
 
@@ -134,8 +144,18 @@ export const authService = {
         // Mock Subscription (Just check local storage on load)
         try {
             const stored = localStorage.getItem(STORAGE_USER_KEY);
-            const user = stored ? JSON.parse(stored) : null;
-            callback(user);
+            if (stored) {
+                const user = JSON.parse(stored);
+                // Force sync credits from storage on load
+                const currentCredits = storageService.getUserCredits(user.id);
+                // If storage has specific credit record, use it, otherwise fallback to user obj
+                if (currentCredits !== undefined) {
+                    user.credits = currentCredits;
+                }
+                callback(user);
+            } else {
+                callback(null);
+            }
         } catch (e) {
             callback(null);
         }
@@ -147,9 +167,11 @@ export const authService = {
         const mockUsers = getMockUsers();
         let updated = false;
         DEMO_USERS.forEach(demoUser => {
-            // Always update demo users to ensure latest config (like plan changes)
-            mockUsers[demoUser.id] = demoUser;
-            updated = true;
+            if (!mockUsers[demoUser.id]) {
+                mockUsers[demoUser.id] = demoUser;
+                storageService.saveUserCredits(demoUser.id, demoUser.credits);
+                updated = true;
+            }
         });
         if (updated) {
             localStorage.setItem(MOCK_DB_USERS_KEY, JSON.stringify(mockUsers));
@@ -166,23 +188,36 @@ export const authService = {
   getCurrentUser: (): User | null => {
       try {
           const stored = localStorage.getItem(STORAGE_USER_KEY);
-          return stored ? JSON.parse(stored) : null;
+          if (stored) {
+              const user = JSON.parse(stored);
+              // Optimistic read of latest credits
+              const latestCredits = storageService.getUserCredits(user.id);
+              return { ...user, credits: latestCredits };
+          }
+          return null;
       } catch (e) {
           return null;
       }
   },
 
   signup: async (userData: User, password: string): Promise<User> => {
+    // If user is in trial mode, give 50 credits, otherwise default to Plan credits
+    let initialCredits = PLANS[userData.plan]?.monthlyCredits || 25;
+    if (userData.isTrial) {
+        initialCredits = 50;
+    }
+    const finalUser = { ...userData, credits: initialCredits };
+
     if (isFirebaseConfigured && auth) {
         try {
             const userCredential = await createUserWithEmailAndPassword(auth, userData.email, password);
             const uid = userCredential.user.uid;
-            const { id, ...profileData } = userData;
+            const { id, ...profileData } = finalUser;
             await setDoc(doc(db!, "users", uid), {
                 ...profileData,
                 createdAt: new Date().toISOString()
             });
-            const fullUser = { ...userData, id: uid };
+            const fullUser = { ...finalUser, id: uid };
             localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(fullUser));
             return fullUser;
         } catch (error: any) {
@@ -192,7 +227,7 @@ export const authService = {
         // Mock Signup
         const cleanEmail = userData.email.trim().toLowerCase();
         
-        // 1. Check reserved demo emails to prevent collision
+        // 1. Check reserved demo emails
         if (DEMO_USERS.some(u => u.email.toLowerCase() === cleanEmail)) {
             throw new Error("This email is reserved for demo access. Please use a different email or log in.");
         }
@@ -206,9 +241,10 @@ export const authService = {
         }
 
         const uid = `usr_${Date.now().toString(36)}`;
-        const newUser = { ...userData, id: uid, email: userData.email.trim() }; // Store trimmed email
+        const newUser = { ...finalUser, id: uid, email: userData.email.trim() };
         
         saveMockUser(newUser, password);
+        storageService.saveUserCredits(newUser.id, newUser.credits);
         localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(newUser));
         notifyObservers(newUser);
         return newUser;
@@ -233,8 +269,11 @@ export const authService = {
           }
 
           const uid = `usr_${Date.now().toString(36)}`;
-          const newUser = { ...userData, id: uid, email: userData.email.trim() };
+          const initialCredits = PLANS[userData.plan]?.monthlyCredits || 25;
+          const newUser = { ...userData, id: uid, email: userData.email.trim(), credits: initialCredits };
+          
           saveMockUser(newUser, password);
+          storageService.saveUserCredits(newUser.id, newUser.credits);
           return newUser;
       }
   },
@@ -267,6 +306,8 @@ export const authService = {
                 // Force update/save in mock DB to ensure latest details persist
                 saveMockUser(demoUser, cleanPassword);
                 const { password: _, ...safeUser } = demoUser;
+                // Ensure credits synced
+                storageService.saveUserCredits(safeUser.id, safeUser.credits);
                 localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(safeUser));
                 notifyObservers(safeUser as User);
                 return safeUser as User;
@@ -278,6 +319,10 @@ export const authService = {
         
         if (storedUser && storedUser.password === cleanPassword) {
              const { password: _, ...safeUser } = storedUser;
+             // Load current credits from separate storage if available
+             const storedCredits = storageService.getUserCredits(safeUser.id);
+             if (storedCredits !== undefined) safeUser.credits = storedCredits;
+             
              localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(safeUser));
              notifyObservers(safeUser as User);
              return safeUser as User;
@@ -314,9 +359,11 @@ export const authService = {
         const user = mockUsers[uid];
         if (user) {
             const { password, ...safeUser } = user;
+            const currentCredits = storageService.getUserCredits(uid);
+            safeUser.credits = currentCredits !== undefined ? currentCredits : safeUser.credits;
             return safeUser as User;
         }
-        // Fallback to demo users list if not found in LS
+        // Fallback to demo users
         const demoUser = DEMO_USERS.find(u => u.id === uid);
         if (demoUser) {
              const { password, ...safeUser } = demoUser;
@@ -327,19 +374,17 @@ export const authService = {
   },
 
   getAllUsers: async (): Promise<User[]> => {
-      if (isFirebaseConfigured && db) {
-          console.warn("getAllUsers requires Admin SDK or custom collection query.");
-          return []; 
-      } else {
-          const mockUsers = getMockUsers();
-          // Ensure Demo users are included in the list even if not explicitly in LS yet
-          DEMO_USERS.forEach(d => {
-              if (!mockUsers[d.id]) {
-                  mockUsers[d.id] = d;
-              }
-          });
-          return Object.values(mockUsers).map(({ password, ...u }) => u as User);
-      }
+      const mockUsers = getMockUsers();
+      // Ensure Demo users are included
+      DEMO_USERS.forEach(d => {
+          if (!mockUsers[d.id]) {
+              mockUsers[d.id] = d;
+          }
+      });
+      return Object.values(mockUsers).map(({ password, ...u }) => {
+          const currentCredits = storageService.getUserCredits(u.id);
+          return { ...u, credits: currentCredits !== undefined ? currentCredits : u.credits } as User;
+      });
   },
 
   updateUser: async (updatedUser: User) => {
@@ -352,6 +397,10 @@ export const authService = {
       } else {
           const mockUsers = getMockUsers();
           const existing = mockUsers[updatedUser.id] || {};
+          // Preserve credits if not passed
+          if (updatedUser.credits !== undefined) {
+              storageService.saveUserCredits(updatedUser.id, updatedUser.credits);
+          }
           mockUsers[updatedUser.id] = { ...existing, ...updatedUser };
           localStorage.setItem(MOCK_DB_USERS_KEY, JSON.stringify(mockUsers));
       }

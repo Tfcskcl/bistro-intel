@@ -1,10 +1,13 @@
 
+
+
 import React, { useState, useEffect } from 'react';
 import { PlanType, User, PlanConfig } from '../types';
-import { Check, Star, Loader2, ShieldCheck, Zap, ArrowDown, ArrowUp, AlertCircle, X, CreditCard, Calendar, Clock, FileText, Download, Smartphone, CheckCircle2 } from 'lucide-react';
+import { Check, Star, Loader2, ShieldCheck, Zap, ArrowDown, ArrowUp, AlertCircle, X, CreditCard, Calendar, Clock, FileText, Download, Smartphone, CheckCircle2, Wallet, Plus } from 'lucide-react';
 import { paymentService } from '../services/paymentService';
 import { trackingService } from '../services/trackingService';
 import { storageService } from '../services/storageService';
+import { RECHARGE_RATE, MIN_RECHARGE_CREDITS } from '../constants';
 
 interface BillingProps {
     user: User;
@@ -23,18 +26,20 @@ export const Billing: React.FC<BillingProps> = ({ user, onUpgrade }) => {
   const [currentPlans, setCurrentPlans] = useState<Record<PlanType, PlanConfig> | null>(null);
   const [invoices, setInvoices] = useState<any[]>([]);
 
+  // Recharge State
+  const [rechargeAmount, setRechargeAmount] = useState<number>(MIN_RECHARGE_CREDITS);
+  const [processingRecharge, setProcessingRecharge] = useState(false);
+
   // Downgrade Modal State
   const [showDowngradeModal, setShowDowngradeModal] = useState(false);
   const [targetDowngradePlan, setTargetDowngradePlan] = useState<PlanType | null>(null);
   const [downgradeReason, setDowngradeReason] = useState('');
 
   useEffect(() => {
-    // Load dynamic plans & invoices
     setCurrentPlans(storageService.getPlans());
     setInvoices(storageService.getInvoices(user.id));
   }, [user.id]);
 
-  // Track that user started checkout process (entered billing page)
   useEffect(() => {
     trackingService.trackCheckoutStart(user);
   }, [user]);
@@ -42,12 +47,9 @@ export const Billing: React.FC<BillingProps> = ({ user, onUpgrade }) => {
   const handlePlanAction = async (targetPlan: PlanType, price: number) => {
       const currentLevel = PLAN_HIERARCHY[user.plan];
       const targetLevel = PLAN_HIERARCHY[targetPlan];
-
-      // If User is on Trial, any paid plan is an upgrade
       const isUpgrade = user.isTrial || targetLevel > currentLevel;
 
       if (isUpgrade) {
-          // --- UPGRADE FLOW ---
           setProcessingPlan(targetPlan);
           await paymentService.initiatePayment(
               user,
@@ -55,7 +57,6 @@ export const Billing: React.FC<BillingProps> = ({ user, onUpgrade }) => {
               price,
               (paymentId) => {
                   console.log(`Payment success: ${paymentId}`);
-                  // Create Invoice Record
                   storageService.addInvoice(user.id, {
                       id: paymentId,
                       date: new Date().toISOString(),
@@ -64,8 +65,13 @@ export const Billing: React.FC<BillingProps> = ({ user, onUpgrade }) => {
                       status: 'Paid',
                       period: isQuarterly ? 'Quarterly' : 'Monthly'
                   });
-                  setInvoices(storageService.getInvoices(user.id));
                   
+                  // When upgrading, also refresh credits based on new plan (optional, or just handle in onUpgrade prop logic upstream)
+                  // For now, assume backend/service handles credit reset on plan change
+                  const newPlanCredits = currentPlans ? currentPlans[targetPlan].monthlyCredits : 0;
+                  storageService.saveUserCredits(user.id, newPlanCredits);
+
+                  setInvoices(storageService.getInvoices(user.id));
                   onUpgrade(targetPlan);
                   setProcessingPlan(null);
               },
@@ -77,7 +83,6 @@ export const Billing: React.FC<BillingProps> = ({ user, onUpgrade }) => {
               }
           );
       } else {
-          // --- DOWNGRADE FLOW ---
           setTargetDowngradePlan(targetPlan);
           setDowngradeReason('');
           setShowDowngradeModal(true);
@@ -86,19 +91,45 @@ export const Billing: React.FC<BillingProps> = ({ user, onUpgrade }) => {
 
   const confirmDowngrade = () => {
       if (targetDowngradePlan) {
-          // Log reason (in a real app, send to backend)
           console.log(`User ${user.id} downgraded to ${targetDowngradePlan}. Reason: ${downgradeReason}`);
-          
-          // Process the change
+          const newPlanCredits = currentPlans ? currentPlans[targetDowngradePlan].monthlyCredits : 25;
+          storageService.saveUserCredits(user.id, newPlanCredits); // Reset to lower tier limit
           onUpgrade(targetDowngradePlan);
-          
-          // Reset UI
           setShowDowngradeModal(false);
           setTargetDowngradePlan(null);
       }
   };
 
-  // Mock Date for Next Billing
+  const handleRecharge = async () => {
+      if (rechargeAmount < MIN_RECHARGE_CREDITS) return;
+      const cost = rechargeAmount * RECHARGE_RATE;
+      setProcessingRecharge(true);
+
+      await paymentService.initiatePayment(
+          user,
+          user.plan, // Current plan context
+          cost,
+          (paymentId) => {
+              storageService.addCredits(user.id, rechargeAmount, `Wallet Recharge: ${rechargeAmount} Credits`);
+              storageService.addInvoice(user.id, {
+                  id: paymentId,
+                  date: new Date().toISOString(),
+                  amount: cost,
+                  plan: 'Credit Top-up',
+                  status: 'Paid',
+                  period: 'One-time'
+              });
+              setInvoices(storageService.getInvoices(user.id));
+              // Force update local user state if possible via prop or reload, but dashboard will reflect
+              window.location.reload(); // Simple reload to refresh credits everywhere
+          },
+          (error) => {
+              if (error !== "Payment process cancelled") alert(error);
+              setProcessingRecharge(false);
+          }
+      );
+  };
+
   const nextBillingDate = new Date();
   nextBillingDate.setDate(nextBillingDate.getDate() + 30);
 
@@ -107,7 +138,6 @@ export const Billing: React.FC<BillingProps> = ({ user, onUpgrade }) => {
   return (
     <div className="space-y-8 animate-fade-in relative pb-16">
         
-        {/* Downgrade Reason Modal */}
         {showDowngradeModal && (
             <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
                 <div className="bg-white dark:bg-slate-900 rounded-xl max-w-md w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 animate-scale-in">
@@ -116,63 +146,69 @@ export const Billing: React.FC<BillingProps> = ({ user, onUpgrade }) => {
                             <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-full text-amber-600 dark:text-amber-400">
                                 <AlertCircle size={24} />
                             </div>
-                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">We're sorry to see you go</h3>
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">Confirm Downgrade</h3>
                         </div>
                         <button onClick={() => setShowDowngradeModal(false)} className="text-slate-400 hover:text-slate-600">
                             <X size={20} />
                         </button>
                     </div>
-                    
                     <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-                        You are downgrading to the <strong>{currentPlans[targetDowngradePlan!].name}</strong> plan. 
-                        You will lose access to premium features immediately.
+                        You are downgrading to <strong>{currentPlans[targetDowngradePlan!].name}</strong>. 
+                        Your credit limit will be reset to {currentPlans[targetDowngradePlan!].monthlyCredits} credits.
                     </p>
-
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-2">
-                        Could you tell us why you are downgrading?
-                    </label>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-2">Reason for downgrading</label>
                     <textarea 
                         value={downgradeReason}
                         onChange={(e) => setDowngradeReason(e.target.value)}
-                        placeholder="Too expensive, missing features, not using enough..."
+                        placeholder="Feedback helps us improve..."
                         className="w-full p-3 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-emerald-500 outline-none mb-6 h-24 resize-none"
                     />
-
                     <div className="flex gap-3">
-                        <button 
-                            onClick={() => setShowDowngradeModal(false)}
-                            className="flex-1 py-2 text-slate-600 dark:text-slate-300 font-bold hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
-                        >
-                            Cancel
-                        </button>
-                        <button 
-                            onClick={confirmDowngrade}
-                            disabled={!downgradeReason.trim()}
-                            className="flex-1 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            Confirm Downgrade
-                        </button>
+                        <button onClick={() => setShowDowngradeModal(false)} className="flex-1 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-lg">Cancel</button>
+                        <button onClick={confirmDowngrade} disabled={!downgradeReason.trim()} className="flex-1 py-2 bg-slate-900 text-white font-bold rounded-lg hover:opacity-90 disabled:opacity-50">Confirm</button>
                     </div>
                 </div>
             </div>
         )}
 
         <div className="text-center max-w-2xl mx-auto">
-            <h2 className="text-3xl font-bold text-slate-900 dark:text-white">Choose your Intelligence Plan</h2>
-            <p className="text-slate-500 dark:text-slate-400 mt-2">Scale your operations with AI-powered insights. Secure payment via Razorpay.</p>
+            <h2 className="text-3xl font-bold text-slate-900 dark:text-white">Plans & Credits</h2>
+            <p className="text-slate-500 dark:text-slate-400 mt-2">Flexible plans with credit-based usage. Top up anytime.</p>
             
-            {/* Trial Status Banner */}
-            {user.isTrial && (
-                <div className="mt-6 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-3 inline-block">
-                    <div className="flex items-center gap-2 text-yellow-800 dark:text-yellow-400 font-bold">
-                        <Zap size={18} fill="currentColor" />
-                        Free Demo Active
+            {/* Credit Wallet Banner */}
+            <div className="mt-6 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700 rounded-xl p-6 inline-block w-full max-w-md">
+                <div className="flex justify-between items-center mb-4">
+                    <div className="flex items-center gap-2 text-emerald-800 dark:text-emerald-400 font-bold">
+                        <Wallet size={20} /> Your Wallet
                     </div>
-                    <p className="text-sm text-yellow-700 dark:text-yellow-500 mt-1">
-                        {user.queriesUsed || 0} / {user.queryLimit || 10} AI Queries Used
-                    </p>
+                    <span className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">{user.credits} CR</span>
                 </div>
-            )}
+                
+                <div className="flex items-end gap-2">
+                    <div className="flex-1 text-left">
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Add Credits (Min {MIN_RECHARGE_CREDITS})</label>
+                        <div className="relative">
+                            <input 
+                                type="number" 
+                                min={MIN_RECHARGE_CREDITS}
+                                value={rechargeAmount}
+                                onChange={(e) => setRechargeAmount(Math.max(0, parseInt(e.target.value) || 0))}
+                                className="w-full pl-3 pr-12 py-2 rounded-lg border border-emerald-200 focus:ring-2 focus:ring-emerald-500 outline-none bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono"
+                            />
+                            <span className="absolute right-3 top-2 text-xs font-bold text-slate-400">CR</span>
+                        </div>
+                    </div>
+                    <button 
+                        onClick={handleRecharge}
+                        disabled={rechargeAmount < MIN_RECHARGE_CREDITS || processingRecharge}
+                        className="px-4 py-2 bg-emerald-600 text-white font-bold rounded-lg hover:bg-emerald-700 transition-colors h-[42px] flex items-center gap-2"
+                    >
+                        {processingRecharge ? <Loader2 className="animate-spin" size={16} /> : <Plus size={16} />}
+                        Pay ₹{rechargeAmount * RECHARGE_RATE}
+                    </button>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-2 text-left">1 Credit = ₹{RECHARGE_RATE}. Used for Recipes, SOPs, and Strategy.</p>
+            </div>
 
             {/* Billing Toggle */}
             <div className="flex items-center justify-center gap-3 mt-8">
@@ -191,17 +227,8 @@ export const Billing: React.FC<BillingProps> = ({ user, onUpgrade }) => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
             {(Object.entries(currentPlans) as [string, PlanConfig][]).map(([key, plan]) => {
                 const planType = key as PlanType;
-                
                 const isCurrent = !user.isTrial && user.plan === planType;
                 const isPopular = planType === PlanType.PRO;
-                const isProcessing = processingPlan === planType;
-                
-                // Rank Logic
-                const currentLevel = PLAN_HIERARCHY[user.plan];
-                const thisLevel = PLAN_HIERARCHY[planType];
-                const isUpgrade = user.isTrial || thisLevel > currentLevel;
-                const isDowngrade = !user.isTrial && thisLevel < currentLevel;
-
                 const displayPrice = isQuarterly ? plan.quarterlyPrice : plan.price;
 
                 return (
@@ -224,7 +251,9 @@ export const Billing: React.FC<BillingProps> = ({ user, onUpgrade }) => {
                                 <span className="text-4xl font-bold tracking-tight text-slate-900 dark:text-white">₹{displayPrice.toLocaleString()}</span>
                                 <span className="ml-1 text-sm font-medium text-slate-500 dark:text-slate-400">/{isQuarterly ? 'qtr' : 'mo'}</span>
                             </div>
-                            <p className="text-xs text-slate-400 mt-1">+ Taxes applicable</p>
+                            <div className="mt-2 bg-slate-100 dark:bg-slate-800 rounded-lg py-1 px-3 inline-block">
+                                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{plan.monthlyCredits} Credits / Month</span>
+                            </div>
                         </div>
 
                         <ul className="flex-1 space-y-4 mb-8">
@@ -238,107 +267,58 @@ export const Billing: React.FC<BillingProps> = ({ user, onUpgrade }) => {
 
                         <button
                             onClick={() => handlePlanAction(planType, displayPrice)}
-                            disabled={isCurrent || isProcessing}
+                            disabled={isCurrent || processingPlan === planType}
                             className={`w-full py-3 px-4 rounded-lg font-bold transition-all flex items-center justify-center gap-2 ${
                                 isCurrent 
                                 ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-default'
-                                : isDowngrade
-                                    ? 'bg-white dark:bg-slate-900 text-slate-500 border-2 border-slate-200 dark:border-slate-700 hover:border-slate-400 hover:text-slate-700'
-                                    : planType === PlanType.PRO 
-                                        ? 'bg-slate-900 dark:bg-emerald-600 text-white hover:bg-slate-800 dark:hover:bg-emerald-700 shadow-lg hover:shadow-xl'
-                                        : 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white border-2 border-slate-200 dark:border-slate-700 hover:border-slate-900 dark:hover:border-slate-500'
+                                : planType === PlanType.PRO 
+                                    ? 'bg-slate-900 dark:bg-emerald-600 text-white hover:bg-slate-800 shadow-lg'
+                                    : 'bg-white dark:bg-slate-900 text-slate-900 border-2 border-slate-200 hover:border-slate-900'
                             }`}
                         >
-                            {isProcessing ? (
-                                <><Loader2 className="animate-spin" size={18} /> Processing...</>
-                            ) : isCurrent ? (
-                                'Current Plan'
-                            ) : isDowngrade ? (
-                                <><ArrowDown size={16} /> Downgrade Now</>
-                            ) : (
-                                <><ArrowUp size={16} /> Upgrade Now</>
-                            )}
+                            {processingPlan === planType ? <Loader2 className="animate-spin" size={18} /> : isCurrent ? 'Current Plan' : 'Switch Plan'}
                         </button>
                     </div>
                 );
             })}
         </div>
 
-        {/* Billing Management Section */}
+        {/* Billing Management */}
         <div className="max-w-6xl mx-auto mt-16 grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Payment Methods & Next Billing */}
             <div className="lg:col-span-1 space-y-6">
                 <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
                     <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
                         <CreditCard size={20} className="text-emerald-500" /> Payment Methods
                     </h3>
-                    
-                    <div className="space-y-3">
-                        {/* Credit Card Option */}
-                        <div className="flex items-center gap-3 p-3 border border-emerald-500/50 rounded-lg bg-emerald-50/10 relative">
-                            <div className="w-10 h-8 bg-slate-800 rounded flex items-center justify-center text-white text-[10px] font-bold shadow-sm">
-                                CARD
-                            </div>
-                            <div className="flex-1">
-                                <p className="text-sm font-bold text-slate-700 dark:text-slate-300">Credit / Debit Card</p>
-                                <p className="text-xs text-slate-500">Expires 12/28</p>
-                            </div>
-                            <div className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-white dark:bg-slate-800 px-2 py-1 rounded-full border border-emerald-200 dark:border-emerald-800 shadow-sm">
-                                <CheckCircle2 size={10} /> Active
-                            </div>
+                    <div className="flex items-center gap-3 p-3 border border-emerald-500/50 rounded-lg bg-emerald-50/10">
+                        <div className="w-10 h-8 bg-slate-800 rounded flex items-center justify-center text-white text-[10px] font-bold shadow-sm">CARD</div>
+                        <div className="flex-1">
+                            <p className="text-sm font-bold text-slate-700 dark:text-slate-300">Default Method</p>
+                            <p className="text-xs text-slate-500">Via Razorpay</p>
                         </div>
-
-                        {/* UPI Option */}
-                        <div className="flex items-center gap-3 p-3 border border-slate-200 dark:border-slate-700 rounded-lg hover:border-emerald-300 transition-colors cursor-pointer bg-white dark:bg-slate-900 group">
-                            <div className="w-10 h-8 bg-slate-100 dark:bg-slate-800 rounded flex items-center justify-center text-slate-500 dark:text-slate-400 group-hover:text-emerald-600 transition-colors">
-                                <Smartphone size={16} />
-                            </div>
-                            <div className="flex-1">
-                                <p className="text-sm font-bold text-slate-700 dark:text-slate-300">UPI</p>
-                                <p className="text-xs text-slate-500">Google Pay, PhonePe, Paytm</p>
-                            </div>
-                        </div>
+                        <CheckCircle2 size={16} className="text-emerald-600" />
                     </div>
-
-                    <button 
-                        onClick={() => alert("You can manage payment methods during checkout.")}
-                        className="w-full mt-4 text-xs font-bold text-slate-500 hover:text-slate-700 border border-slate-200 dark:border-slate-700 rounded py-2 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                    >
-                        Manage Payment Methods
-                    </button>
                 </div>
                 
                 <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
                     <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
                         <Calendar size={20} className="text-blue-500" /> Renewal
                     </h3>
-                    {user.plan === PlanType.FREE ? (
-                         <div className="text-center py-4">
-                             <p className="text-sm font-bold text-slate-700 dark:text-white">Free Forever</p>
-                             <p className="text-xs text-slate-500 mt-1">Upgrade anytime to unlock features.</p>
-                         </div>
-                    ) : (
-                        <>
-                            <div className="flex justify-between items-end mb-2">
-                                <p className="text-sm text-slate-500">Next billing date</p>
-                                <p className="font-bold text-slate-800 dark:text-white">{nextBillingDate.toLocaleDateString()}</p>
-                            </div>
-                            <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 mb-4">
-                                <div className="bg-blue-500 h-2 rounded-full w-[25%]"></div>
-                            </div>
-                            <p className="text-xs text-slate-400">
-                                Your payment method will be charged automatically.
-                            </p>
-                        </>
-                    )}
+                    <div className="flex justify-between items-end mb-2">
+                        <p className="text-sm text-slate-500">Next billing date</p>
+                        <p className="font-bold text-slate-800 dark:text-white">{nextBillingDate.toLocaleDateString()}</p>
+                    </div>
+                    <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 mb-4">
+                        <div className="bg-blue-500 h-2 rounded-full w-[25%]"></div>
+                    </div>
+                    <p className="text-xs text-slate-400">Credits reset on renewal.</p>
                 </div>
             </div>
 
-            {/* Billing History */}
             <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
                 <div className="flex justify-between items-center mb-6">
                     <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                        <Clock size={20} className="text-slate-400" /> Billing History
+                        <Clock size={20} className="text-slate-400" /> Transaction History
                     </h3>
                     <button className="text-xs font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1">
                         <Download size={12} /> Download All
@@ -348,7 +328,7 @@ export const Billing: React.FC<BillingProps> = ({ user, onUpgrade }) => {
                 {invoices.length === 0 ? (
                     <div className="text-center py-12 text-slate-400 border border-dashed border-slate-200 dark:border-slate-700 rounded-xl">
                         <FileText size={32} className="mx-auto mb-2 opacity-50" />
-                        <p className="text-sm">No invoices found.</p>
+                        <p className="text-sm">No transactions yet.</p>
                     </div>
                 ) : (
                     <div className="overflow-x-auto">
@@ -356,7 +336,7 @@ export const Billing: React.FC<BillingProps> = ({ user, onUpgrade }) => {
                             <thead className="text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 uppercase text-xs font-bold">
                                 <tr>
                                     <th className="px-4 py-3 rounded-l-lg">Date</th>
-                                    <th className="px-4 py-3">Plan</th>
+                                    <th className="px-4 py-3">Description</th>
                                     <th className="px-4 py-3">Amount</th>
                                     <th className="px-4 py-3">Status</th>
                                     <th className="px-4 py-3 rounded-r-lg text-right">Invoice</th>
@@ -369,7 +349,7 @@ export const Billing: React.FC<BillingProps> = ({ user, onUpgrade }) => {
                                             {new Date(inv.date).toLocaleDateString()}
                                         </td>
                                         <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-                                            {inv.plan.replace('_', ' ')} <span className="text-xs text-slate-400">({inv.period || 'Monthly'})</span>
+                                            {inv.plan} <span className="text-xs text-slate-400">({inv.period})</span>
                                         </td>
                                         <td className="px-4 py-3 font-bold text-slate-800 dark:text-white">
                                             ₹{inv.amount.toLocaleString()}

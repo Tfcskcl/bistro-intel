@@ -1,10 +1,12 @@
 
+
+
 import React, { useState, useRef, useEffect } from 'react';
-import { PLANS } from '../constants';
+import { PLANS, CREDIT_COSTS } from '../constants';
 import { generateRecipeCard, generateRecipeVariation } from '../services/geminiService';
 import { ingredientService } from '../services/ingredientService';
 import { RecipeCard, MenuItem, User, UserRole, POSChangeRequest, RecipeRequest } from '../types';
-import { Loader2, ChefHat, Scale, Clock, AlertCircle, Upload, Lock, Sparkles, Check, Save, RefreshCw, Search, Plus, Store, Zap, Trash2, Building2, FileSignature, X, AlignLeft, UtensilsCrossed, Inbox, UserCheck, CheckCircle2, Clock3, Carrot, Type } from 'lucide-react';
+import { Loader2, ChefHat, Scale, Clock, AlertCircle, Upload, Lock, Sparkles, Check, Save, RefreshCw, Search, Plus, Store, Zap, Trash2, Building2, FileSignature, X, AlignLeft, UtensilsCrossed, Inbox, UserCheck, CheckCircle2, Clock3, Carrot, Type, Wallet } from 'lucide-react';
 import { storageService } from '../services/storageService';
 import { authService } from '../services/authService';
 
@@ -85,30 +87,24 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
     fetchRestaurants();
   }, []);
 
-  // Plan Limit Logic
-  const planLimit = PLANS[user.plan]?.recipeLimit || 1;
-  // Limit applies to Saved Recipes for now
-  const limitReached = !user.isTrial && savedRecipes.length >= planLimit;
-
-  const checkUsage = (): boolean => {
-      if (user.isTrial) {
-          if ((user.queriesUsed || 0) >= (user.queryLimit || 10)) {
-              setError("Free Demo limit reached (10/10 queries). Please upgrade to continue.");
-              return false;
-          }
-      }
+  const checkCredits = (): boolean => {
+      if (isAdmin) return true; // Admins bypass credit checks for demo/ops purposes usually, or consume organization credits
       
-      if (limitReached && !isAdmin) {
-           setError(`You have reached the ${planLimit} recipe limit for your ${PLANS[user.plan].name} plan. Please upgrade or delete recipes.`);
-           return false;
+      const cost = CREDIT_COSTS.RECIPE;
+      if (user.credits < cost) {
+          setError(`Insufficient Credits. This action requires ${cost} credits, but you have ${user.credits}. Please recharge.`);
+          return false;
       }
       return true;
   };
 
-  const incrementUsage = () => {
-      if (user.isTrial && onUserUpdate) {
-          const newUsage = (user.queriesUsed || 0) + 1;
-          onUserUpdate({ ...user, queriesUsed: newUsage });
+  const deductCredits = () => {
+      if (!isAdmin && onUserUpdate) {
+          const cost = CREDIT_COSTS.RECIPE;
+          const success = storageService.deductCredits(user.id, cost, 'Recipe Generation');
+          if (success) {
+              onUserUpdate({ ...user, credits: user.credits - cost });
+          }
       }
   };
 
@@ -129,10 +125,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
 
   // 1. Open Form from List
   const handleGenerateClick = (item: MenuItem) => {
-      if (!isAdmin && limitReached) return; 
-      if (!checkUsage()) return;
       setFormItem(item);
-      // Pre-fill standard values or reset
       setFormData({ cuisine: '', dietary: [], notes: '', ingredients: '' });
       setIsFormOpen(true);
   };
@@ -140,8 +133,6 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
   // 2. Open Form from Custom Input
   const handleGenerateCustomClick = () => {
       if (!customItemName.trim()) return;
-      if (!isAdmin && limitReached) return;
-      if (!checkUsage()) return;
 
       const tempSku = `NEW-${Date.now().toString().slice(-4)}`;
       const tempItem: MenuItem = {
@@ -163,6 +154,12 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       e.preventDefault();
       if (!formItem) return;
 
+      // Credit Check before anything
+      if (!checkCredits()) {
+          setIsFormOpen(false);
+          return;
+      }
+
       setIsFormOpen(false); // Close modal
       setError(null);
 
@@ -183,6 +180,10 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
   };
 
   const createRequest = (item: MenuItem, requirements: string) => {
+      // NOTE: We do not deduct credits for REQUESTING, only when Admin fulfills? 
+      // OR Deduct immediately. Let's deduct immediately for simplicity of the flow "Pay per query"
+      deductCredits();
+
       const newRequest: RecipeRequest = {
           id: `req_${Date.now()}`,
           userId: user.id,
@@ -204,7 +205,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
           storageService.saveMenu(user.id, newMenu);
       }
       
-      alert("Request received! Our culinary team will review and generate this recipe within 1 hour.");
+      alert(`Request received! ${CREDIT_COSTS.RECIPE} credits deducted. Our culinary team will review and generate this recipe within 1 hour.`);
       handleTabChange('requests');
   };
 
@@ -223,7 +224,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
           const contextUserId = activeRequest ? activeRequest.userId : user.id;
           const card = await generateRecipeCard(contextUserId, item, requirements);
           setGeneratedRecipe(card);
-          incrementUsage(); // Increment only on successful generation
+          // If Admin is generating for themselves, deduct credits? Maybe not for Admin role.
       } catch (e: any) {
           console.error(e);
           setError(e.message || "Failed to generate recipe card. Please check your inputs or API key.");
@@ -243,7 +244,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
 
   const handleVariation = async (type: string) => {
     if (!generatedRecipe) return;
-    if (!isAdmin && !checkUsage()) return; 
+    if (!checkCredits()) return; 
 
     setLoading(true);
     setLoadingText(`Creating ${type} variation...`);
@@ -253,7 +254,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
     try {
       const variant = await generateRecipeVariation(user.id, generatedRecipe, type);
       setGeneratedRecipe(variant);
-      incrementUsage();
+      deductCredits();
     } catch (e) {
       setError(`Failed to create ${type} variation.`);
     } finally {
@@ -379,7 +380,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                               {isAdmin ? 'Generate Recipe' : 'Request Recipe'}
                           </h3>
                           <p className="text-xs text-slate-500 dark:text-slate-400">
-                             {isAdmin ? 'AI Co-pilot Configuration' : 'Tell us what you want to create'}
+                             {isAdmin ? 'AI Co-pilot Configuration' : `Cost: ${CREDIT_COSTS.RECIPE} Credits`}
                           </p>
                       </div>
                       <button onClick={() => setIsFormOpen(false)} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full text-slate-500">
@@ -430,18 +431,6 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                   onChange={e => setFormData({...formData, cuisine: e.target.value})}
                                   className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none"
                               />
-                          </div>
-                          <div className="flex flex-wrap gap-2 mt-2">
-                            {['Italian', 'Indian', 'Mexican', 'Asian', 'Healthy', 'Continental'].map(c => (
-                                <button
-                                    key={c}
-                                    type="button"
-                                    onClick={() => setFormData({...formData, cuisine: c})}
-                                    className="px-2 py-1 text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded hover:bg-emerald-50 hover:text-emerald-600 border border-transparent hover:border-emerald-200 transition-colors"
-                                >
-                                    {c}
-                                </button>
-                            ))}
                           </div>
                       </div>
 
@@ -502,7 +491,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                               className="px-6 py-2 bg-slate-900 dark:bg-emerald-600 text-white text-sm font-bold rounded-lg hover:opacity-90 flex items-center gap-2 shadow-lg shadow-emerald-500/20"
                           >
                               {isAdmin ? <Sparkles size={16} fill="currentColor" /> : <Inbox size={16} />} 
-                              {isAdmin ? 'Generate Recipe' : 'Submit Request'}
+                              {isAdmin ? 'Generate Recipe' : `Submit (${CREDIT_COSTS.RECIPE} CR)`}
                           </button>
                       </div>
                   </form>
@@ -544,12 +533,10 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
             </button>
         </div>
         
-        {user.isTrial && (
-            <div className="flex items-center gap-2 px-3 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400 rounded-full text-xs font-bold">
-                <Zap size={12} fill="currentColor" />
-                Demo: {user.queriesUsed || 0}/{user.queryLimit} Queries
-            </div>
-        )}
+        <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-400 rounded-full text-xs font-bold">
+            <Wallet size={12} />
+            Credits: {user.credits}
+        </div>
       </div>
 
       {viewMode === 'requests' && (
@@ -657,15 +644,6 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                     />
                 </div>
                 
-                {limitReached && !isAdmin && (
-                    <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg text-xs text-amber-800 flex items-center gap-2 animate-fade-in">
-                        <Lock size={14} className="shrink-0" />
-                        <span>
-                            Plan limit reached ({savedRecipes.length}/{planLimit}).
-                        </span>
-                    </div>
-                )}
-
                 <div className="relative">
                     <input 
                         type="text" 
@@ -673,13 +651,12 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                         onChange={(e) => setCustomItemName(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleGenerateCustomClick()}
                         placeholder={isAdmin ? "Generate for: Butter Chicken" : "Request for: Butter Chicken"}
-                        disabled={limitReached && !isAdmin}
-                        className="w-full pl-8 pr-8 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all disabled:bg-slate-100 disabled:cursor-not-allowed"
+                        className="w-full pl-8 pr-8 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
                     />
                     <Search className="absolute left-2.5 top-2.5 text-slate-400" size={14} />
                     <button 
                         onClick={handleGenerateCustomClick}
-                        disabled={!customItemName || loading || (limitReached && !isAdmin)}
+                        disabled={!customItemName || loading}
                         className="absolute right-1.5 top-1.5 p-1 bg-slate-100 hover:bg-emerald-500 hover:text-white rounded text-slate-400 transition-colors disabled:opacity-50 disabled:hover:bg-slate-100 disabled:hover:text-slate-400"
                     >
                         {loading && customItemName ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
@@ -704,13 +681,11 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                 menuItems.map((item) => (
                     <div 
                     key={item.sku_id}
-                    onClick={() => (!limitReached || isAdmin) && handleGenerateClick(item)}
+                    onClick={() => handleGenerateClick(item)}
                     className={`p-4 rounded-lg transition-all border ${
                         selectedSku === item.sku_id 
                         ? 'bg-yellow-50 border-yellow-200 ring-1 ring-yellow-300' 
-                        : (limitReached && !isAdmin)
-                            ? 'bg-slate-50 border-transparent opacity-60 cursor-not-allowed'
-                            : 'bg-white border-transparent hover:bg-slate-50 hover:border-slate-200 cursor-pointer'
+                        : 'bg-white border-transparent hover:bg-slate-50 hover:border-slate-200 cursor-pointer'
                     }`}
                     >
                     <div className="flex justify-between items-start">
@@ -743,7 +718,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                         <div className="bg-red-100 p-4 rounded-full text-red-500">
                             <AlertCircle size={32} />
                         </div>
-                        <h3 className="text-lg font-bold text-slate-800">Generation Failed</h3>
+                        <h3 className="text-lg font-bold text-slate-800">Action Failed</h3>
                         <p className="text-slate-500 max-w-sm">{error}</p>
                         <button 
                             onClick={() => handleDiscard()}

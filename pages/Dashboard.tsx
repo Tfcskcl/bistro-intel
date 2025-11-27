@@ -1,6 +1,8 @@
 
+
+
 import React, { useState, useEffect, useRef } from 'react';
-import { DollarSign, ShoppingBag, Utensils, AlertTriangle, Users, Clock, TrendingUp, Activity, MapPin, Globe, Eye, UserX, UserPlus, Zap, Edit, Save, Brain, Database, ArrowRight, X, ChevronRight, Search, Mail, Phone, Calendar, Shield, ShieldCheck, Trash2, Terminal, UploadCloud, FileText, CheckCircle2, Sliders, Cpu, Layers, Loader2, BarChart3, PlusCircle } from 'lucide-react';
+import { DollarSign, ShoppingBag, Utensils, AlertTriangle, Users, Clock, TrendingUp, Activity, MapPin, Globe, Eye, UserX, UserPlus, Zap, Edit, Save, Brain, Database, ArrowRight, X, ChevronRight, Search, Mail, Phone, Calendar, Shield, ShieldCheck, Trash2, Terminal, UploadCloud, FileText, CheckCircle2, Sliders, Cpu, Layers, Loader2, BarChart3, PlusCircle, Wallet, RefreshCw } from 'lucide-react';
 import { StatCard } from '../components/StatCard';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { User, UserRole, PlanType, VisitorSession, PlanConfig } from '../types';
@@ -74,7 +76,7 @@ const JourneyModal: React.FC<{ visitor: VisitorSession | null, onClose: () => vo
 
 // --- SUPER ADMIN DASHBOARD ---
 const SuperAdminDashboard: React.FC = () => {
-    const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'plans' | 'training'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'credits' | 'training'>('overview');
     const [subscribers, setSubscribers] = useState<User[]>([]);
     const [liveVisitors, setLiveVisitors] = useState<VisitorSession[]>([]);
     const [stats, setStats] = useState({ activeNow: 0, totalVisitsToday: 0, bounceRate: '0%', checkoutDropoff: 0 });
@@ -92,6 +94,10 @@ const SuperAdminDashboard: React.FC = () => {
         restaurantName: '',
         location: ''
     });
+
+    // Credit Management State
+    const [creditUpdateUser, setCreditUpdateUser] = useState<string>('');
+    const [creditAmount, setCreditAmount] = useState<number>(0);
 
     // AI Training State
     const [trainingParams, setTrainingParams] = useState({
@@ -134,7 +140,7 @@ const SuperAdminDashboard: React.FC = () => {
                 joinedDate: new Date().toISOString().split('T')[0],
                 plan: PlanType.PRO, // Default
                 isTrial: false,
-                // Add defaults for empty fields
+                credits: 25, // Default start
                 cuisineType: 'General',
                 gstNumber: '',
                 fssaiNumber: ''
@@ -148,6 +154,20 @@ const SuperAdminDashboard: React.FC = () => {
         } catch (err: any) {
             alert(err.message);
         }
+    };
+
+    const handleCreditUpdate = (userId: string, amount: number) => {
+        if (amount === 0) return;
+        if (amount > 0) {
+            storageService.addCredits(userId, amount, 'Admin Manual Top-up');
+        } else {
+            storageService.deductCredits(userId, Math.abs(amount), 'Admin Manual Deduction');
+        }
+        alert("Credits updated successfully.");
+        setCreditUpdateUser('');
+        setCreditAmount(0);
+        // Refresh users
+        authService.getAllUsers().then(setSubscribers);
     };
 
     const startTraining = () => {
@@ -243,7 +263,7 @@ const SuperAdminDashboard: React.FC = () => {
                     <p className="text-slate-500 dark:text-slate-400">System overview and user management.</p>
                 </div>
                 <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
-                    {['overview', 'users', 'plans', 'training'].map(tab => (
+                    {['overview', 'users', 'credits', 'training'].map(tab => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab as any)}
@@ -267,7 +287,6 @@ const SuperAdminDashboard: React.FC = () => {
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col items-center justify-center">
                             <h3 className="font-bold text-slate-800 dark:text-white mb-4 self-start">Traffic Overview</h3>
-                            {/* Empty State for Admin Overview */}
                             <div className="text-center text-slate-400 py-12">
                                 <Activity size={48} className="mx-auto mb-4 opacity-50" />
                                 <p>No real-time traffic data available.</p>
@@ -335,6 +354,7 @@ const SuperAdminDashboard: React.FC = () => {
                                     <th className="px-6 py-3">User / Restaurant</th>
                                     <th className="px-6 py-3">Role</th>
                                     <th className="px-6 py-3">Plan</th>
+                                    <th className="px-6 py-3">Credits</th>
                                     <th className="px-6 py-3">Location</th>
                                     <th className="px-6 py-3">Joined</th>
                                     <th className="px-6 py-3 text-right">Actions</th>
@@ -358,6 +378,9 @@ const SuperAdminDashboard: React.FC = () => {
                                                 {sub.plan}
                                             </span>
                                         </td>
+                                        <td className="px-6 py-4 font-mono text-slate-700 dark:text-slate-300">
+                                            {sub.credits}
+                                        </td>
                                         <td className="px-6 py-4 text-slate-600 dark:text-slate-400">{sub.location || 'N/A'}</td>
                                         <td className="px-6 py-4 text-slate-600 dark:text-slate-400">{sub.joinedDate}</td>
                                         <td className="px-6 py-4 text-right">
@@ -369,6 +392,61 @@ const SuperAdminDashboard: React.FC = () => {
                                 ))}
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'credits' && (
+                <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden p-6">
+                    <h3 className="font-bold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
+                        <Wallet size={20} className="text-emerald-500" /> Credit Manager
+                    </h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div>
+                            <h4 className="text-sm font-bold text-slate-500 uppercase mb-4">Manual Adjustment</h4>
+                            <div className="space-y-4 max-w-sm">
+                                <div>
+                                    <label className="block text-xs text-slate-400 mb-1">Select User</label>
+                                    <select 
+                                        className="w-full p-2 border rounded dark:bg-slate-800 dark:border-slate-700"
+                                        value={creditUpdateUser}
+                                        onChange={(e) => setCreditUpdateUser(e.target.value)}
+                                    >
+                                        <option value="">-- Select User --</option>
+                                        {subscribers.map(s => (
+                                            <option key={s.id} value={s.id}>{s.name} ({s.credits} CR)</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs text-slate-400 mb-1">Amount (+ to add, - to deduct)</label>
+                                    <input 
+                                        type="number" 
+                                        className="w-full p-2 border rounded dark:bg-slate-800 dark:border-slate-700"
+                                        value={creditAmount}
+                                        onChange={(e) => setCreditAmount(parseInt(e.target.value))}
+                                    />
+                                </div>
+                                <button 
+                                    onClick={() => handleCreditUpdate(creditUpdateUser, creditAmount)}
+                                    disabled={!creditUpdateUser || creditAmount === 0}
+                                    className="w-full py-2 bg-slate-900 text-white rounded font-bold disabled:opacity-50"
+                                >
+                                    Update Balance
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h4 className="text-sm font-bold text-slate-500 uppercase mb-4">Credit Usage Overview</h4>
+                            <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg">
+                                <p className="text-xs text-slate-400">Total System Credits</p>
+                                <p className="text-2xl font-bold text-slate-800 dark:text-white">
+                                    {subscribers.reduce((acc, u) => acc + (u.credits || 0), 0).toLocaleString()}
+                                </p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
@@ -544,14 +622,20 @@ const OwnerDashboard: React.FC<{ user: User }> = ({ user }) => {
                     icon={Utensils} 
                     colorClass="bg-amber-500" 
                 />
-                <StatCard 
-                    label="Labor Cost" 
-                    value={hasData ? "24%" : "N/A"} 
-                    trend={hasData ? "+0.8%" : undefined} 
-                    trendUp={false} 
-                    icon={Users} 
-                    colorClass="bg-purple-500" 
-                />
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Available Credits</p>
+                            <h3 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{user.credits}</h3>
+                        </div>
+                        <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400">
+                            <Wallet size={24} />
+                        </div>
+                    </div>
+                    <div className="mt-4 flex items-center gap-2">
+                        <span className="text-xs text-slate-400">Use for AI Tasks</span>
+                    </div>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
