@@ -56,24 +56,34 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
       if (mode === 'login') {
         const user = await authService.login(email, password);
         
-        // CHECK: If this is a Demo Account or new user, seed data if empty
-        storageService.seedDemoData(user.id);
+        // CHECK: Only seed data for specific Demo Accounts
+        const demoEmails = [
+            'owner@bistro.com', 
+            'admin@bistro.com', 
+            'info@bistroconnect.in', 
+            'amit@chef-hire.in',
+            'info@chef-hire.in'
+        ];
+        
+        if (demoEmails.includes(user.email.toLowerCase())) {
+            storageService.seedDemoData(user.id);
+        }
 
         onLogin(user);
       } else if (mode === 'signup') {
-        // Create new user
+        // Create new user with sanitized inputs
         const newUser: User = {
-          id: '', // Will be set by Firebase UID
-          name,
-          email,
+          id: '', // Will be set by Firebase UID or Mock service
+          name: name.trim(),
+          email: email.trim(),
           role: UserRole.OWNER, // Forced to Owner/F&B Entrepreneur
           plan: PlanType.PRO_PLUS, // Give Full Access initially
-          restaurantName,
-          location,
-          cuisineType,
+          restaurantName: restaurantName.trim(),
+          location: location.trim(),
+          cuisineType: cuisineType.trim(),
           joinedDate: new Date().toISOString().split('T')[0],
-          gstNumber,
-          fssaiNumber,
+          gstNumber: gstNumber.trim(),
+          fssaiNumber: fssaiNumber.trim(),
           menuFile: menuFileName,
           isTrial: true,
           queriesUsed: 0,

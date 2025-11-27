@@ -125,11 +125,11 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
   const handleGenerate = async () => {
       // Check for API Key Selection (Required for both Veo and Imagen 3)
       try {
-          const hasKey = await window.aistudio.hasSelectedApiKey();
+          const hasKey = await (window as any).aistudio.hasSelectedApiKey();
           if (!hasKey) {
               setLoading(true);
               setLoadingState("Waiting for API Key selection...");
-              await window.aistudio.openSelectKey();
+              await (window as any).aistudio.openSelectKey();
           }
       } catch (e) {
           console.warn("AI Studio key check skipped or failed", e);
@@ -196,7 +196,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
 
   const openKeyDialog = async () => {
       try {
-          await window.aistudio.openSelectKey();
+          await (window as any).aistudio.openSelectKey();
       } catch (e) {
           alert("Could not open key selection dialog.");
       }

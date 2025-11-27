@@ -4,7 +4,7 @@ import { PLANS } from '../constants';
 import { generateRecipeCard, generateRecipeVariation } from '../services/geminiService';
 import { ingredientService } from '../services/ingredientService';
 import { RecipeCard, MenuItem, User, UserRole, POSChangeRequest, RecipeRequest } from '../types';
-import { Loader2, ChefHat, Scale, Clock, AlertCircle, Upload, Lock, Sparkles, Check, Save, RefreshCw, Search, Plus, Store, Zap, Trash2, Building2, FileSignature, X, AlignLeft, UtensilsCrossed, Inbox, UserCheck, CheckCircle2, Clock3 } from 'lucide-react';
+import { Loader2, ChefHat, Scale, Clock, AlertCircle, Upload, Lock, Sparkles, Check, Save, RefreshCw, Search, Plus, Store, Zap, Trash2, Building2, FileSignature, X, AlignLeft, UtensilsCrossed, Inbox, UserCheck, CheckCircle2, Clock3, Carrot, Type } from 'lucide-react';
 import { storageService } from '../services/storageService';
 import { authService } from '../services/authService';
 
@@ -49,10 +49,12 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       cuisine: string;
       dietary: string[];
       notes: string;
+      ingredients: string;
   }>({
       cuisine: '',
       dietary: [],
-      notes: ''
+      notes: '',
+      ingredients: ''
   });
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -131,7 +133,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       if (!checkUsage()) return;
       setFormItem(item);
       // Pre-fill standard values or reset
-      setFormData({ cuisine: '', dietary: [], notes: '' });
+      setFormData({ cuisine: '', dietary: [], notes: '', ingredients: '' });
       setIsFormOpen(true);
   };
 
@@ -152,7 +154,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       };
       
       setFormItem(tempItem);
-      setFormData({ cuisine: '', dietary: [], notes: '' });
+      setFormData({ cuisine: '', dietary: [], notes: '', ingredients: '' });
       setIsFormOpen(true);
   };
 
@@ -166,6 +168,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
 
       const requirements = `
           Cuisine Style: ${formData.cuisine || 'Standard'}
+          Key Ingredients to Include: ${formData.ingredients || 'AI Suggested'}
           Dietary Restrictions: ${formData.dietary.length > 0 ? formData.dietary.join(', ') : 'None'}
           Preparation Notes: ${formData.notes || 'Standard preparation'}
       `;
@@ -368,7 +371,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       {/* Requirement Form Modal */}
       {isFormOpen && formItem && (
           <div className="absolute inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
-              <div className="bg-white dark:bg-slate-900 rounded-xl w-full max-w-lg shadow-2xl border border-slate-200 dark:border-slate-800 animate-scale-in overflow-hidden">
+              <div className="bg-white dark:bg-slate-900 rounded-xl w-full max-w-lg shadow-2xl border border-slate-200 dark:border-slate-800 animate-scale-in overflow-hidden max-h-[90vh] overflow-y-auto custom-scrollbar">
                   <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
                       <div>
                           <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2">
@@ -376,7 +379,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                               {isAdmin ? 'Generate Recipe' : 'Request Recipe'}
                           </h3>
                           <p className="text-xs text-slate-500 dark:text-slate-400">
-                             {isAdmin ? 'Immediate AI Generation' : 'Send to admin for review & generation'}
+                             {isAdmin ? 'AI Co-pilot Configuration' : 'Tell us what you want to create'}
                           </p>
                       </div>
                       <button onClick={() => setIsFormOpen(false)} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full text-slate-500">
@@ -385,6 +388,36 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                   </div>
                   
                   <form onSubmit={handleFormSubmit} className="p-6 space-y-4">
+                      {/* Dish Name Field */}
+                      <div>
+                          <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Dish Name</label>
+                          <div className="relative">
+                              <Type size={16} className="absolute left-3 top-3 text-slate-400" />
+                              <input 
+                                  type="text" 
+                                  required
+                                  value={formItem.name}
+                                  onChange={e => setFormItem({...formItem, name: e.target.value})}
+                                  className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none font-medium"
+                              />
+                          </div>
+                      </div>
+
+                      {/* Ingredients Field */}
+                      <div>
+                          <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Key Ingredients (Optional)</label>
+                          <div className="relative">
+                              <Carrot size={16} className="absolute left-3 top-3 text-slate-400" />
+                              <input 
+                                  type="text" 
+                                  placeholder="e.g. Fresh Basil, San Marzano Tomatoes, Parmesan..."
+                                  value={formData.ingredients}
+                                  onChange={e => setFormData({...formData, ingredients: e.target.value})}
+                                  className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none"
+                              />
+                          </div>
+                      </div>
+
                       <div>
                           <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Cuisine Style</label>
                           <div className="relative">

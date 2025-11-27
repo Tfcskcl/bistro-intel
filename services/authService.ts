@@ -190,12 +190,24 @@ export const authService = {
         }
     } else {
         // Mock Signup
-        const mockUsers = getMockUsers();
-        const exists = Object.values(mockUsers).find(u => u.email === userData.email);
-        if (exists) throw new Error("Email already in use (Mock Mode).");
+        const cleanEmail = userData.email.trim().toLowerCase();
+        
+        // 1. Check reserved demo emails to prevent collision
+        if (DEMO_USERS.some(u => u.email.toLowerCase() === cleanEmail)) {
+            throw new Error("This email is reserved for demo access. Please use a different email or log in.");
+        }
 
-        const uid = `mock_${Date.now()}`;
-        const newUser = { ...userData, id: uid };
+        // 2. Check against Existing Mock Users
+        const mockUsers = getMockUsers();
+        const exists = Object.values(mockUsers).some(u => u.email.toLowerCase() === cleanEmail);
+        
+        if (exists) {
+            throw new Error("Email already registered. Please login.");
+        }
+
+        const uid = `usr_${Date.now().toString(36)}`;
+        const newUser = { ...userData, id: uid, email: userData.email.trim() }; // Store trimmed email
+        
         saveMockUser(newUser, password);
         localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(newUser));
         notifyObservers(newUser);
@@ -209,8 +221,19 @@ export const authService = {
           return authService.signup(userData, password);
       } else {
           // In mock mode, we just add to DB but don't switch session
-          const uid = `mock_${Date.now()}`;
-          const newUser = { ...userData, id: uid };
+          const cleanEmail = userData.email.trim().toLowerCase();
+          
+          if (DEMO_USERS.some(u => u.email.toLowerCase() === cleanEmail)) {
+             throw new Error("Cannot create user with a reserved demo email.");
+          }
+
+          const mockUsers = getMockUsers();
+          if (Object.values(mockUsers).some(u => u.email.toLowerCase() === cleanEmail)) {
+             throw new Error("User with this email already exists.");
+          }
+
+          const uid = `usr_${Date.now().toString(36)}`;
+          const newUser = { ...userData, id: uid, email: userData.email.trim() };
           saveMockUser(newUser, password);
           return newUser;
       }

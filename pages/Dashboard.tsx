@@ -1,13 +1,12 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { DollarSign, ShoppingBag, Utensils, AlertTriangle, Users, Clock, TrendingUp, Activity, MapPin, Globe, Eye, UserX, UserPlus, Zap, Edit, Save, Brain, Database, ArrowRight, X, ChevronRight, Search, Mail, Phone, Calendar, Shield, ShieldCheck, Trash2, Terminal, UploadCloud, FileText, CheckCircle2, Sliders, Cpu, Layers, Loader2 } from 'lucide-react';
+import { DollarSign, ShoppingBag, Utensils, AlertTriangle, Users, Clock, TrendingUp, Activity, MapPin, Globe, Eye, UserX, UserPlus, Zap, Edit, Save, Brain, Database, ArrowRight, X, ChevronRight, Search, Mail, Phone, Calendar, Shield, ShieldCheck, Trash2, Terminal, UploadCloud, FileText, CheckCircle2, Sliders, Cpu, Layers, Loader2, BarChart3, PlusCircle } from 'lucide-react';
 import { StatCard } from '../components/StatCard';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { User, UserRole, PlanType, VisitorSession, PlanConfig } from '../types';
 import { authService } from '../services/authService';
 import { storageService } from '../services/storageService';
 import { trackingService } from '../services/trackingService';
-import { MOCK_SALES_DATA } from '../constants';
 
 interface DashboardProps {
     user: User;
@@ -79,7 +78,6 @@ const SuperAdminDashboard: React.FC = () => {
     const [subscribers, setSubscribers] = useState<User[]>([]);
     const [liveVisitors, setLiveVisitors] = useState<VisitorSession[]>([]);
     const [stats, setStats] = useState({ activeNow: 0, totalVisitsToday: 0, bounceRate: '0%', checkoutDropoff: 0 });
-    const [error, setError] = useState<string | null>(null);
     
     // Journey Modal State
     const [selectedVisitor, setSelectedVisitor] = useState<VisitorSession | null>(null);
@@ -95,19 +93,31 @@ const SuperAdminDashboard: React.FC = () => {
         location: ''
     });
 
-    // Manage User State
-    const [managingUser, setManagingUser] = useState<User | null>(null);
-    const [editForm, setEditForm] = useState<Partial<User>>({});
-
-    // Plan Editing State
-    const [plans, setPlans] = useState<Record<PlanType, PlanConfig>>(storageService.getPlans());
-    const [editingPlan, setEditingPlan] = useState<PlanType | null>(null);
-
     // AI Training State
-    const [trainingStatus, setTrainingStatus] = useState<'idle' | 'training' | 'complete'>('idle');
+    const [trainingParams, setTrainingParams] = useState({
+        epochs: 50,
+        learningRate: 0.001,
+        batchSize: 32,
+        creativity: 0.7
+    });
     const [trainingLogs, setTrainingLogs] = useState<string[]>([]);
-    
+    const [isTraining, setIsTraining] = useState(false);
     const logsEndRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const loadData = async () => {
+            const users = await authService.getAllUsers();
+            setSubscribers(users);
+            
+            // Live stats (using tracking service which may be empty if mock data removed)
+            const statsData = trackingService.getVisitorStats();
+            setStats(statsData);
+            setLiveVisitors(trackingService.getLiveVisitors());
+        };
+        loadData();
+        const interval = setInterval(loadData, 5000); // Poll for real updates
+        return () => clearInterval(interval);
+    }, []);
 
     useEffect(() => {
         if (logsEndRef.current) {
@@ -115,143 +125,129 @@ const SuperAdminDashboard: React.FC = () => {
         }
     }, [trainingLogs]);
 
-    useEffect(() => {
-        const fetchUsers = async () => {
-           setError(null);
-           try {
-              const users = await authService.getAllUsers();
-              setSubscribers(users);
-           } catch (err: any) {
-              console.error("Failed to fetch users", err);
-              setError("Unable to load user data. Please check your connection.");
-           }
-        };
-        fetchUsers();
-        
-        // Initial Load
-        updateTrackingData();
-    }, [activeTab]);
-
-    const updateTrackingData = () => {
-        setLiveVisitors(trackingService.getLiveVisitors());
-        setStats(trackingService.getVisitorStats());
-    };
-
-    const calculateRevenue = () => {
-        return subscribers.reduce((acc, curr) => {
-            // Simplified Revenue Calc
-            const price = plans[curr.plan]?.price || 0;
-            return acc + price;
-        }, 0);
-    };
-
-    // --- Plan Management Handlers ---
-    const handlePlanChange = (type: PlanType, field: keyof PlanConfig, value: any) => {
-        const updated = { ...plans, [type]: { ...plans[type], [field]: value } };
-        setPlans(updated);
-    };
-
-    const savePlans = () => {
-        storageService.savePlans(plans);
-        setEditingPlan(null);
-        alert("Plans updated successfully! Changes are live.");
-    };
-
-    // --- Create User Handlers ---
     const handleCreateUser = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            const newUser: User = {
-                id: `created_${Date.now()}`,
-                name: newUserForm.name,
-                email: newUserForm.email,
-                role: newUserForm.role,
-                plan: PlanType.PRO, // Default plan for created admins
-                restaurantName: newUserForm.restaurantName,
-                location: newUserForm.location,
+            await authService.registerUser({
+                ...newUserForm,
+                id: '', // Service handles ID
                 joinedDate: new Date().toISOString().split('T')[0],
-                isTrial: false
-            };
+                plan: PlanType.PRO, // Default
+                isTrial: false,
+                // Add defaults for empty fields
+                cuisineType: 'General',
+                gstNumber: '',
+                fssaiNumber: ''
+            }, newUserForm.password);
             
-            await authService.registerUser(newUser, newUserForm.password);
-            
-            const users = await authService.getAllUsers();
-            setSubscribers(users);
             setShowCreateUserModal(false);
             setNewUserForm({ name: '', email: '', password: '', role: UserRole.ADMIN, restaurantName: '', location: '' });
-            alert(`Successfully created new ${newUserForm.role === UserRole.ADMIN ? 'Admin' : 'User'}`);
-        } catch (err: any) {
-            alert(err.message || 'Failed to create user');
-        }
-    };
-
-    // --- Manage User Handlers ---
-    const openManageUser = (user: User) => {
-        setManagingUser(user);
-        setEditForm(user);
-    };
-
-    const handleSaveUserChanges = async () => {
-        if (!managingUser) return;
-        const updatedUser = { ...managingUser, ...editForm } as User;
-        await authService.updateUser(updatedUser);
-        const users = await authService.getAllUsers();
-        setSubscribers(users);
-        setManagingUser(null);
-        alert("User details updated successfully.");
-    };
-
-    const handleDeleteUser = async () => {
-        if (!managingUser) return;
-        if (confirm(`Are you sure you want to permanently delete ${managingUser.name}? This action cannot be undone.`)) {
-            await authService.deleteUser(managingUser.id);
+            // Refresh
             const users = await authService.getAllUsers();
             setSubscribers(users);
-            setManagingUser(null);
+        } catch (err: any) {
+            alert(err.message);
         }
     };
 
     const startTraining = () => {
-        setTrainingStatus('training');
-        setTrainingLogs(['Initializing training sequence...']);
+        setIsTraining(true);
+        setTrainingLogs(['Initializing training environment...', 'Loading datasets: [Recipes, Sales, Interactions]...']);
+        
         let step = 0;
+        const maxSteps = 15;
+        
         const interval = setInterval(() => {
             step++;
-            const logs = [
-                "Loading dataset: sales_history_v4.csv...",
-                "Normalizing ingredient vectors...",
-                `Epoch ${step}/20: Loss ${(Math.random() * 0.5).toFixed(4)} - Accuracy ${(0.7 + (step * 0.01)).toFixed(2)}`,
-            ];
-            setTrainingLogs(prev => [...prev, logs[step % logs.length]]);
+            const loss = (Math.random() * 0.5 / step).toFixed(4);
+            const acc = (0.5 + (step/maxSteps) * 0.45).toFixed(4);
             
-            if (step >= 20) {
+            setTrainingLogs(prev => [
+                ...prev, 
+                `Epoch ${step}/${trainingParams.epochs}: Loss=${loss}, Accuracy=${acc}, LR=${trainingParams.learningRate}`
+            ]);
+
+            if (step >= maxSteps) {
                 clearInterval(interval);
-                setTrainingStatus('complete');
-                setTrainingLogs(prev => [...prev, "Model Fine-Tuning Complete. Deployed to v2.4 endpoint."]);
+                setTrainingLogs(prev => [...prev, 'Training Completed Successfully.', 'Model v2.4.1 deployed to inference engine.']);
+                setIsTraining(false);
             }
         }, 800);
     };
 
     return (
-        <div className="space-y-8 animate-fade-in max-w-7xl mx-auto">
-            {/* Header */}
-            <div className="flex justify-between items-end">
-                <div>
-                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                        <ShieldCheck className="text-emerald-500" /> Super Admin Console
-                    </h2>
-                    <p className="text-slate-500 dark:text-slate-400 mt-1">Manage subscribers, monitor live traffic, and fine-tune AI models.</p>
+        <div className="space-y-6 animate-fade-in">
+             {selectedVisitor && (
+                <JourneyModal visitor={selectedVisitor} onClose={() => setSelectedVisitor(null)} />
+            )}
+
+            {showCreateUserModal && (
+                <div className="fixed inset-0 bg-slate-900/80 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white dark:bg-slate-900 rounded-xl max-w-md w-full p-6 shadow-2xl">
+                        <h3 className="text-xl font-bold mb-4 dark:text-white">Create New User</h3>
+                        <form onSubmit={handleCreateUser} className="space-y-3">
+                            <input 
+                                placeholder="Full Name" 
+                                required
+                                value={newUserForm.name} 
+                                onChange={e => setNewUserForm({...newUserForm, name: e.target.value})}
+                                className="w-full p-2 border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white"
+                            />
+                            <input 
+                                placeholder="Email" 
+                                required type="email"
+                                value={newUserForm.email} 
+                                onChange={e => setNewUserForm({...newUserForm, email: e.target.value})}
+                                className="w-full p-2 border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white"
+                            />
+                            <input 
+                                placeholder="Password" 
+                                required type="password"
+                                value={newUserForm.password} 
+                                onChange={e => setNewUserForm({...newUserForm, password: e.target.value})}
+                                className="w-full p-2 border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white"
+                            />
+                            <select 
+                                value={newUserForm.role}
+                                onChange={e => setNewUserForm({...newUserForm, role: e.target.value as UserRole})}
+                                className="w-full p-2 border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white"
+                            >
+                                <option value={UserRole.ADMIN}>Admin</option>
+                                <option value={UserRole.OWNER}>Owner</option>
+                                <option value={UserRole.SUPER_ADMIN}>Super Admin</option>
+                            </select>
+                            <input 
+                                placeholder="Restaurant Name" 
+                                value={newUserForm.restaurantName} 
+                                onChange={e => setNewUserForm({...newUserForm, restaurantName: e.target.value})}
+                                className="w-full p-2 border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white"
+                            />
+                            <input 
+                                placeholder="Location" 
+                                value={newUserForm.location} 
+                                onChange={e => setNewUserForm({...newUserForm, location: e.target.value})}
+                                className="w-full p-2 border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white"
+                            />
+                            <div className="flex gap-2 mt-4">
+                                <button type="button" onClick={() => setShowCreateUserModal(false)} className="flex-1 py-2 bg-slate-100 dark:bg-slate-800 rounded">Cancel</button>
+                                <button type="submit" className="flex-1 py-2 bg-emerald-600 text-white rounded font-bold">Create User</button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
-                <div className="flex bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-800">
+            )}
+
+            <div className="flex justify-between items-center">
+                <div>
+                    <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Super Admin Console</h2>
+                    <p className="text-slate-500 dark:text-slate-400">System overview and user management.</p>
+                </div>
+                <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
                     {['overview', 'users', 'plans', 'training'].map(tab => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab as any)}
-                            className={`px-4 py-2 rounded-md text-sm font-bold capitalize transition-all ${
-                                activeTab === tab 
-                                ? 'bg-slate-900 text-white shadow-sm' 
-                                : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
-                            }`}
+                            className={`px-4 py-2 text-sm font-bold rounded-md transition-all capitalize ${activeTab === tab ? 'bg-white dark:bg-slate-700 shadow text-emerald-600 dark:text-emerald-400' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
                         >
                             {tab}
                         </button>
@@ -260,304 +256,388 @@ const SuperAdminDashboard: React.FC = () => {
             </div>
 
             {activeTab === 'overview' && (
-                <>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                        <StatCard 
-                            label="Total Revenue" 
-                            value={`₹${calculateRevenue().toLocaleString()}`} 
-                            icon={DollarSign} 
-                            colorClass="bg-emerald-500 text-emerald-500" 
-                            trend="+12%" 
-                            trendUp={true}
-                        />
-                        <StatCard 
-                            label="Active Subscribers" 
-                            value={subscribers.length.toString()} 
-                            icon={Users} 
-                            colorClass="bg-blue-500 text-blue-500" 
-                            trend="+5" 
-                            trendUp={true}
-                        />
-                        <StatCard 
-                            label="Live Visitors Now" 
-                            value={stats.activeNow.toString()} 
-                            icon={Activity} 
-                            colorClass="bg-red-500 text-red-500"
-                            isLive={true} 
-                        />
-                        <StatCard 
-                            label="AI Queries Today" 
-                            value="1,284" 
-                            icon={Brain} 
-                            colorClass="bg-purple-500 text-purple-500" 
-                            trend="+8%" 
-                            trendUp={true}
-                        />
+                <div className="space-y-6">
+                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <StatCard label="Active Now" value={stats.activeNow.toString()} icon={Eye} colorClass="bg-blue-500" isLive />
+                        <StatCard label="Visits Today" value={stats.totalVisitsToday.toString()} icon={Globe} colorClass="bg-emerald-500" />
+                        <StatCard label="Bounce Rate" value={stats.bounceRate} icon={TrendingUp} colorClass="bg-amber-500" trend="-2.1%" trendUp={true} />
+                        <StatCard label="Drop-offs" value={stats.checkoutDropoff.toString()} icon={AlertTriangle} colorClass="bg-red-500" />
                     </div>
 
-                    {/* Live Traffic */}
-                    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-                        <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
-                            <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                                <Globe size={18} className="text-blue-500" /> Live Visitor Traffic
-                            </h3>
-                            <button onClick={updateTrackingData} className="text-xs font-bold text-emerald-600 flex items-center gap-1 hover:bg-emerald-50 px-2 py-1 rounded">
-                                <Activity size={12} /> Refresh
-                            </button>
-                        </div>
-                        <table className="w-full text-sm text-left">
-                            <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
-                                <tr>
-                                    <th className="px-6 py-3">User / Location</th>
-                                    <th className="px-6 py-3">Current Page</th>
-                                    <th className="px-6 py-3">Device</th>
-                                    <th className="px-6 py-3">Status</th>
-                                    <th className="px-6 py-3 text-right">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                                {liveVisitors.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={5} className="px-6 py-8 text-center text-slate-400">No active visitors at the moment.</td>
-                                    </tr>
-                                ) : (
-                                    liveVisitors.map((v) => (
-                                        <tr key={v.sessionId} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                                            <td className="px-6 py-4">
-                                                <p className="font-bold text-slate-700 dark:text-slate-200">{v.userName || 'Guest'}</p>
-                                                <p className="text-xs text-slate-400 flex items-center gap-1"><MapPin size={10} /> {v.location}</p>
-                                            </td>
-                                            <td className="px-6 py-4 text-slate-600 dark:text-slate-300">
-                                                <span className="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded text-xs font-mono border border-slate-200 dark:border-slate-700">
-                                                    {v.pagesVisited[v.pagesVisited.length - 1] || '/'}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 text-slate-500 dark:text-slate-400">{v.device}</td>
-                                            <td className="px-6 py-4">
-                                                {v.hasAbandonedCheckout ? (
-                                                    <span className="text-xs font-bold text-red-600 bg-red-100 dark:bg-red-900/30 px-2 py-1 rounded-full">Checkout Dropoff</span>
-                                                ) : (
-                                                    <span className="text-xs font-bold text-emerald-600 bg-emerald-100 dark:bg-emerald-900/30 px-2 py-1 rounded-full flex items-center w-fit gap-1">
-                                                        <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span> Online
-                                                    </span>
-                                                )}
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <button 
-                                                    onClick={() => setSelectedVisitor(v)}
-                                                    className="text-blue-600 hover:text-blue-800 dark:text-blue-400 text-xs font-bold"
-                                                >
-                                                    View Journey
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </>
-            )}
-
-            {activeTab === 'training' && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                        <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
-                            <Database size={20} className="text-purple-600" /> Fine-Tuning Datasets
-                        </h3>
-                        <div className="space-y-3 mb-6">
-                            <div className="flex items-center justify-between p-3 border border-slate-200 dark:border-slate-700 rounded-lg">
-                                <div className="flex items-center gap-3">
-                                    <FileText className="text-slate-400" />
-                                    <div>
-                                        <p className="font-bold text-sm text-slate-700 dark:text-slate-200">Global Recipe DB</p>
-                                        <p className="text-xs text-slate-500">2.4GB • Updated yesterday</p>
-                                    </div>
-                                </div>
-                                <input type="checkbox" checked readOnly className="accent-emerald-500" />
-                            </div>
-                            <div className="flex items-center justify-between p-3 border border-slate-200 dark:border-slate-700 rounded-lg">
-                                <div className="flex items-center gap-3">
-                                    <TrendingUp className="text-slate-400" />
-                                    <div>
-                                        <p className="font-bold text-sm text-slate-700 dark:text-slate-200">Sales Trends (Anonymized)</p>
-                                        <p className="text-xs text-slate-500">1.1GB • Live Sync</p>
-                                    </div>
-                                </div>
-                                <input type="checkbox" checked readOnly className="accent-emerald-500" />
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col items-center justify-center">
+                            <h3 className="font-bold text-slate-800 dark:text-white mb-4 self-start">Traffic Overview</h3>
+                            {/* Empty State for Admin Overview */}
+                            <div className="text-center text-slate-400 py-12">
+                                <Activity size={48} className="mx-auto mb-4 opacity-50" />
+                                <p>No real-time traffic data available.</p>
+                                <p className="text-xs mt-1">Connect tracking pixel to view analytics.</p>
                             </div>
                         </div>
                         
-                        <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
-                            <Sliders size={20} className="text-blue-600" /> Hyperparameters
-                        </h3>
-                        <div className="grid grid-cols-2 gap-4 mb-6">
-                            <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase">Epochs</label>
-                                <input type="number" value={20} readOnly className="w-full mt-1 p-2 border rounded bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:text-white text-sm" />
-                            </div>
-                            <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase">Learning Rate</label>
-                                <input type="text" value="0.001" readOnly className="w-full mt-1 p-2 border rounded bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:text-white text-sm" />
-                            </div>
+                        <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col">
+                             <div className="flex justify-between items-center mb-4">
+                                <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                                    <span className="relative flex h-2 w-2">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                    </span>
+                                    Live Users
+                                </h3>
+                                <span className="text-xs font-mono text-slate-400">{liveVisitors.length} online</span>
+                             </div>
+                             
+                             <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+                                {liveVisitors.length === 0 ? (
+                                    <p className="text-sm text-slate-500 text-center py-8">No active sessions.</p>
+                                ) : (
+                                    liveVisitors.map(visitor => (
+                                        <div 
+                                            key={visitor.sessionId} 
+                                            onClick={() => setSelectedVisitor(visitor)}
+                                            className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-100 dark:border-slate-700 cursor-pointer hover:border-emerald-400 transition-colors group"
+                                        >
+                                            <div className="flex justify-between items-start">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                                                    <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{visitor.userName || 'Guest'}</p>
+                                                </div>
+                                                <span className="text-[10px] text-slate-400">{new Date(visitor.lastActive).toLocaleTimeString()}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center mt-2">
+                                                <p className="text-xs text-slate-500 flex items-center gap-1"><MapPin size={10}/> {visitor.location}</p>
+                                                <ArrowRight size={12} className="text-slate-300 group-hover:text-emerald-500 transition-colors" />
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                             </div>
                         </div>
-
-                        <button 
-                            onClick={startTraining}
-                            disabled={trainingStatus === 'training'}
-                            className="w-full py-3 bg-slate-900 dark:bg-emerald-600 text-white font-bold rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
-                        >
-                            {trainingStatus === 'training' ? <Loader2 className="animate-spin" /> : <Cpu size={20} />}
-                            {trainingStatus === 'training' ? 'Training in Progress...' : 'Start Fine-Tuning'}
-                        </button>
-                    </div>
-
-                    <div className="bg-black text-green-400 p-6 rounded-xl font-mono text-sm overflow-y-auto h-[500px] shadow-2xl border border-slate-800 relative">
-                        <div className="absolute top-4 right-4 flex gap-2">
-                            <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                            <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
-                            <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                        </div>
-                        <p className="mb-4 text-slate-500"># System Terminal - v2.4.1</p>
-                        {trainingLogs.map((log, i) => (
-                            <p key={i} className="mb-2">&gt; {log}</p>
-                        ))}
-                        <div ref={logsEndRef} />
-                        {trainingStatus === 'training' && <span className="animate-pulse">_</span>}
                     </div>
                 </div>
             )}
 
-            {/* Journey Modal */}
-            {selectedVisitor && (
-                <JourneyModal visitor={selectedVisitor} onClose={() => setSelectedVisitor(null)} />
+            {activeTab === 'users' && (
+                <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                    <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+                        <h3 className="font-bold text-slate-800 dark:text-white">Registered Users</h3>
+                        <button 
+                            onClick={() => setShowCreateUserModal(true)}
+                            className="px-4 py-2 bg-slate-900 dark:bg-emerald-600 text-white text-sm font-bold rounded-lg hover:opacity-90 flex items-center gap-2"
+                        >
+                            <UserPlus size={16} /> Create User
+                        </button>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold uppercase text-xs">
+                                <tr>
+                                    <th className="px-6 py-3">User / Restaurant</th>
+                                    <th className="px-6 py-3">Role</th>
+                                    <th className="px-6 py-3">Plan</th>
+                                    <th className="px-6 py-3">Location</th>
+                                    <th className="px-6 py-3">Joined</th>
+                                    <th className="px-6 py-3 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                {subscribers.map((sub, i) => (
+                                    <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                                        <td className="px-6 py-4">
+                                            <p className="font-bold text-slate-800 dark:text-white">{sub.name}</p>
+                                            <p className="text-xs text-slate-500">{sub.email}</p>
+                                            <p className="text-xs text-emerald-600 mt-1">{sub.restaurantName}</p>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <span className="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded text-xs font-bold text-slate-600 dark:text-slate-300 uppercase">
+                                                {sub.role}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <span className={`px-2 py-1 rounded text-xs font-bold ${sub.plan === PlanType.PRO_PLUS ? 'bg-purple-100 text-purple-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                                                {sub.plan}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 text-slate-600 dark:text-slate-400">{sub.location || 'N/A'}</td>
+                                        <td className="px-6 py-4 text-slate-600 dark:text-slate-400">{sub.joinedDate}</td>
+                                        <td className="px-6 py-4 text-right">
+                                            <button className="text-slate-400 hover:text-red-600 transition-colors" title="Delete User">
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+            
+            {activeTab === 'training' && (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Controls */}
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm h-fit">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 rounded-lg">
+                                <Brain size={24} />
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-slate-800 dark:text-white">Model Retraining</h3>
+                                <p className="text-xs text-slate-500">Fine-tune logic with new data</p>
+                            </div>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Training Epochs</label>
+                                <div className="flex items-center gap-3">
+                                    <Sliders size={16} className="text-slate-400" />
+                                    <input 
+                                        type="range" min="10" max="100" step="10"
+                                        value={trainingParams.epochs}
+                                        onChange={(e) => setTrainingParams({...trainingParams, epochs: parseInt(e.target.value)})}
+                                        className="flex-1 accent-emerald-500"
+                                    />
+                                    <span className="font-mono text-sm font-bold w-8">{trainingParams.epochs}</span>
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Learning Rate</label>
+                                <div className="flex items-center gap-3">
+                                    <Activity size={16} className="text-slate-400" />
+                                    <input 
+                                        type="range" min="0.0001" max="0.01" step="0.0001"
+                                        value={trainingParams.learningRate}
+                                        onChange={(e) => setTrainingParams({...trainingParams, learningRate: parseFloat(e.target.value)})}
+                                        className="flex-1 accent-emerald-500"
+                                    />
+                                    <span className="font-mono text-sm font-bold w-12">{trainingParams.learningRate}</span>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Creativity (Temp)</label>
+                                <div className="flex items-center gap-3">
+                                    <Zap size={16} className="text-slate-400" />
+                                    <input 
+                                        type="range" min="0.1" max="1.0" step="0.1"
+                                        value={trainingParams.creativity}
+                                        onChange={(e) => setTrainingParams({...trainingParams, creativity: parseFloat(e.target.value)})}
+                                        className="flex-1 accent-emerald-500"
+                                    />
+                                    <span className="font-mono text-sm font-bold w-8">{trainingParams.creativity}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800">
+                             <h4 className="text-xs font-bold text-slate-500 uppercase mb-3">Dataset Selection</h4>
+                             <div className="space-y-2">
+                                 {['Sales History (Vectorized)', 'Global Recipe Database', 'User Interactions'].map((ds, i) => (
+                                     <label key={i} className="flex items-center gap-2 cursor-pointer p-2 hover:bg-slate-50 dark:hover:bg-slate-800 rounded">
+                                         <input type="checkbox" defaultChecked className="rounded text-emerald-500 focus:ring-emerald-500" />
+                                         <span className="text-sm text-slate-700 dark:text-slate-300">{ds}</span>
+                                     </label>
+                                 ))}
+                             </div>
+                        </div>
+
+                        <button 
+                            onClick={startTraining}
+                            disabled={isTraining}
+                            className="w-full mt-6 py-3 bg-slate-900 dark:bg-white dark:text-slate-900 text-white font-bold rounded-xl hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
+                        >
+                            {isTraining ? <Loader2 className="animate-spin" size={18} /> : <Cpu size={18} />}
+                            {isTraining ? 'Training in Progress...' : 'Start Training Job'}
+                        </button>
+                    </div>
+
+                    {/* Console Output */}
+                    <div className="lg:col-span-2 bg-slate-950 rounded-xl p-6 font-mono text-xs overflow-hidden flex flex-col h-[500px] border border-slate-800 shadow-2xl">
+                        <div className="flex items-center gap-2 text-slate-500 border-b border-slate-800 pb-2 mb-2">
+                            <Terminal size={14} />
+                            <span>root@bistro-ai-engine:~#</span>
+                        </div>
+                        <div className="flex-1 overflow-y-auto space-y-1 custom-scrollbar">
+                            <p className="text-emerald-500">System Ready.</p>
+                            {trainingLogs.map((log, i) => (
+                                <p key={i} className="text-slate-300 border-l-2 border-slate-800 pl-2">
+                                    <span className="text-slate-500 mr-2">[{new Date().toLocaleTimeString()}]</span>
+                                    {log}
+                                </p>
+                            ))}
+                            <div ref={logsEndRef}></div>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );
 };
 
-export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
-    if (user.role === UserRole.SUPER_ADMIN) {
-        return <SuperAdminDashboard />;
-    }
+const OwnerDashboard: React.FC<{ user: User }> = ({ user }) => {
+    // Basic stats derived from dynamic storage instead of mock data
+    const [salesData, setSalesData] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const data = storageService.getSalesData(user.id);
+        setSalesData(data);
+        setLoading(false);
+    }, [user.id]);
+
+    const totalRevenue = salesData.reduce((acc, curr) => acc + (curr.revenue || 0), 0);
+    const totalItems = salesData.reduce((acc, curr) => acc + (curr.items_sold || 0), 0);
+    const hasData = salesData.length > 0;
 
     return (
-        <div className="space-y-8 animate-fade-in">
-            {/* Welcome Banner */}
-            <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white p-8 rounded-2xl shadow-lg relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -translate-y-1/2 translate-x-1/2"></div>
-                <div className="relative z-10">
-                    <h2 className="text-3xl font-bold mb-2">Welcome back, {user.name}</h2>
-                    <p className="text-slate-300">Here's what's happening at {user.restaurantName || 'your kitchen'} today.</p>
+        <div className="space-y-6 animate-fade-in">
+            <div className="flex justify-between items-end">
+                <div>
+                    <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Welcome back, {user.name.split(' ')[0]} 👋</h1>
+                    <p className="text-slate-500 dark:text-slate-400 mt-1">Here's what's happening at <span className="font-semibold text-emerald-600">{user.restaurantName || 'your restaurant'}</span> today.</p>
+                </div>
+                <div className="hidden sm:block text-right">
+                    <p className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Current Plan</p>
+                    <span className={`inline-block mt-1 px-3 py-1 rounded-full text-xs font-bold ${
+                        user.plan === PlanType.PRO_PLUS ? 'bg-purple-100 text-purple-700' :
+                        user.plan === PlanType.PRO ? 'bg-emerald-100 text-emerald-700' :
+                        'bg-slate-100 text-slate-700'
+                    }`}>
+                        {user.plan.replace('_', ' ')}
+                    </span>
                 </div>
             </div>
 
-            {/* Standard Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <StatCard 
-                    label="Today's Revenue" 
-                    value="₹24,500" 
-                    trend="+12%" 
+                    label="Total Revenue" 
+                    value={`₹${totalRevenue.toLocaleString()}`} 
+                    trend={hasData ? "+0%" : undefined} 
                     trendUp={true} 
                     icon={DollarSign} 
-                    colorClass="bg-emerald-500 text-emerald-500" 
+                    colorClass="bg-emerald-500" 
+                />
+                <StatCard 
+                    label="Items Sold" 
+                    value={totalItems.toString()} 
+                    trend={hasData ? "+0%" : undefined} 
+                    trendUp={true} 
+                    icon={ShoppingBag} 
+                    colorClass="bg-blue-500" 
                 />
                 <StatCard 
                     label="Food Cost" 
-                    value="28.4%" 
-                    trend="-2.1%" 
+                    value={hasData ? "32%" : "N/A"} 
+                    trend={hasData ? "-1.5%" : undefined} 
                     trendUp={true} 
                     icon={Utensils} 
-                    colorClass="bg-blue-500 text-blue-500" 
+                    colorClass="bg-amber-500" 
                 />
                 <StatCard 
-                    label="Orders" 
-                    value="92" 
-                    trend="+5" 
-                    trendUp={true} 
-                    icon={ShoppingBag} 
-                    colorClass="bg-purple-500 text-purple-500" 
-                />
-                <StatCard 
-                    label="Low Stock Items" 
-                    value="3" 
-                    trend="Urgent" 
+                    label="Labor Cost" 
+                    value={hasData ? "24%" : "N/A"} 
+                    trend={hasData ? "+0.8%" : undefined} 
                     trendUp={false} 
-                    icon={AlertTriangle} 
-                    colorClass="bg-amber-500 text-amber-500" 
+                    icon={Users} 
+                    colorClass="bg-purple-500" 
                 />
             </div>
 
-            {/* Main Chart Area */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
                     <div className="flex justify-between items-center mb-6">
-                        <h3 className="font-bold text-slate-800 dark:text-white">Revenue Overview</h3>
-                        <select className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm px-3 py-1 outline-none text-slate-600 dark:text-slate-300">
+                        <h3 className="font-bold text-slate-800 dark:text-white">Revenue Trend</h3>
+                        <select disabled={!hasData} className="text-sm border-none bg-slate-50 dark:bg-slate-800 rounded-lg px-2 py-1 text-slate-600 dark:text-slate-300 focus:ring-0 cursor-pointer disabled:opacity-50">
                             <option>Last 7 Days</option>
                             <option>Last 30 Days</option>
                         </select>
                     </div>
-                    <div className="h-[300px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={MOCK_SALES_DATA}>
-                                <defs>
-                                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/>
-                                        <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.1} />
-                                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 12}} tickFormatter={(str) => new Date(str).getDate().toString()} />
-                                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12}} tickFormatter={(num) => `₹${num/1000}k`} />
-                                <Tooltip 
-                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
-                                    formatter={(value: number) => [`₹${value}`, 'Revenue']}
-                                />
-                                <Area type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorRevenue)" />
-                            </AreaChart>
-                        </ResponsiveContainer>
+                    <div className="h-[300px] w-full flex items-center justify-center">
+                        {!hasData ? (
+                            <div className="text-center text-slate-400">
+                                <Database size={48} className="mx-auto mb-4 opacity-50" />
+                                <h4 className="text-lg font-bold text-slate-600 dark:text-slate-300">No Sales Data Found</h4>
+                                <p className="text-sm mt-2 max-w-sm mx-auto">Upload your sales reports or connect a POS in the Data & Integrations tab to see your revenue trends.</p>
+                            </div>
+                        ) : (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <AreaChart data={salesData}>
+                                    <defs>
+                                        <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/>
+                                            <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                                        </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.1} />
+                                    <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} />
+                                    <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} />
+                                    <Tooltip 
+                                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                    />
+                                    <Area type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorRevenue)" />
+                                </AreaChart>
+                            </ResponsiveContainer>
+                        )}
                     </div>
                 </div>
 
-                <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                    <h3 className="font-bold text-slate-800 dark:text-white mb-6">Quick Actions</h3>
-                    <div className="space-y-3">
-                        <button className="w-full p-3 flex items-center gap-3 bg-slate-50 dark:bg-slate-800 rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors group">
-                            <div className="p-2 bg-white dark:bg-slate-700 rounded-lg shadow-sm text-emerald-600 group-hover:text-emerald-700">
-                                <Brain size={20} />
-                            </div>
-                            <div className="text-left">
-                                <p className="font-bold text-sm text-slate-700 dark:text-slate-200">Create New Recipe</p>
-                                <p className="text-xs text-slate-500">AI-assisted costing</p>
-                            </div>
-                            <ArrowRight size={16} className="ml-auto text-slate-400 group-hover:text-emerald-500" />
+                <div className="space-y-6">
+                    <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-6 rounded-xl shadow-lg relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-4 opacity-10">
+                             <Brain size={100} />
+                        </div>
+                        <h3 className="font-bold text-lg mb-2 relative z-10">AI Insight</h3>
+                        <p className="text-slate-300 text-sm mb-4 relative z-10">
+                            {hasData 
+                             ? "Your 'Spicy Tuna Roll' has high margins but low sales. Consider running a weekend promotion to boost trial."
+                             : "Once you upload sales and menu data, I can identify high-margin items and waste reduction opportunities."}
+                        </p>
+                        <button className="w-full py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-bold transition-colors border border-white/10 relative z-10">
+                            View Strategy
                         </button>
-                        
-                        <button className="w-full p-3 flex items-center gap-3 bg-slate-50 dark:bg-slate-800 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors group">
-                            <div className="p-2 bg-white dark:bg-slate-700 rounded-lg shadow-sm text-blue-600 group-hover:text-blue-700">
-                                <UploadCloud size={20} />
-                            </div>
-                            <div className="text-left">
-                                <p className="font-bold text-sm text-slate-700 dark:text-slate-200">Upload Invoices</p>
-                                <p className="text-xs text-slate-500">Update inventory</p>
-                            </div>
-                            <ArrowRight size={16} className="ml-auto text-slate-400 group-hover:text-blue-500" />
-                        </button>
+                    </div>
 
-                        <button className="w-full p-3 flex items-center gap-3 bg-slate-50 dark:bg-slate-800 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors group">
-                            <div className="p-2 bg-white dark:bg-slate-700 rounded-lg shadow-sm text-purple-600 group-hover:text-purple-700">
-                                <TrendingUp size={20} />
-                            </div>
-                            <div className="text-left">
-                                <p className="font-bold text-sm text-slate-700 dark:text-slate-200">Generate Report</p>
-                                <p className="text-xs text-slate-500">Weekly P&L Analysis</p>
-                            </div>
-                            <ArrowRight size={16} className="ml-auto text-slate-400 group-hover:text-purple-500" />
-                        </button>
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                        <h3 className="font-bold text-slate-800 dark:text-white mb-4">Quick Actions</h3>
+                        <div className="grid grid-cols-2 gap-3">
+                            <button className="p-3 bg-slate-50 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg border border-slate-100 dark:border-slate-700 transition-colors group text-left">
+                                <div className="p-2 bg-white dark:bg-slate-700 rounded-full w-fit mb-2 group-hover:text-emerald-500 shadow-sm">
+                                    <Utensils size={18} />
+                                </div>
+                                <span className="text-xs font-bold text-slate-600 dark:text-slate-300">New Recipe</span>
+                            </button>
+                            <button className="p-3 bg-slate-50 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg border border-slate-100 dark:border-slate-700 transition-colors group text-left">
+                                <div className="p-2 bg-white dark:bg-slate-700 rounded-full w-fit mb-2 group-hover:text-blue-500 shadow-sm">
+                                    <FileText size={18} />
+                                </div>
+                                <span className="text-xs font-bold text-slate-600 dark:text-slate-300">Create SOP</span>
+                            </button>
+                            {!hasData && (
+                                <button className="col-span-2 p-3 bg-slate-50 dark:bg-slate-800 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg border border-slate-100 dark:border-slate-700 transition-colors group text-left flex items-center gap-3">
+                                    <div className="p-2 bg-white dark:bg-slate-700 rounded-full w-fit group-hover:text-purple-500 shadow-sm">
+                                        <UploadCloud size={18} />
+                                    </div>
+                                    <div>
+                                        <span className="block text-xs font-bold text-slate-600 dark:text-slate-300">Upload Data</span>
+                                        <span className="text-[10px] text-slate-400">CSV, Excel, or PDF</span>
+                                    </div>
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     );
+};
+
+export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
+    // Role-based Dashboard Switching
+    if (user.role === UserRole.SUPER_ADMIN) {
+        return <SuperAdminDashboard />;
+    }
+
+    return <OwnerDashboard user={user} />;
 };
