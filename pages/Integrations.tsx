@@ -1,17 +1,18 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { UploadCloud, Database, CheckCircle2, Server, Loader2, X, RefreshCw, FileSpreadsheet, Download, Settings, Key, AlertTriangle, ArrowRight, ShieldCheck, BookOpen, Copy, ExternalLink, Save, Receipt } from 'lucide-react';
+import { UploadCloud, CheckCircle2, Server, Loader2, X, FileSpreadsheet, Download, Settings, Key, AlertTriangle, ArrowRight, ShieldCheck, BookOpen, ExternalLink, Save, Receipt, Instagram, Facebook, MapPin, Megaphone, Image as ImageIcon, Link2, LogOut } from 'lucide-react';
 import { storageService } from '../services/storageService';
-import { POSChangeRequest, User, UserRole } from '../types';
+import { POSChangeRequest, UserRole } from '../types';
 import { authService } from '../services/authService';
 
 interface IntegrationItem {
   id: string;
   name: string;
-  icon: string;
+  icon: React.ReactNode;
   status: string;
   lastSync?: string;
   loading?: boolean;
+  connectedAccount?: string; // For Social Media handles
 }
 
 // Configuration Guidelines & Schema
@@ -71,6 +72,12 @@ export const Integrations: React.FC = () => {
     { id: 'swiggy', name: 'Swiggy', icon: 'S', status: 'disconnected' },
   ]);
 
+  const [marketingApps, setMarketingApps] = useState<IntegrationItem[]>([
+      { id: 'instagram', name: 'Instagram', icon: <Instagram size={20} />, status: 'disconnected' },
+      { id: 'facebook', name: 'Facebook', icon: <Facebook size={20} />, status: 'disconnected' },
+      { id: 'google_business', name: 'Google Business', icon: <MapPin size={20} />, status: 'disconnected' }
+  ]);
+
   const [uploading, setUploading] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
   const [pendingRequests, setPendingRequests] = useState<POSChangeRequest[]>([]);
@@ -81,6 +88,10 @@ export const Integrations: React.FC = () => {
   const [configTab, setConfigTab] = useState<'guide' | 'settings'>('guide');
   const [configValues, setConfigValues] = useState<Record<string, string>>({});
   const [savingConfig, setSavingConfig] = useState(false);
+
+  // Social Auth Modal State
+  const [authModalProvider, setAuthModalProvider] = useState<string | null>(null);
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const purchaseInputRef = useRef<HTMLInputElement>(null);
@@ -93,7 +104,7 @@ export const Integrations: React.FC = () => {
       }
   }, [currentUser]);
 
-  const toggleConnection = (id: string) => {
+  const togglePOSConnection = (id: string) => {
       setIntegrations(prev => prev.map(int => {
           if (int.id === id) return { ...int, loading: true };
           return int;
@@ -103,7 +114,6 @@ export const Integrations: React.FC = () => {
           setIntegrations(prev => prev.map(int => {
               if (int.id === id) {
                   const isConnected = int.status === 'connected';
-                  // If connecting, we might normally require config first, but for demo we allow simple toggle
                   return {
                       ...int,
                       status: isConnected ? 'disconnected' : 'connected',
@@ -114,12 +124,10 @@ export const Integrations: React.FC = () => {
               return int;
           }));
           
-          // If connecting, open config automatically
           const target = integrations.find(i => i.id === id);
           if (target && target.status === 'disconnected') {
               handleConfigure(id);
           }
-
       }, 1500);
   };
 
@@ -135,9 +143,68 @@ export const Integrations: React.FC = () => {
           setSavingConfig(false);
           setConfiguringId(null);
           setUploadSuccess(`Configuration for ${integrations.find(i => i.id === configuringId)?.name} saved successfully.`);
+          
+          // Simulate Data Sync on Connect
+          if (currentUser) {
+              const mockSales = generateMockSales(30);
+              storageService.saveSalesData(currentUser.id, mockSales);
+          }
+          
           setTimeout(() => setUploadSuccess(null), 3000);
       }, 1000);
   };
+
+  // --- SOCIAL MEDIA HANDLERS ---
+  const openSocialAuth = (id: string) => {
+      setAuthModalProvider(id);
+  };
+
+  const handleSocialConnectSuccess = () => {
+      if (!authModalProvider) return;
+      setIsAuthenticating(true);
+
+      // Simulate API Handshake
+      setTimeout(() => {
+          const mockHandle = authModalProvider === 'instagram' ? '@the_golden_spoon_official' 
+            : authModalProvider === 'facebook' ? 'The Golden Spoon Page' 
+            : 'The Golden Spoon - Bandra';
+
+          setMarketingApps(prev => prev.map(app => {
+              if (app.id === authModalProvider) {
+                  return {
+                      ...app,
+                      status: 'connected',
+                      connectedAccount: mockHandle,
+                      lastSync: 'Just now'
+                  };
+              }
+              return app;
+          }));
+
+          setIsAuthenticating(false);
+          setAuthModalProvider(null);
+          setUploadSuccess(`Successfully linked ${mockHandle}`);
+          setTimeout(() => setUploadSuccess(null), 3000);
+      }, 2000);
+  };
+
+  const handleSocialDisconnect = (id: string) => {
+      if (confirm("Are you sure you want to disconnect? Scheduled posts will fail.")) {
+        setMarketingApps(prev => prev.map(app => {
+            if (app.id === id) {
+                return {
+                    ...app,
+                    status: 'disconnected',
+                    connectedAccount: undefined,
+                    lastSync: undefined
+                };
+            }
+            return app;
+        }));
+      }
+  };
+
+  // --- FILE UPLOADS ---
 
   const handleUploadClick = () => {
       fileInputRef.current?.click();
@@ -151,15 +218,57 @@ export const Integrations: React.FC = () => {
       expenseInputRef.current?.click();
   };
 
+  // Helper to generate realistic looking daily sales data
+  const generateMockSales = (days: number) => {
+      const data = [];
+      const today = new Date();
+      for (let i = days; i >= 0; i--) {
+          const d = new Date(today);
+          d.setDate(d.getDate() - i);
+          // Random revenue between 15k and 50k
+          const rev = Math.floor(Math.random() * 35000) + 15000;
+          const items = Math.floor(rev / 350); // Approx avg ticket
+          data.push({
+              date: d.toISOString().split('T')[0],
+              revenue: rev,
+              items_sold: items
+          });
+      }
+      return data;
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: string) => {
       if (e.target.files && e.target.files.length > 0) {
-          const fileName = e.target.files[0].name;
+          const files = Array.from(e.target.files);
+          const count = files.length;
+          
           setUploading(type);
           setUploadSuccess(null);
           
+          // Simulate Processing Delay
           setTimeout(() => {
               setUploading(null);
-              setUploadSuccess(`${type}: ${fileName} processed successfully.`);
+              setUploadSuccess(`${type}: ${count} file${count > 1 ? 's' : ''} processed successfully.`);
+              
+              // --- INJECT DATA EFFECT ---
+              if (currentUser) {
+                  if (type === 'Sales Data') {
+                      // Generate and save sales data to enable Dashboard charts
+                      const mockSales = generateMockSales(30);
+                      storageService.saveSalesData(currentUser.id, mockSales);
+                  }
+                  // For expenses/purchases we could assume it affects the same dataset for this demo
+                  // or just logging it. But adding Sales data ensures the Dashboard "wakes up"
+                  if (type === 'Operational Expenses' || type === 'Purchase Logs') {
+                       // Ensure basic sales data exists so the user sees the dashboard
+                       const currentSales = storageService.getSalesData(currentUser.id);
+                       if (!currentSales || currentSales.length === 0) {
+                           const mockSales = generateMockSales(30);
+                           storageService.saveSalesData(currentUser.id, mockSales);
+                       }
+                  }
+              }
+
               if (fileInputRef.current) fileInputRef.current.value = '';
               if (purchaseInputRef.current) purchaseInputRef.current.value = '';
               if (expenseInputRef.current) expenseInputRef.current.value = '';
@@ -191,10 +300,86 @@ export const Integrations: React.FC = () => {
   const selectedConfig = configuringId ? (POS_CONFIGS[configuringId] || POS_CONFIGS['default']) : null;
   const selectedIntegration = integrations.find(i => i.id === configuringId);
 
+  // Social Auth Modal Component logic
+  const renderSocialAuthModal = () => {
+      if (!authModalProvider) return null;
+      
+      const config = {
+          instagram: { 
+              color: 'bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600', 
+              icon: <Instagram size={48} className="text-white"/>,
+              title: 'Instagram',
+              permissions: ['Manage Posts', 'Read Profile', 'Access Insights'] 
+          },
+          facebook: { 
+              color: 'bg-blue-600', 
+              icon: <Facebook size={48} className="text-white"/>,
+              title: 'Facebook',
+              permissions: ['Manage Pages', 'Publish Content', 'Page Analytics'] 
+          },
+          google_business: { 
+              color: 'bg-white border-2 border-slate-100', 
+              icon: <div className="p-2"><MapPin size={40} className="text-blue-500"/></div>,
+              title: 'Google Business Profile',
+              textColor: 'text-slate-800',
+              permissions: ['Manage Locations', 'Reply to Reviews', 'Update Business Info'] 
+          }
+      }[authModalProvider] || { color: 'bg-slate-800', icon: <Server/>, title: 'App', permissions: [] };
+
+      // @ts-ignore
+      const isGoogle = authModalProvider === 'google_business';
+
+      return (
+          <div className="fixed inset-0 z-[60] bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-scale-in relative">
+                  <div className={`h-32 ${config.color} flex items-center justify-center`}>
+                      {config.icon}
+                  </div>
+                  
+                  <div className="p-8 text-center">
+                      <h3 className="text-xl font-bold text-slate-900 mb-2">Connect {config.title}</h3>
+                      <p className="text-sm text-slate-500 mb-6">
+                          Allow BistroIntelligence to access your {config.title} account to schedule posts and analyze performance.
+                      </p>
+
+                      <div className="text-left bg-slate-50 p-4 rounded-lg border border-slate-100 mb-6">
+                          <p className="text-xs font-bold text-slate-400 uppercase mb-2">Requested Permissions</p>
+                          <ul className="space-y-2">
+                              {config.permissions.map(p => (
+                                  <li key={p} className="flex items-center gap-2 text-sm text-slate-700">
+                                      <CheckCircle2 size={14} className="text-emerald-500"/> {p}
+                                  </li>
+                              ))}
+                          </ul>
+                      </div>
+
+                      <button 
+                        onClick={handleSocialConnectSuccess}
+                        disabled={isAuthenticating}
+                        className={`w-full py-3 rounded-lg font-bold text-white transition-all shadow-lg flex items-center justify-center gap-2 ${isGoogle ? 'bg-blue-600 hover:bg-blue-700' : 'bg-slate-900 hover:bg-slate-800'}`}
+                      >
+                          {isAuthenticating ? <Loader2 className="animate-spin" size={20} /> : null}
+                          {isAuthenticating ? 'Connecting...' : `Continue as ${currentUser?.name || 'User'}`}
+                      </button>
+                      
+                      <button 
+                        onClick={() => setAuthModalProvider(null)}
+                        className="mt-4 text-sm text-slate-400 hover:text-slate-600 font-medium"
+                      >
+                          Cancel
+                      </button>
+                  </div>
+              </div>
+          </div>
+      );
+  };
+
   return (
     <div className="space-y-8 animate-fade-in max-w-6xl mx-auto relative">
       
-      {/* Configuration Modal */}
+      {renderSocialAuthModal()}
+
+      {/* POS Configuration Modal */}
       {configuringId && selectedConfig && selectedIntegration && (
           <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4">
               <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden animate-fade-in-up">
@@ -303,7 +488,7 @@ export const Integrations: React.FC = () => {
       <div className="flex justify-between items-end border-b border-slate-200 pb-6">
         <div>
             <h2 className="text-2xl font-bold text-slate-800">Data & Integrations</h2>
-            <p className="text-slate-500 mt-1">Connect your billing software or upload operational data for AI analysis.</p>
+            <p className="text-slate-500 mt-1">Connect your billing software, social media, or upload operational data.</p>
         </div>
         <div className="flex gap-2">
             <span className="px-3 py-1 bg-emerald-50 text-emerald-700 text-xs font-bold rounded-full border border-emerald-100 flex items-center gap-1">
@@ -373,75 +558,136 @@ export const Integrations: React.FC = () => {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* POS Integrations */}
-        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col h-full">
-            <div className="mb-6">
-                <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                    <Server size={20} className="text-blue-600"/> Billing & POS Connectors
-                </h3>
-                <p className="text-sm text-slate-500 mt-1">Real-time sales syncing for accurate inventory & revenue analytics.</p>
-            </div>
-            
-            <div className="space-y-4 flex-1">
-                {integrations.map((pos) => (
-                    <div key={pos.id} className={`p-4 border rounded-xl transition-all ${
-                        pos.status === 'connected' ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-100 hover:border-slate-300'
-                    }`}>
-                        <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center gap-4">
-                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-white text-lg shadow-sm ${
-                                    pos.status === 'connected' ? 'bg-emerald-500' : 'bg-slate-400'
-                                }`}>
-                                    {pos.icon}
+        
+        {/* Left Column: POS + Marketing */}
+        <div className="space-y-8">
+            {/* POS Integrations */}
+            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col">
+                <div className="mb-6">
+                    <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                        <Server size={20} className="text-blue-600"/> Billing & POS Connectors
+                    </h3>
+                    <p className="text-sm text-slate-500 mt-1">Real-time sales syncing for accurate inventory & revenue analytics.</p>
+                </div>
+                
+                <div className="space-y-4 flex-1">
+                    {integrations.map((pos) => (
+                        <div key={pos.id} className={`p-4 border rounded-xl transition-all ${
+                            pos.status === 'connected' ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-100 hover:border-slate-300'
+                        }`}>
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-4">
+                                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-white text-lg shadow-sm ${
+                                        pos.status === 'connected' ? 'bg-emerald-500' : 'bg-slate-400'
+                                    }`}>
+                                        {pos.icon}
+                                    </div>
+                                    <div>
+                                        <h4 className="font-bold text-slate-800">{pos.name}</h4>
+                                        <div className="flex items-center gap-2">
+                                            <span className={`w-2 h-2 rounded-full ${pos.status === 'connected' ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`}></span>
+                                            <p className="text-xs text-slate-500 font-medium">
+                                                {pos.status === 'connected' ? `Synced: ${pos.lastSync}` : 'Not Connected'}
+                                            </p>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div>
-                                    <h4 className="font-bold text-slate-800">{pos.name}</h4>
-                                    <div className="flex items-center gap-2">
-                                        <span className={`w-2 h-2 rounded-full ${pos.status === 'connected' ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`}></span>
-                                        <p className="text-xs text-slate-500 font-medium">
-                                            {pos.status === 'connected' ? `Synced: ${pos.lastSync}` : 'Not Connected'}
+                                <button 
+                                    onClick={() => togglePOSConnection(pos.id)}
+                                    disabled={pos.loading}
+                                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all shadow-sm min-w-[100px] flex justify-center ${
+                                    pos.status === 'connected' 
+                                    ? 'bg-white text-red-600 border border-slate-200 hover:bg-red-50 hover:border-red-200' 
+                                    : 'bg-slate-900 text-white hover:bg-slate-800 hover:shadow-md'
+                                }`}>
+                                    {pos.loading ? <Loader2 size={16} className="animate-spin"/> : (pos.status === 'connected' ? 'Disconnect' : 'Connect')}
+                                </button>
+                            </div>
+                            
+                            {/* Config Status */}
+                            {pos.status === 'connected' && (
+                                <div className="mt-4 pt-3 border-t border-emerald-200/50 animate-fade-in">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs text-emerald-700 font-bold">Configuration Active</span>
+                                        <button 
+                                            onClick={() => handleConfigure(pos.id)}
+                                            className="text-xs flex items-center gap-1 text-emerald-600 hover:text-emerald-800 font-medium"
+                                        >
+                                            <Settings size={12} /> Settings
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* Social & Marketing Integrations */}
+            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col">
+                <div className="mb-6">
+                    <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                        <Megaphone size={20} className="text-pink-600"/> Social Media & Marketing
+                    </h3>
+                    <p className="text-sm text-slate-500 mt-1">Connect accounts to auto-post generated content and track engagement.</p>
+                </div>
+                
+                <div className="space-y-4">
+                    {marketingApps.map((app) => (
+                        <div key={app.id} className={`p-4 border rounded-xl transition-all ${
+                            app.status === 'connected' ? 'border-pink-200 bg-pink-50/30' : 'border-slate-100 hover:border-slate-300'
+                        }`}>
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-4">
+                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-sm transition-colors ${
+                                        app.status === 'connected' ? (app.id === 'instagram' ? 'bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600' : app.id === 'facebook' ? 'bg-blue-600' : 'bg-blue-500') : 'bg-slate-400'
+                                    }`}>
+                                        {app.icon}
+                                    </div>
+                                    <div>
+                                        <h4 className="font-bold text-slate-800">{app.name}</h4>
+                                        <p className="text-xs text-slate-500 font-medium flex items-center gap-1">
+                                            {app.status === 'connected' ? (
+                                                <span className="text-pink-600 font-bold flex items-center gap-1">
+                                                    <Link2 size={10} /> {app.connectedAccount || 'Linked'}
+                                                </span>
+                                            ) : 'Not Connected'}
                                         </p>
                                     </div>
                                 </div>
+                                
+                                {app.status === 'connected' ? (
+                                    <div className="flex gap-2">
+                                        <button 
+                                            onClick={() => handleSocialDisconnect(app.id)}
+                                            className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                            title="Disconnect"
+                                        >
+                                            <LogOut size={16} />
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <button 
+                                        onClick={() => openSocialAuth(app.id)}
+                                        className="px-3 py-1.5 bg-slate-900 text-white rounded-lg text-xs font-bold transition-all shadow-sm hover:bg-slate-800"
+                                    >
+                                        Connect
+                                    </button>
+                                )}
                             </div>
-                            <button 
-                                onClick={() => toggleConnection(pos.id)}
-                                disabled={pos.loading}
-                                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all shadow-sm min-w-[100px] flex justify-center ${
-                                pos.status === 'connected' 
-                                ? 'bg-white text-red-600 border border-slate-200 hover:bg-red-50 hover:border-red-200' 
-                                : 'bg-slate-900 text-white hover:bg-slate-800 hover:shadow-md'
-                            }`}>
-                                {pos.loading ? <Loader2 size={16} className="animate-spin"/> : (pos.status === 'connected' ? 'Disconnect' : 'Connect')}
-                            </button>
                         </div>
-                        
-                        {/* Config Status */}
-                        {pos.status === 'connected' && (
-                            <div className="mt-4 pt-3 border-t border-emerald-200/50 animate-fade-in">
-                                <div className="flex items-center justify-between">
-                                     <span className="text-xs text-emerald-700 font-bold">Configuration Active</span>
-                                     <button 
-                                        onClick={() => handleConfigure(pos.id)}
-                                        className="text-xs flex items-center gap-1 text-emerald-600 hover:text-emerald-800 font-medium"
-                                     >
-                                        <Settings size={12} /> Settings
-                                     </button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                ))}
+                    ))}
+                </div>
             </div>
         </div>
 
-        {/* Data Upload Section */}
+        {/* Right Column: Data Upload Section */}
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col h-full">
             <div className="mb-6">
                 <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                     <UploadCloud size={20} className="text-emerald-600"/> Manual Data Upload
                 </h3>
-                <p className="text-sm text-slate-500 mt-1">Upload CSV/Excel files if you don't use a supported POS.</p>
+                <p className="text-sm text-slate-500 mt-1">Upload files in any format if you don't use a supported POS.</p>
             </div>
 
             <div className="space-y-4 flex-1">
@@ -454,13 +700,14 @@ export const Integrations: React.FC = () => {
                         <FileSpreadsheet size={24} />
                     </div>
                     <h4 className="font-bold text-slate-700">Upload Sales Reports</h4>
-                    <p className="text-xs text-slate-400 mt-1">Drag & drop or click to browse</p>
+                    <p className="text-xs text-slate-400 mt-1">CSV, Excel, PDF, Images</p>
                     <input 
                         type="file" 
                         ref={fileInputRef}
                         onChange={(e) => handleFileChange(e, 'Sales Data')}
                         className="hidden" 
-                        accept=".csv,.xlsx"
+                        multiple
+                        accept=".csv,.xlsx,.xls,.pdf,image/*,.doc,.docx,.txt"
                     />
                 </div>
 
@@ -470,16 +717,17 @@ export const Integrations: React.FC = () => {
                     className="p-6 border-2 border-dashed border-slate-200 rounded-xl hover:bg-slate-50 hover:border-blue-300 transition-all cursor-pointer group text-center"
                 >
                     <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
-                        <Database size={24} />
+                        <ImageIcon size={24} />
                     </div>
-                    <h4 className="font-bold text-slate-700">Upload Purchase Logs</h4>
-                    <p className="text-xs text-slate-400 mt-1">For accurate inventory costing</p>
+                    <h4 className="font-bold text-slate-700">Upload Purchase Logs & Receipts</h4>
+                    <p className="text-xs text-slate-400 mt-1">Invoices, CSV, Excel, or <span className="text-blue-600 font-bold">Photo Receipts</span></p>
                     <input 
                         type="file" 
                         ref={purchaseInputRef}
                         onChange={(e) => handleFileChange(e, 'Purchase Logs')}
                         className="hidden" 
-                        accept=".csv,.xlsx"
+                        multiple
+                        accept=".csv,.xlsx,.xls,.pdf,image/*,.doc,.docx,.txt"
                     />
                 </div>
 
@@ -492,13 +740,14 @@ export const Integrations: React.FC = () => {
                         <Receipt size={24} />
                     </div>
                     <h4 className="font-bold text-slate-700">Upload Expenses & Salaries</h4>
-                    <p className="text-xs text-slate-400 mt-1">PDF, Images, Excel, etc.</p>
+                    <p className="text-xs text-slate-400 mt-1">Any format (PDF, Excel, Img)</p>
                     <input 
                         type="file" 
                         ref={expenseInputRef}
                         onChange={(e) => handleFileChange(e, 'Operational Expenses')}
                         className="hidden" 
-                        accept=".pdf,image/*,.csv,.xlsx,.doc,.docx"
+                        multiple
+                        accept=".pdf,image/*,.csv,.xlsx,.xls,.doc,.docx,.txt"
                     />
                 </div>
             </div>
@@ -519,14 +768,14 @@ export const Integrations: React.FC = () => {
                     <Loader2 className="animate-spin text-emerald-400" size={24} />
                     <div>
                         <p className="font-bold">Processing {uploading}...</p>
-                        <p className="text-xs text-slate-400">Parsing rows and normalizing data</p>
+                        <p className="text-xs text-slate-400">Parsing data and extracting insights</p>
                     </div>
                   </>
               ) : (
                   <>
                     <CheckCircle2 className="text-emerald-400" size={24} />
                      <div>
-                        <p className="font-bold">Upload Complete</p>
+                        <p className="font-bold">Success</p>
                         <p className="text-xs text-slate-400">{uploadSuccess}</p>
                     </div>
                   </>

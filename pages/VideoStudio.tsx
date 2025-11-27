@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { User, PlanType, MarketingRequest, UserRole } from '../types';
-import { Clapperboard, Upload, Play, Loader2, Sparkles, CheckCircle2, Film, AlertCircle, Key, Info, Plus, Trash2, Clock3, UserCheck, Download, Image as ImageIcon, Grid, Maximize2 } from 'lucide-react';
+import { Clapperboard, Upload, Play, Loader2, Sparkles, CheckCircle2, Film, AlertCircle, Key, Info, Plus, Trash2, Clock3, UserCheck, Download, Image as ImageIcon, Grid, Maximize2, Youtube, ExternalLink } from 'lucide-react';
 import { generateMarketingVideo, generateMarketingImage } from '../services/geminiService';
 import { storageService } from '../services/storageService';
 
@@ -17,8 +17,12 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
   const [images, setImages] = useState<string[]>([]);
   const [aspectRatio, setAspectRatio] = useState<string>('16:9');
   
+  // New: YouTube Reference URL
+  const [youtubeUrl, setYoutubeUrl] = useState('');
+  
   const [loading, setLoading] = useState(false);
   const [loadingState, setLoadingState] = useState<string>('');
+  const [progress, setProgress] = useState(0);
   const [outputUrl, setOutputUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   
@@ -84,8 +88,8 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
           return;
       }
       
-      if (activeTab === 'video' && images.length === 0) {
-          setError("Please upload at least one source image for video generation.");
+      if (activeTab === 'video' && images.length === 0 && !youtubeUrl) {
+          setError("Please upload a source image or provide a YouTube URL for context.");
           return;
       }
 
@@ -96,6 +100,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
           type: activeTab,
           prompt: prompt,
           images: images,
+          youtubeUrl: youtubeUrl,
           aspectRatio: aspectRatio as any,
           status: 'pending',
           requestDate: new Date().toISOString()
@@ -104,6 +109,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
       storageService.saveMarketingRequest(newReq);
       refreshRequests();
       setImages([]);
+      setYoutubeUrl('');
       setPrompt('');
       alert(`${activeTab === 'video' ? 'Video' : 'Image'} Request Submitted! Admin will process it.`);
       setViewMode('my-requests');
@@ -114,6 +120,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
       setActiveRequest(req);
       setActiveTab(req.type);
       setImages(req.images || []);
+      setYoutubeUrl(req.youtubeUrl || '');
       setPrompt(req.prompt);
       setAspectRatio(req.aspectRatio);
       setViewMode('generator');
@@ -138,13 +145,24 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
       setLoading(true);
       setError(null);
       setOutputUrl(null);
+      setProgress(0);
       setLoadingState(`Initializing ${activeTab === 'video' ? 'Veo' : 'Imagen'} Model...`);
+
+      // Progress Timer
+      const progressTimer = setInterval(() => {
+          setProgress(old => {
+              if (old >= 95) return 95;
+              // Slow down progress as it gets higher
+              const increment = old < 50 ? 5 : old < 80 ? 2 : 0.5;
+              return old + (Math.random() * increment);
+          });
+      }, 500);
 
       try {
           if (activeTab === 'video') {
-              if (images.length === 0) throw new Error("Source images required for video.");
+              if (images.length === 0 && !prompt) throw new Error("Source images or prompt required.");
               
-              // Progress simulation
+              // Progress simulation for text
               const progressInterval = setInterval(() => {
                   setLoadingState(prev => {
                       if (prev.includes("Initializing")) return "Analyzing Image Structure...";
@@ -163,9 +181,12 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
               const url = await generateMarketingImage(prompt, aspectRatio);
               setOutputUrl(url);
           }
+          setProgress(100);
       } catch (err: any) {
           setError(err.message || "Generation failed.");
+          setProgress(0);
       } finally {
+          clearInterval(progressTimer);
           setLoading(false);
           setLoadingState('');
       }
@@ -190,6 +211,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
       setActiveRequest(null);
       setOutputUrl(null);
       setImages([]);
+      setYoutubeUrl('');
       setPrompt('');
       setViewMode('requests');
   };
@@ -286,7 +308,15 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
                                           <span className="text-xs text-slate-400">• {new Date(req.requestDate).toLocaleDateString()}</span>
                                       </div>
                                       <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-1 font-medium">{req.prompt}</p>
-                                      <p className="text-[10px] text-slate-400 mt-0.5 uppercase">{req.type} • {req.aspectRatio}</p>
+                                      
+                                      <div className="flex items-center gap-3 mt-1">
+                                          <p className="text-[10px] text-slate-400 uppercase">{req.type} • {req.aspectRatio}</p>
+                                          {req.youtubeUrl && (
+                                              <a href={req.youtubeUrl} target="_blank" rel="noreferrer" className="text-[10px] text-red-500 flex items-center gap-1 hover:underline">
+                                                  <Youtube size={10} /> Ref Video
+                                              </a>
+                                          )}
+                                      </div>
                                   </div>
                               </div>
 
@@ -392,6 +422,29 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
                         </div>
                     )}
 
+                    {/* YouTube Reference Input */}
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">
+                            Reference Video (YouTube URL)
+                        </label>
+                        <div className="relative">
+                            <Youtube className="absolute left-3 top-2.5 text-slate-400" size={16} />
+                            <input 
+                                type="text"
+                                value={youtubeUrl}
+                                onChange={(e) => setYoutubeUrl(e.target.value)}
+                                placeholder="https://youtube.com/watch?v=..."
+                                readOnly={!!activeRequest} // Admins can copy, but usually read-only context if fulfilling exact request. Or editable if Admin is adjusting. Let's keep it editable but initialized.
+                                className={`w-full pl-10 pr-10 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm focus:ring-2 focus:ring-pink-500 outline-none text-slate-900 dark:text-white ${activeRequest ? 'opacity-80' : ''}`}
+                            />
+                            {youtubeUrl && (
+                                <a href={youtubeUrl} target="_blank" rel="noreferrer" className="absolute right-3 top-2.5 text-slate-400 hover:text-pink-500">
+                                    <ExternalLink size={16} />
+                                </a>
+                            )}
+                        </div>
+                    </div>
+
                     {/* Prompt */}
                     <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-2">
@@ -466,14 +519,31 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
                 <div className="bg-slate-900 rounded-2xl border border-slate-800 h-[500px] flex items-center justify-center relative overflow-hidden shadow-2xl">
                     
                     {loading ? (
-                        <div className="text-center z-10">
-                            <div className="relative w-20 h-20 mx-auto mb-6">
-                                <div className="absolute inset-0 border-4 border-slate-700 rounded-full"></div>
-                                <div className="absolute inset-0 border-4 border-t-pink-500 rounded-full animate-spin"></div>
-                                {activeTab === 'video' ? <Film className="absolute inset-0 m-auto text-pink-500" size={24} /> : <ImageIcon className="absolute inset-0 m-auto text-pink-500" size={24} />}
+                         <div className="absolute inset-0 z-20 bg-slate-900/90 flex flex-col items-center justify-center p-8">
+                            {/* Animated Icon */}
+                            <div className="relative mb-8">
+                                <div className="absolute inset-0 bg-pink-500 blur-xl opacity-20 animate-pulse"></div>
+                                <div className="relative w-24 h-24 bg-slate-800 rounded-2xl flex items-center justify-center border border-slate-700 shadow-2xl">
+                                    {activeTab === 'video' ? (
+                                        <Film className="text-pink-500 animate-bounce" size={40} />
+                                    ) : (
+                                        <ImageIcon className="text-pink-500 animate-pulse" size={40} />
+                                    )}
+                                </div>
                             </div>
-                            <h3 className="text-xl font-bold text-white mb-2">Creating Magic</h3>
-                            <p className="text-slate-400 text-sm animate-pulse">{loadingState}</p>
+
+                            <h3 className="text-2xl font-bold text-white mb-2">Creating Magic</h3>
+                            <p className="text-slate-400 text-sm mb-8 animate-pulse">{loadingState}</p>
+
+                            {/* Progress Bar */}
+                            <div className="w-full max-w-md h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-700 shadow-inner">
+                                <div 
+                                    className="h-full bg-gradient-to-r from-pink-600 to-purple-600 transition-all duration-300 ease-out"
+                                    style={{ width: `${Math.round(progress)}%` }}
+                                >
+                                </div>
+                            </div>
+                            <p className="text-xs text-slate-500 mt-3 font-mono text-center w-full">{Math.round(progress)}% Complete</p>
                         </div>
                     ) : outputUrl ? (
                         <div className="w-full h-full flex flex-col bg-black">
@@ -529,7 +599,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
                             <p className="text-sm">
                                 {activeRequest 
                                 ? 'Review inputs on the left and click Generate to fulfill this request.' 
-                                : 'Upload assets and describe the vision to submit a request.'}
+                                : 'Upload assets, add a reference URL, and describe the vision to submit a request.'}
                             </p>
                         </div>
                     )}

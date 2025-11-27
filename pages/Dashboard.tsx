@@ -480,6 +480,7 @@ const OwnerDashboard: React.FC<{ user: User }> = ({ user }) => {
     // Basic stats derived from dynamic storage instead of mock data
     const [salesData, setSalesData] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [timeRange, setTimeRange] = useState<'7' | '30'>('7');
 
     useEffect(() => {
         const data = storageService.getSalesData(user.id);
@@ -490,6 +491,14 @@ const OwnerDashboard: React.FC<{ user: User }> = ({ user }) => {
     const totalRevenue = salesData.reduce((acc, curr) => acc + (curr.revenue || 0), 0);
     const totalItems = salesData.reduce((acc, curr) => acc + (curr.items_sold || 0), 0);
     const hasData = salesData.length > 0;
+
+    const chartData = React.useMemo(() => {
+        if (!salesData.length) return [];
+        // Ensure sorted by date
+        const sorted = [...salesData].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        const days = parseInt(timeRange);
+        return sorted.slice(-days);
+    }, [salesData, timeRange]);
 
     return (
         <div className="space-y-6 animate-fade-in">
@@ -549,9 +558,14 @@ const OwnerDashboard: React.FC<{ user: User }> = ({ user }) => {
                 <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
                     <div className="flex justify-between items-center mb-6">
                         <h3 className="font-bold text-slate-800 dark:text-white">Revenue Trend</h3>
-                        <select disabled={!hasData} className="text-sm border-none bg-slate-50 dark:bg-slate-800 rounded-lg px-2 py-1 text-slate-600 dark:text-slate-300 focus:ring-0 cursor-pointer disabled:opacity-50">
-                            <option>Last 7 Days</option>
-                            <option>Last 30 Days</option>
+                        <select 
+                            disabled={!hasData} 
+                            value={timeRange}
+                            onChange={(e) => setTimeRange(e.target.value as '7' | '30')}
+                            className="text-sm border-none bg-slate-50 dark:bg-slate-800 rounded-lg px-2 py-1 text-slate-600 dark:text-slate-300 focus:ring-0 cursor-pointer disabled:opacity-50"
+                        >
+                            <option value="7">Last 7 Days</option>
+                            <option value="30">Last 30 Days</option>
                         </select>
                     </div>
                     <div className="h-[300px] w-full flex items-center justify-center">
@@ -563,7 +577,7 @@ const OwnerDashboard: React.FC<{ user: User }> = ({ user }) => {
                             </div>
                         ) : (
                             <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={salesData}>
+                                <AreaChart data={chartData}>
                                     <defs>
                                         <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
                                             <stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/>

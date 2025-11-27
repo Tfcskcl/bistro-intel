@@ -1,4 +1,5 @@
 
+
 export interface Ingredient {
   ingredient_id: string;
   name: string;
@@ -79,6 +80,7 @@ export interface MarketingRequest {
     type: 'video' | 'image';
     prompt: string;
     images?: string[]; // Array of base64 strings (for video ref)
+    youtubeUrl?: string; // Reference video URL
     aspectRatio: '16:9' | '9:16' | '1:1' | '4:3' | '3:4';
     status: 'pending' | 'completed';
     requestDate: string;
