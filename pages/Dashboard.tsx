@@ -420,7 +420,7 @@ const SuperAdminDashboard: React.FC = () => {
                         </div>
                         <p className="mb-4 text-slate-500"># System Terminal - v2.4.1</p>
                         {trainingLogs.map((log, i) => (
-                            <p key={i} className="mb-2">> {log}</p>
+                            <p key={i} className="mb-2">&gt; {log}</p>
                         ))}
                         <div ref={logsEndRef} />
                         {trainingStatus === 'training' && <span className="animate-pulse">_</span>}

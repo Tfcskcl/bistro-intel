@@ -218,14 +218,12 @@ export interface RazorpayResponse {
 }
 
 declare global {
-    interface AIStudio {
-        hasSelectedApiKey(): Promise<boolean>;
-        openSelectKey(): Promise<void>;
-    }
-
     interface Window {
         Razorpay: new (options: RazorpayOptions) => { open: () => void };
-        // aistudio property is defined in external types as AIStudio
+        aistudio: {
+            hasSelectedApiKey(): Promise<boolean>;
+            openSelectKey(): Promise<void>;
+        };
     }
 }
 
