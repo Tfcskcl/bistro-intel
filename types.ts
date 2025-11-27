@@ -1,4 +1,5 @@
 
+
 export interface Ingredient {
   ingredient_id: string;
   name: string;
@@ -217,13 +218,15 @@ export interface RazorpayResponse {
     razorpay_signature?: string;
 }
 
+export interface AIStudio {
+    hasSelectedApiKey(): Promise<boolean>;
+    openSelectKey(): Promise<void>;
+}
+
 declare global {
     interface Window {
         Razorpay: new (options: RazorpayOptions) => { open: () => void };
-        aistudio: {
-            hasSelectedApiKey(): Promise<boolean>;
-            openSelectKey(): Promise<void>;
-        };
+        aistudio?: AIStudio;
     }
 }
 

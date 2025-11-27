@@ -1,15 +1,15 @@
-
 import React, { useState } from 'react';
 import { Logo } from '../components/Logo';
-import { ArrowRight, CheckCircle2, TrendingUp, ChefHat, FileText, Zap, Star, PlayCircle, Quote, Calculator, Server, BarChart3, ArrowUpRight, DollarSign, Mail, Phone, MapPin, X } from 'lucide-react';
+import { ArrowRight, CheckCircle2, TrendingUp, ChefHat, FileText, Zap, Star, PlayCircle, Quote, Calculator, Server, BarChart3, ArrowUpRight, DollarSign, Mail, Phone, MapPin, X, ExternalLink, Sliders, Users } from 'lucide-react';
 import { PLANS } from '../constants';
 import { PlanType } from '../types';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 interface LandingProps {
   onGetStarted: () => void;
 }
 
-type LegalSection = 'privacy' | 'terms' | 'refund' | null;
+type LegalSection = 'privacy' | 'terms' | 'refund' | 'cancellation' | null;
 
 const LEGAL_CONTENT = {
     privacy: {
@@ -64,16 +64,31 @@ const LEGAL_CONTENT = {
             <div className="space-y-4 text-slate-600 text-sm">
                 <p>Thank you for choosing BistroIntelligence.</p>
                 
-                <h4 className="font-bold text-slate-900 mt-4">1. Subscription Cancellation</h4>
-                <p>You may cancel your subscription at any time via the 'Plans & Billing' section of your dashboard. Your access will continue until the end of your current billing cycle.</p>
-
-                <h4 className="font-bold text-slate-900 mt-4">2. Refunds</h4>
+                <h4 className="font-bold text-slate-900 mt-4">1. Refunds</h4>
                 <p>We do not offer refunds for partial months of service, upgrade/downgrade refunds, or refunds for months unused with an open account. However, exceptions may be made in the following circumstances:</p>
                 <ul className="list-disc pl-5 space-y-1">
                     <li>If there was a technical error in billing (e.g., double charge).</li>
                     <li>If the service was unavailable for a significant period (uptime &lt; 99%) as per our SLA.</li>
                 </ul>
                 <p>To request a refund, please contact support at info@bistroconnect.in within 7 days of the billing date.</p>
+            </div>
+        )
+    },
+    cancellation: {
+        title: "Cancellation Policy",
+        content: (
+            <div className="space-y-4 text-slate-600 text-sm">
+                <h4 className="font-bold text-slate-900 mt-4">Subscription Cancellation</h4>
+                <p>You may cancel your BistroIntelligence subscription at any time through your account dashboard under 'Plans & Billing'.</p>
+                
+                <ul className="list-disc pl-5 space-y-2 mt-2">
+                    <li><strong>Immediate Effect:</strong> Cancellation requests are processed immediately.</li>
+                    <li><strong>Access:</strong> You will continue to have access to your premium features until the end of your current billing cycle.</li>
+                    <li><strong>Data Retention:</strong> After cancellation, your account will revert to the Free tier. We will retain your data for 90 days, after which inactive data may be archived or deleted.</li>
+                    <li><strong>Auto-Renewal:</strong> Canceling turns off auto-renewal. You will not be charged for the next cycle.</li>
+                </ul>
+                
+                <p className="mt-4">For assistance with cancellation, please contact our support team.</p>
             </div>
         )
     }
@@ -107,7 +122,26 @@ export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
   
   // ROI Calculator State
   const [revenue, setRevenue] = useState(1500000);
-  const annualSavings = (revenue * 12 * 0.12).toLocaleString('en-IN', { maximumFractionDigits: 0 });
+  const [foodCostPct, setFoodCostPct] = useState(35);
+  const [laborCostPct, setLaborCostPct] = useState(25);
+
+  // Calculations
+  const overheadsPct = 0.20; // Fixed 20% overheads assumption for demo
+  const currentProfitMargin = 1 - (foodCostPct / 100) - (laborCostPct / 100) - overheadsPct;
+  const currentAnnualProfit = revenue * 12 * currentProfitMargin;
+
+  // Optimization Assumptions
+  const optimizedFoodCost = foodCostPct * 0.93; // 7% reduction
+  const optimizedLaborCost = laborCostPct * 0.90; // 10% efficiency gain
+  const optimizedProfitMargin = 1 - (optimizedFoodCost / 100) - (optimizedLaborCost / 100) - overheadsPct;
+  const optimizedAnnualProfit = revenue * 12 * optimizedProfitMargin;
+  
+  const extraProfit = optimizedAnnualProfit - currentAnnualProfit;
+
+  const chartData = [
+      { name: 'Current', profit: currentAnnualProfit, color: '#94a3b8' },
+      { name: 'Optimized', profit: optimizedAnnualProfit, color: '#10b981' }
+  ];
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-yellow-200">
@@ -394,54 +428,116 @@ export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
         </div>
       </section>
 
-      {/* ROI Calculator */}
-      <section className="py-20 bg-slate-900 text-white">
-        <div className="max-w-7xl mx-auto px-6 grid md:grid-cols-2 gap-16 items-center">
-            <div>
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold uppercase mb-6">
-                    <Calculator size={14} /> Profit Simulator
+      {/* ROI Calculator - Updated Design */}
+      <section className="py-24 bg-slate-900 text-white">
+        <div className="max-w-7xl mx-auto px-6">
+            <div className="text-center mb-16">
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/20 text-emerald-400 text-sm font-bold uppercase tracking-wide mb-6 border border-emerald-500/30">
+                    <Calculator size={16} /> Profit Simulator
                 </div>
-                <h2 className="text-3xl font-bold mb-4">See your potential savings</h2>
-                <p className="text-slate-400 text-lg mb-8">
-                    Based on our average user data, BistroIntel helps restaurants reduce food costs by ~5-8% and operational waste by ~10%.
+                <h2 className="text-4xl font-bold mb-4">Calculate Your ROI</h2>
+                <p className="text-slate-400 text-lg max-w-2xl mx-auto">
+                    Visualize how optimizing food and labor costs directly impacts your bottom line.
                 </p>
-                
-                <div className="space-y-6">
+            </div>
+
+            <div className="grid md:grid-cols-12 gap-12 items-center bg-slate-800/50 p-8 rounded-3xl border border-slate-700">
+                {/* Controls */}
+                <div className="md:col-span-5 space-y-8">
                     <div>
-                        <div className="flex justify-between text-sm font-bold mb-2">
-                            <span>Monthly Revenue</span>
-                            <span className="text-emerald-400">₹{revenue.toLocaleString()}</span>
+                        <div className="flex justify-between text-sm font-bold mb-3 text-slate-300">
+                            <span>Avg. Monthly Revenue</span>
+                            <span className="text-emerald-400">₹{(revenue/100000).toFixed(1)} Lakhs</span>
                         </div>
                         <input 
                             type="range" 
                             min="500000" 
-                            max="5000000" 
+                            max="10000000" 
                             step="100000"
                             value={revenue}
                             onChange={(e) => setRevenue(parseInt(e.target.value))}
-                            className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                            className="w-full h-3 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-500 hover:accent-emerald-400"
                         />
-                        <div className="flex justify-between text-xs text-slate-500 mt-2">
-                            <span>₹5L</span>
-                            <span>₹50L+</span>
+                    </div>
+
+                    <div>
+                        <div className="flex justify-between text-sm font-bold mb-3 text-slate-300">
+                            <span className="flex items-center gap-2"><ChefHat size={16}/> Food Cost %</span>
+                            <span className="text-white">{foodCostPct}%</span>
                         </div>
+                        <input 
+                            type="range" 
+                            min="20" 
+                            max="50" 
+                            step="1"
+                            value={foodCostPct}
+                            onChange={(e) => setFoodCostPct(parseInt(e.target.value))}
+                            className="w-full h-3 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-yellow-500 hover:accent-yellow-400"
+                        />
+                    </div>
+
+                    <div>
+                        <div className="flex justify-between text-sm font-bold mb-3 text-slate-300">
+                            <span className="flex items-center gap-2"><Users size={16}/> Labor Cost %</span>
+                            <span className="text-white">{laborCostPct}%</span>
+                        </div>
+                        <input 
+                            type="range" 
+                            min="15" 
+                            max="40" 
+                            step="1"
+                            value={laborCostPct}
+                            onChange={(e) => setLaborCostPct(parseInt(e.target.value))}
+                            className="w-full h-3 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500 hover:accent-blue-400"
+                        />
+                    </div>
+
+                    <div className="p-4 bg-slate-800 rounded-xl border border-slate-700 mt-6">
+                        <p className="text-xs text-slate-400 uppercase font-bold mb-1">Your Potential Annual Extra Profit</p>
+                        <div className="text-4xl font-bold text-emerald-400">
+                            ₹{extraProfit.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                        </div>
+                        <p className="text-xs text-slate-500 mt-2">
+                            Based on conservative 7% food cost reduction and 10% labor efficiency gain.
+                        </p>
+                    </div>
+                </div>
+
+                {/* Chart */}
+                <div className="md:col-span-7 h-[400px] bg-slate-800 rounded-xl p-6 border border-slate-700 relative">
+                    <h4 className="text-center text-sm font-bold text-slate-400 mb-6 uppercase tracking-wider">Annual Net Profit Comparison</h4>
+                    <ResponsiveContainer width="100%" height="90%">
+                        <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }} barSize={60}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                            <XAxis dataKey="name" stroke="#94a3b8" tick={{fontSize: 14, fontWeight: 'bold'}} axisLine={false} tickLine={false} dy={10} />
+                            <YAxis stroke="#64748b" tickFormatter={(val) => `₹${val/100000}L`} axisLine={false} tickLine={false} />
+                            <Tooltip 
+                                cursor={{fill: 'transparent'}}
+                                contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px', color: '#fff' }}
+                                itemStyle={{ color: '#fff' }}
+                                formatter={(val: number) => [`₹${val.toLocaleString()}`, 'Annual Profit']}
+                            />
+                            <Bar dataKey="profit" radius={[8, 8, 0, 0]}>
+                                {chartData.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={entry.color} />
+                                ))}
+                            </Bar>
+                        </BarChart>
+                    </ResponsiveContainer>
+                    
+                    {/* Floating Badge on Optimized Bar */}
+                    <div className="absolute top-1/3 right-[15%] bg-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg transform -translate-y-1/2 animate-bounce">
+                        +{((extraProfit / currentAnnualProfit) * 100).toFixed(0)}% Growth
                     </div>
                 </div>
             </div>
             
-            <div className="bg-slate-800 p-8 rounded-2xl border border-slate-700 relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-32 bg-emerald-500/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
-                <h3 className="text-slate-400 font-medium mb-2">Estimated Annual Savings</h3>
-                <div className="text-5xl font-bold text-white mb-2 flex items-baseline gap-2">
-                    ₹{annualSavings}
-                    <span className="text-lg text-emerald-400 font-medium">*</span>
-                </div>
-                <p className="text-sm text-slate-500 mb-8">* Projected based on 12% margin improvement.</p>
+            <div className="text-center mt-12">
                 <button 
                     onClick={onGetStarted}
-                    className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-white font-bold rounded-xl transition-all"
+                    className="px-10 py-4 bg-white text-slate-900 font-bold rounded-xl shadow-xl hover:bg-emerald-50 transition-colors text-lg"
                 >
-                    Unlock My Savings
+                    Start Optimizing Now
                 </button>
             </div>
         </div>
@@ -576,6 +672,9 @@ export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
                       BistroIntelligence is the modern operating system for forward-thinking restaurants. 
                       We combine AI with operational expertise to help you build a more profitable business.
                   </p>
+                  <p className="text-xs text-yellow-500 font-bold mt-4 uppercase tracking-widest">
+                      Built in India 🇮🇳 for the World's F&B Industry
+                  </p>
                   <div className="flex gap-4 mt-6">
                       {/* Social placeholders */}
                       {[1,2,3].map(i => <div key={i} className="w-8 h-8 rounded bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer"></div>)}
@@ -588,6 +687,7 @@ export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
                       <li><button onClick={() => setActiveLegal('privacy')} className="hover:text-yellow-400 transition-colors text-left">Privacy Policy</button></li>
                       <li><button onClick={() => setActiveLegal('terms')} className="hover:text-yellow-400 transition-colors text-left">Terms & Conditions</button></li>
                       <li><button onClick={() => setActiveLegal('refund')} className="hover:text-yellow-400 transition-colors text-left">Return & Refund Policy</button></li>
+                      <li><button onClick={() => setActiveLegal('cancellation')} className="hover:text-yellow-400 transition-colors text-left">Cancellation Policy</button></li>
                   </ul>
               </div>
               
@@ -610,7 +710,17 @@ export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
                            <div className="w-8 h-8 rounded bg-slate-800 flex items-center justify-center text-yellow-400">
                              <MapPin size={16} />
                           </div>
-                          Indore, India
+                          Mumbai, Indore, Hyderabad
+                      </li>
+                      <li className="mt-4 pt-4 border-t border-slate-800">
+                          <a 
+                            href="https://bistroconnect.in/" 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 text-yellow-400 hover:text-white transition-colors font-bold"
+                          >
+                              Start a New Restaurant <ExternalLink size={14} />
+                          </a>
                       </li>
                   </ul>
               </div>
