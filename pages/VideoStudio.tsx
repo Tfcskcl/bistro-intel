@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { User, PlanType, MarketingRequest, UserRole } from '../types';
-import { Clapperboard, Upload, Play, Loader2, Sparkles, CheckCircle2, Film, AlertCircle, Key, Info, Plus, Trash2, Clock3, UserCheck, Download, Image as ImageIcon, Grid, Maximize2, Youtube, ExternalLink } from 'lucide-react';
+import { Clapperboard, Upload, Play, Loader2, Sparkles, CheckCircle2, Film, AlertCircle, Key, Info, Plus, Trash2, Clock3, UserCheck, Download, Image as ImageIcon, Grid, Maximize2, Youtube, ExternalLink, Wand2 } from 'lucide-react';
 import { generateMarketingVideo, generateMarketingImage } from '../services/geminiService';
 import { storageService } from '../services/storageService';
 
@@ -192,6 +192,64 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
       }
   };
 
+  // Generate Promo Video Handler
+  const handleGeneratePromo = async () => {
+      // Check for API Key Selection
+      try {
+          const hasKey = await (window as any).aistudio.hasSelectedApiKey();
+          if (!hasKey) {
+              setLoading(true);
+              setLoadingState("Waiting for API Key selection...");
+              await (window as any).aistudio.openSelectKey();
+          }
+      } catch (e) {
+          console.warn("AI Studio key check skipped or failed", e);
+      }
+
+      setActiveTab('video');
+      setAspectRatio('9:16');
+      const promoPrompt = "A futuristic montage of a professional kitchen. Shows a chef using a digital tablet to check recipe costs, then a shot of a digital checklist being completed for SOPs, followed by a business analytics dashboard with growing revenue charts. Cinematic lighting, high tech, professional style.";
+      setPrompt(promoPrompt);
+      setImages([]); // Clear images for text-to-video
+      
+      setLoading(true);
+      setError(null);
+      setOutputUrl(null);
+      setProgress(0);
+      setLoadingState("Initializing Veo for Promo Generation...");
+
+      const progressTimer = setInterval(() => {
+          setProgress(old => {
+              if (old >= 95) return 95;
+              return old + (Math.random() * 2);
+          });
+      }, 800);
+
+      try {
+           // Direct Service Call Logic for Text-to-Video (Promo)
+           // Workaround: Create a simple placeholder image on the fly
+           const canvas = document.createElement('canvas');
+           canvas.width = 10; canvas.height = 10;
+           const ctx = canvas.getContext('2d');
+           if (ctx) {
+               ctx.fillStyle = '#000'; 
+               ctx.fillRect(0,0,10,10);
+           }
+           const dummyImage = canvas.toDataURL().split(',')[1];
+           
+           const url = await generateMarketingVideo([dummyImage], promoPrompt, '9:16');
+           setOutputUrl(url);
+           setProgress(100);
+
+      } catch (err: any) {
+          setError(err.message || "Promo generation failed.");
+      } finally {
+          clearInterval(progressTimer);
+          setLoading(false);
+          setLoadingState('');
+      }
+  };
+
   // 4. Save/Complete Request (Admin)
   const handleCompleteRequest = () => {
       if (!activeRequest) return;
@@ -260,7 +318,18 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
               {!isAdmin && (
                   <>
                     <button 
-                        onClick={() => setViewMode('request-form')}
+                        onClick={() => {
+                            setViewMode('request-form');
+                            // Reset Form State
+                            setPrompt('');
+                            setImages([]);
+                            setYoutubeUrl('');
+                            setAspectRatio('16:9');
+                            setActiveRequest(null);
+                            setError(null);
+                            setOutputUrl(null);
+                            setActiveTab('video');
+                        }}
                         className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${viewMode === 'request-form' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 border border-slate-200'}`}
                     >
                         New Request
@@ -360,6 +429,25 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
 
                 <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm space-y-6">
                     
+                    {/* Instant Promo Button */}
+                    {!activeRequest && (
+                        <div className="p-4 bg-gradient-to-r from-pink-500 to-purple-600 rounded-xl text-white mb-6">
+                            <div className="flex items-center justify-between mb-2">
+                                <h3 className="font-bold flex items-center gap-2"><Sparkles size={16} /> Instant Promo</h3>
+                                <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded font-mono">9:16</span>
+                            </div>
+                            <p className="text-xs text-white/80 mb-3">Generate a showcase video for BistroIntelligence features.</p>
+                            <button 
+                                onClick={handleGeneratePromo}
+                                disabled={loading}
+                                className="w-full py-2 bg-white text-pink-600 font-bold rounded-lg text-xs hover:bg-slate-50 transition-colors shadow-sm flex items-center justify-center gap-2 disabled:opacity-70"
+                            >
+                                {loading && prompt.includes("futuristic montage") ? <Loader2 className="animate-spin" size={14} /> : <Wand2 size={14} />}
+                                Auto-Generate Promo
+                            </button>
+                        </div>
+                    )}
+
                     {/* Type Switcher (Only if not fulfilling) */}
                     {!activeRequest && (
                         <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-lg">

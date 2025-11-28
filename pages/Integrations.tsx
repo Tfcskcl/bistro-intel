@@ -1,8 +1,8 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { UploadCloud, CheckCircle2, Server, Loader2, X, FileSpreadsheet, Download, Settings, Key, AlertTriangle, ArrowRight, ShieldCheck, BookOpen, ExternalLink, Save, Receipt, Instagram, Facebook, MapPin, Megaphone, Image as ImageIcon, Link2, LogOut } from 'lucide-react';
+import { UploadCloud, CheckCircle2, Server, Loader2, X, FileSpreadsheet, Download, Settings, Key, AlertTriangle, ArrowRight, ShieldCheck, BookOpen, ExternalLink, Save, Receipt, Instagram, Facebook, MapPin, Megaphone, Image as ImageIcon, Link2, LogOut, Globe, User as UserIcon } from 'lucide-react';
 import { storageService } from '../services/storageService';
-import { POSChangeRequest, UserRole } from '../types';
+import { POSChangeRequest, UserRole, SocialStats } from '../types';
 import { authService } from '../services/authService';
 
 interface IntegrationItem {
@@ -91,6 +91,7 @@ export const Integrations: React.FC = () => {
 
   // Social Auth Modal State
   const [authModalProvider, setAuthModalProvider] = useState<string | null>(null);
+  const [authInput, setAuthInput] = useState(''); // Stores URL or Username
   const [isAuthenticating, setIsAuthenticating] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -101,8 +102,18 @@ export const Integrations: React.FC = () => {
       if (currentUser) {
           const requests = storageService.getPOSChangeRequests(currentUser.id).filter(r => r.status === 'pending');
           setPendingRequests(requests);
+          
+          // Restore Social connections state from storage
+          const stats = storageService.getSocialStats(currentUser.id);
+          setMarketingApps(prev => prev.map(app => {
+              const stat = stats.find(s => s.platform === app.id);
+              if (stat) {
+                  return { ...app, status: 'connected', connectedAccount: stat.handle, lastSync: 'Just now' };
+              }
+              return app;
+          }));
       }
-  }, [currentUser]);
+  }, [currentUser?.id]);
 
   const togglePOSConnection = (id: string) => {
       setIntegrations(prev => prev.map(int => {
@@ -157,39 +168,121 @@ export const Integrations: React.FC = () => {
   // --- SOCIAL MEDIA HANDLERS ---
   const openSocialAuth = (id: string) => {
       setAuthModalProvider(id);
+      setAuthInput('');
   };
 
   const handleSocialConnectSuccess = () => {
-      if (!authModalProvider) return;
+      if (!authModalProvider || !authInput.trim()) return;
       setIsAuthenticating(true);
 
-      // Simulate API Handshake
-      setTimeout(() => {
-          const mockHandle = authModalProvider === 'instagram' ? '@the_golden_spoon_official' 
-            : authModalProvider === 'facebook' ? 'The Golden Spoon Page' 
-            : 'The Golden Spoon - Bandra';
+      const provider = authModalProvider; // Capture current provider
+      const rawInput = authInput.trim();
 
-          setMarketingApps(prev => prev.map(app => {
-              if (app.id === authModalProvider) {
-                  return {
-                      ...app,
-                      status: 'connected',
-                      connectedAccount: mockHandle,
-                      lastSync: 'Just now'
+      // Simulate API Handshake & Data Fetch
+      setTimeout(() => {
+          try {
+              const platformId = provider as 'instagram' | 'facebook' | 'google_business';
+              let handle = rawInput;
+              
+              // Robust URL Parsing
+              try {
+                  if (handle.includes('.') && !handle.startsWith('@')) {
+                       // Ensure protocol present for URL parsing
+                       const urlStr = handle.startsWith('http') ? handle : `https://${handle}`;
+                       const url = new URL(urlStr);
+                       // Extract last path segment that isn't empty
+                       const pathSegments = url.pathname.split('/').filter(p => p && p !== 'home' && p !== 'profile');
+                       if (pathSegments.length > 0) {
+                           handle = pathSegments[pathSegments.length - 1];
+                       }
+                  }
+              } catch (e) {
+                  // Fallback simple split if URL parsing fails
+                  if (handle.includes('/')) {
+                      const parts = handle.split('/');
+                      handle = parts[parts.length - 1] || parts[parts.length - 2]; 
+                  }
+              }
+
+              if (platformId === 'instagram' && !handle.startsWith('@')) handle = `@${handle}`;
+
+              // Generate Mock Stats
+              let newStats: SocialStats | null = null;
+              if (platformId === 'instagram') {
+                  newStats = {
+                      platform: 'instagram',
+                      handle: handle,
+                      lastSync: new Date().toISOString(),
+                      metrics: [
+                          { label: 'Followers', value: (Math.floor(Math.random() * 20000) + 500).toLocaleString(), trend: 12 },
+                          { label: 'Engagement Rate', value: (Math.random() * 5 + 1).toFixed(1) + '%', trend: -2 },
+                          { label: 'Reach (7d)', value: (Math.floor(Math.random() * 50000) + 1000).toLocaleString(), trend: 5 }
+                      ]
+                  };
+              } else if (platformId === 'facebook') {
+                  newStats = {
+                      platform: 'facebook',
+                      handle: handle,
+                      lastSync: new Date().toISOString(),
+                      metrics: [
+                          { label: 'Page Likes', value: (Math.floor(Math.random() * 10000) + 200).toLocaleString(), trend: 3 },
+                          { label: 'Post Reach', value: (Math.floor(Math.random() * 15000) + 500).toLocaleString(), trend: 8 }
+                  ]
+                  };
+              } else if (platformId === 'google_business') {
+                  newStats = {
+                      platform: 'google_business',
+                      handle: handle,
+                      lastSync: new Date().toISOString(),
+                      metrics: [
+                          { label: 'Search Views', value: (Math.floor(Math.random() * 5000) + 100).toLocaleString(), trend: 15 },
+                          { label: 'Calls', value: (Math.floor(Math.random() * 100) + 5).toString(), trend: 0 },
+                          { label: 'Directions', value: (Math.floor(Math.random() * 200) + 10).toString(), trend: 10 }
+                      ]
                   };
               }
-              return app;
-          }));
 
-          setIsAuthenticating(false);
-          setAuthModalProvider(null);
-          setUploadSuccess(`Successfully linked ${mockHandle}`);
-          setTimeout(() => setUploadSuccess(null), 3000);
+              if (currentUser && newStats) {
+                  const currentStats = storageService.getSocialStats(currentUser.id);
+                  // Remove old if exists
+                  const updatedStats = currentStats.filter(s => s.platform !== platformId);
+                  updatedStats.push(newStats);
+                  storageService.saveSocialStats(currentUser.id, updatedStats);
+              }
+
+              setMarketingApps(prev => prev.map(app => {
+                  if (app.id === provider) {
+                      return {
+                          ...app,
+                          status: 'connected',
+                          connectedAccount: handle,
+                          lastSync: 'Just now'
+                      };
+                  }
+                  return app;
+              }));
+
+              setUploadSuccess(`Successfully linked ${handle} & synced data!`);
+              setTimeout(() => setUploadSuccess(null), 3000);
+          
+          } catch (error) {
+              console.error("Social Connect Error", error);
+              setUploadSuccess("Failed to connect account. Please check details.");
+          } finally {
+              setIsAuthenticating(false);
+              setAuthModalProvider(null);
+          }
       }, 2000);
   };
 
   const handleSocialDisconnect = (id: string) => {
-      if (confirm("Are you sure you want to disconnect? Scheduled posts will fail.")) {
+      if (confirm("Are you sure you want to disconnect? Dashboard charts will be cleared.")) {
+        if (currentUser) {
+            const currentStats = storageService.getSocialStats(currentUser.id);
+            const updatedStats = currentStats.filter(s => s.platform !== id);
+            storageService.saveSocialStats(currentUser.id, updatedStats);
+        }
+
         setMarketingApps(prev => prev.map(app => {
             if (app.id === id) {
                 return {
@@ -339,27 +432,34 @@ export const Integrations: React.FC = () => {
                   <div className="p-8 text-center">
                       <h3 className="text-xl font-bold text-slate-900 mb-2">Connect {config.title}</h3>
                       <p className="text-sm text-slate-500 mb-6">
-                          Allow BistroIntelligence to access your {config.title} account to schedule posts and analyze performance.
+                          Enter your credentials to sync analytics and enable auto-posting.
                       </p>
 
-                      <div className="text-left bg-slate-50 p-4 rounded-lg border border-slate-100 mb-6">
-                          <p className="text-xs font-bold text-slate-400 uppercase mb-2">Requested Permissions</p>
-                          <ul className="space-y-2">
-                              {config.permissions.map(p => (
-                                  <li key={p} className="flex items-center gap-2 text-sm text-slate-700">
-                                      <CheckCircle2 size={14} className="text-emerald-500"/> {p}
-                                  </li>
-                              ))}
-                          </ul>
+                      <div className="text-left mb-6 space-y-4">
+                          <div>
+                              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">
+                                  {authModalProvider === 'google_business' ? 'Business Name or URL' : 'Username or Page URL'}
+                              </label>
+                              <div className="relative">
+                                  {authModalProvider === 'instagram' ? <UserIcon size={16} className="absolute left-3 top-2.5 text-slate-400" /> : <Globe size={16} className="absolute left-3 top-2.5 text-slate-400" />}
+                                  <input 
+                                      type="text" 
+                                      value={authInput}
+                                      onChange={(e) => setAuthInput(e.target.value)}
+                                      placeholder={authModalProvider === 'instagram' ? '@the_golden_spoon' : 'https://...'}
+                                      className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none text-slate-900"
+                                  />
+                              </div>
+                          </div>
                       </div>
 
                       <button 
                         onClick={handleSocialConnectSuccess}
-                        disabled={isAuthenticating}
+                        disabled={isAuthenticating || !authInput}
                         className={`w-full py-3 rounded-lg font-bold text-white transition-all shadow-lg flex items-center justify-center gap-2 ${isGoogle ? 'bg-blue-600 hover:bg-blue-700' : 'bg-slate-900 hover:bg-slate-800'}`}
                       >
                           {isAuthenticating ? <Loader2 className="animate-spin" size={20} /> : null}
-                          {isAuthenticating ? 'Connecting...' : `Continue as ${currentUser?.name || 'User'}`}
+                          {isAuthenticating ? 'Syncing Data...' : `Connect & Sync`}
                       </button>
                       
                       <button 
@@ -629,7 +729,7 @@ export const Integrations: React.FC = () => {
                     <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                         <Megaphone size={20} className="text-pink-600"/> Social Media & Marketing
                     </h3>
-                    <p className="text-sm text-slate-500 mt-1">Connect accounts to auto-post generated content and track engagement.</p>
+                    <p className="text-sm text-slate-500 mt-1">Connect accounts to sync data and view dashboard analytics.</p>
                 </div>
                 
                 <div className="space-y-4">

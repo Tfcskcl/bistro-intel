@@ -144,6 +144,17 @@ export interface CreditTransaction {
     description: string;
 }
 
+export interface SocialStats {
+    platform: 'instagram' | 'facebook' | 'google_business';
+    handle: string;
+    metrics: {
+        label: string;
+        value: string;
+        trend?: number; // percentage
+    }[];
+    lastSync: string;
+}
+
 export interface User {
   id: string;
   name: string;

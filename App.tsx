@@ -104,7 +104,7 @@ function App() {
     const renderView = () => {
         switch (currentView) {
           case AppView.DASHBOARD:
-            return <Dashboard user={user} />;
+            return <Dashboard user={user} onChangeView={setCurrentView} />;
           case AppView.RECIPES:
             return <RecipeHub user={user} onUserUpdate={onUserUpdate} />;
           case AppView.SOP:
@@ -118,7 +118,7 @@ function App() {
           case AppView.BILLING:
             return <Billing user={user} onUpgrade={handleUpgrade} />;
           default:
-            return <Dashboard user={user} />;
+            return <Dashboard user={user} onChangeView={setCurrentView} />;
         }
       };
     

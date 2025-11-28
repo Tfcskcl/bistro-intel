@@ -1,6 +1,7 @@
+
 import React, { useState } from 'react';
 import { Logo } from '../components/Logo';
-import { ArrowRight, CheckCircle2, TrendingUp, ChefHat, FileText, Zap, Star, PlayCircle, Quote, Calculator, Server, BarChart3, ArrowUpRight, DollarSign, Mail, Phone, MapPin, X, ExternalLink, Sliders, Users } from 'lucide-react';
+import { ArrowRight, CheckCircle2, TrendingUp, ChefHat, FileText, Zap, Star, PlayCircle, Quote, Calculator, Server, BarChart3, ArrowUpRight, DollarSign, Mail, Phone, MapPin, X, ExternalLink, Sliders, Users, Sparkles, ChevronDown, ChevronUp, LayoutDashboard, Brain, MessageSquare, Database, Globe } from 'lucide-react';
 import { PLANS } from '../constants';
 import { PlanType } from '../types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
@@ -115,10 +116,36 @@ const TESTIMONIALS = [
     }
 ];
 
+const FAQS = [
+    {
+        q: "Does BistroIntelligence replace my POS?",
+        a: "No, we integrate with your existing POS (Petpooja, Posist, etc.) to extract data and provide intelligence layer on top of it. You keep your billing software; we make it smarter."
+    },
+    {
+        q: "Is my recipe data secure?",
+        a: "Absolutely. Your recipes are your intellectual property. We encrypt all data with AES-256 standards, and our AI models are trained to never leak proprietary information between accounts."
+    },
+    {
+        q: "Can I use it for a cloud kitchen?",
+        a: "Yes! Cloud kitchens benefit the most from our food cost tracking and multi-brand management features. Our Pro+ plan is designed specifically for multi-outlet operations."
+    },
+    {
+        q: "Do I need technical skills?",
+        a: "Not at all. If you can chat with WhatsApp, you can use our Strategy AI. The interface is designed for chefs and owners, not IT experts."
+    }
+];
+
+const FEATURE_COLORS = {
+    yellow: { bg: 'bg-yellow-500', iconBg: 'text-yellow-600' },
+    emerald: { bg: 'bg-emerald-500', iconBg: 'text-emerald-600' },
+    purple: { bg: 'bg-purple-500', iconBg: 'text-purple-600' },
+};
+
 export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
   const [activeLegal, setActiveLegal] = useState<LegalSection>(null);
   const [showDemo, setShowDemo] = useState(false);
   const [isQuarterly, setIsQuarterly] = useState(false);
+  const [openFaq, setOpenFaq] = useState<number | null>(null);
   
   // ROI Calculator State
   const [revenue, setRevenue] = useState(1500000);
@@ -144,11 +171,12 @@ export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-yellow-200">
-      {/* Navigation */}
-      <nav className="fixed w-full z-50 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 transition-all duration-300">
+    <div className="min-h-screen bg-white font-sans text-slate-900 selection:bg-emerald-100">
+      
+      {/* Navbar */}
+      <nav className="fixed w-full z-50 bg-slate-950/90 backdrop-blur-lg border-b border-slate-800 transition-all duration-300">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          <Logo iconSize={24} light={true} />
+          <Logo iconSize={28} light={true} />
           <div className="flex items-center gap-6">
             <button 
                 onClick={onGetStarted}
@@ -158,102 +186,94 @@ export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
             </button>
             <button 
                 onClick={onGetStarted}
-                className="px-5 py-2.5 bg-yellow-400 text-slate-900 font-bold rounded-lg hover:bg-yellow-300 transition-all shadow-lg shadow-yellow-400/20 active:scale-95"
+                className="px-5 py-2.5 bg-emerald-500 text-white font-bold rounded-lg hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-500/20 active:scale-95 flex items-center gap-2"
             >
-                Get Started
+                Get Started <ArrowRight size={16} />
             </button>
           </div>
         </div>
       </nav>
 
       {/* Hero Section */}
-      <header className="relative pt-32 pb-24 lg:pt-48 lg:pb-32 overflow-hidden bg-slate-900 text-white">
-        {/* Background Effects */}
-        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-5"></div>
-        <div className="absolute top-0 right-0 -translate-y-20 translate-x-20 w-[600px] h-[600px] bg-emerald-500/20 rounded-full blur-[120px] -z-10"></div>
-        <div className="absolute bottom-0 left-0 translate-y-20 -translate-x-20 w-[600px] h-[600px] bg-blue-500/20 rounded-full blur-[120px] -z-10"></div>
+      <header className="relative pt-32 pb-20 lg:pt-48 lg:pb-32 overflow-hidden bg-slate-950 text-white">
+        {/* Background Gradients */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full max-w-7xl pointer-events-none">
+            <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-emerald-500/10 rounded-full blur-[120px]"></div>
+            <div className="absolute bottom-[-10%] right-[-5%] w-[600px] h-[600px] bg-blue-500/10 rounded-full blur-[120px]"></div>
+        </div>
         
-        <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-16 items-center">
-          <div className="space-y-8 animate-fade-in relative z-10">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800 border border-slate-700 text-yellow-400 text-xs font-bold uppercase tracking-wider">
-                <Star size={12} fill="currentColor" />
-                <span>#1 Operations OS for Restaurants</span>
+        <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-16 items-center relative z-10">
+          <div className="space-y-8 animate-fade-in-up">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800 border border-slate-700 backdrop-blur-sm text-emerald-400 text-xs font-bold uppercase tracking-wider shadow-sm">
+                <Sparkles size={12} fill="currentColor" />
+                <span>The AI OS for Restaurants</span>
             </div>
             
-            <h1 className="text-5xl lg:text-7xl font-extrabold tracking-tight leading-[1.1]">
-              The Intelligence <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-orange-400 to-red-400">Your Kitchen Craves.</span>
+            <h1 className="text-5xl lg:text-7xl font-black tracking-tight leading-[1.1]">
+              Run Your Kitchen <br />
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-400">Like a Tech Giant.</span>
             </h1>
             
             <p className="text-lg text-slate-400 max-w-lg leading-relaxed">
-              BistroIntelligence replaces gut feeling with data. Automate recipe costing, standardize SOPs, and unlock hidden profits with our AI Co-pilot.
+              Stop guessing costs. Start scaling profits. BistroIntelligence uses AI to automate recipe costing, standardise SOPs, and uncover hidden revenue opportunities.
             </p>
             
-            <div className="flex flex-col sm:flex-row gap-4 pt-2">
+            <div className="flex flex-col sm:flex-row gap-4 pt-4">
               <button 
                 onClick={onGetStarted}
-                className="px-8 py-4 bg-emerald-500 hover:bg-emerald-400 text-white text-lg font-bold rounded-xl transition-all shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-2 group"
+                className="px-8 py-4 bg-white text-slate-900 text-lg font-bold rounded-xl hover:bg-slate-100 transition-all shadow-[0_0_20px_rgba(255,255,255,0.3)] flex items-center justify-center gap-2 group"
               >
                 Start Free Trial <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
               </button>
               <button 
                 onClick={() => setShowDemo(true)}
-                className="px-8 py-4 bg-slate-800 text-white text-lg font-bold rounded-xl border border-slate-700 hover:bg-slate-700 transition-all flex items-center justify-center gap-2 hover:shadow-lg"
+                className="px-8 py-4 bg-slate-800/50 backdrop-blur-sm text-white text-lg font-bold rounded-xl border border-slate-700 hover:bg-slate-800 transition-all flex items-center justify-center gap-2"
               >
                 <PlayCircle size={20} /> Watch Demo
               </button>
             </div>
 
-            <div className="flex items-center gap-6 pt-6 border-t border-slate-800">
-               <div className="flex flex-col">
-                   <span className="text-3xl font-bold text-white">500+</span>
-                   <span className="text-xs text-slate-500 uppercase tracking-wide">Active Kitchens</span>
+            <div className="pt-8 flex items-center gap-4 text-sm text-slate-500 font-medium">
+               <div className="flex -space-x-2">
+                   {[1,2,3,4].map(i => (
+                       <div key={i} style={{ zIndex: 10 - i }} className="w-8 h-8 rounded-full border-2 border-slate-950 bg-slate-800 flex items-center justify-center text-[10px] text-white">
+                           <Users size={12} />
+                       </div>
+                   ))}
                </div>
-               <div className="w-px h-10 bg-slate-800"></div>
-               <div className="flex flex-col">
-                   <span className="text-3xl font-bold text-white">₹45cr</span>
-                   <span className="text-xs text-slate-500 uppercase tracking-wide">Costs Optimized</span>
-               </div>
+               <p>Trusted by 2,000+ modern restaurateurs</p>
             </div>
           </div>
 
-          <div className="relative z-10 lg:h-[600px] flex items-center">
-            {/* Dashboard Mockup Container */}
-            <div className="relative w-full animate-float">
-                <div className="absolute inset-0 bg-gradient-to-tr from-yellow-400 to-emerald-500 rounded-2xl blur-lg opacity-30 transform translate-y-4"></div>
-                <div className="relative bg-slate-800 rounded-2xl p-2 border border-slate-700 shadow-2xl">
+          <div className="relative z-10 lg:h-[600px] flex items-center perspective-1000">
+            {/* Dashboard Mockup with 3D Tilt Effect */}
+            <div className="relative w-full animate-float transform rotate-y-[-5deg] rotate-x-[5deg] hover:rotate-y-0 hover:rotate-x-0 transition-transform duration-700 ease-out">
+                <div className="absolute inset-0 bg-gradient-to-tr from-emerald-500 to-cyan-500 rounded-2xl blur-3xl opacity-20 transform translate-y-4"></div>
+                <div className="relative bg-slate-900 rounded-2xl border border-slate-700 shadow-2xl overflow-hidden ring-1 ring-white/10">
+                    <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none z-20"></div>
+                    
+                    {/* Fake Browser Header */}
+                    <div className="h-8 bg-slate-800 border-b border-slate-700 flex items-center px-4 gap-2">
+                        <div className="w-2.5 h-2.5 rounded-full bg-red-500/80"></div>
+                        <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/80"></div>
+                        <div className="w-2.5 h-2.5 rounded-full bg-green-500/80"></div>
+                    </div>
+
                     <img 
                         src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?ixlib=rb-4.0.3&auto=format&fit=crop&w=1600&q=80" 
-                        alt="Bistro Dashboard" 
-                        className="rounded-xl w-full h-auto object-cover opacity-90 hover:opacity-100 transition-opacity"
+                        alt="BistroIntelligence Dashboard" 
+                        className="w-full h-auto object-cover opacity-80"
                         referrerPolicy="no-referrer"
                     />
                     
-                    {/* Floating Cards */}
-                    <div className="absolute -left-8 top-20 bg-white p-4 rounded-xl shadow-xl border border-slate-100 max-w-[200px] hidden md:block animate-bounce-slow">
-                        <div className="flex items-center gap-3 mb-2">
-                            <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center text-green-600">
-                                <TrendingUp size={16} />
-                            </div>
-                            <div>
-                                <p className="text-xs text-slate-500 font-bold uppercase">Profit Margin</p>
-                                <p className="text-lg font-bold text-slate-900">+12.4%</p>
-                            </div>
+                    {/* Floating Insight Card */}
+                    <div className="absolute bottom-8 left-8 right-8 bg-slate-900/90 backdrop-blur-xl p-4 rounded-xl border border-slate-700 shadow-2xl flex items-start gap-4 z-30 animate-fade-in-up" style={{ animationDelay: '500ms' }}>
+                        <div className="w-10 h-10 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                            <Sparkles size={20} />
                         </div>
-                        <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
-                            <div className="h-full bg-green-500 w-[75%]"></div>
-                        </div>
-                    </div>
-
-                    <div className="absolute -right-6 bottom-20 bg-slate-900 p-4 rounded-xl shadow-xl border border-slate-700 max-w-[220px] hidden md:block">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-yellow-400 flex items-center justify-center text-slate-900 font-bold">
-                                AI
-                            </div>
-                            <div>
-                                <p className="text-xs text-slate-400">Insight Detected</p>
-                                <p className="text-sm font-medium text-white">"Switch avocado supplier to save ₹2.5k/week"</p>
-                            </div>
+                        <div>
+                            <p className="text-xs font-bold text-slate-400 uppercase mb-1">AI Strategy Insight</p>
+                            <p className="text-sm font-medium text-white leading-snug">"Detected 15% wastage in avocados. Switch to Supplier B to save <span className="text-emerald-400">₹12,000/mo</span>."</p>
                         </div>
                     </div>
                 </div>
@@ -262,308 +282,241 @@ export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
         </div>
       </header>
 
-      {/* Trusted By Strip */}
-      <div className="border-b border-slate-200 bg-white">
-        <div className="max-w-7xl mx-auto px-6 py-8">
-            <p className="text-center text-xs font-bold text-slate-400 uppercase tracking-widest mb-6">Powering modern brands</p>
-            <div className="flex flex-wrap justify-center gap-8 md:gap-16 opacity-50 grayscale hover:grayscale-0 transition-all duration-500">
-                {/* Simulated Logo Placeholders */}
-                {['Acai by the Bay', 'The Paratha Project', 'Sattva Cafe', 'Heartful Cravings'].map((brand, i) => (
-                    <span key={i} className="text-xl font-black text-slate-800 flex items-center gap-2">
-                        <div className="w-6 h-6 bg-slate-800 rounded-full"></div> {brand}
-                    </span>
-                ))}
-            </div>
-        </div>
+      {/* Partner Marquee */}
+      <div className="bg-slate-950 border-b border-slate-800 overflow-hidden py-10 relative">
+          <div className="absolute left-0 top-0 bottom-0 w-32 bg-gradient-to-r from-slate-950 to-transparent z-10"></div>
+          <div className="absolute right-0 top-0 bottom-0 w-32 bg-gradient-to-l from-slate-950 to-transparent z-10"></div>
+          
+          <div className="flex animate-scroll whitespace-nowrap gap-16 items-center opacity-50 grayscale hover:grayscale-0 transition-all duration-500">
+              {/* Duplicated list for seamless scroll */}
+              {[...Array(2)].map((_, i) => (
+                  <React.Fragment key={i}>
+                      <span className="text-2xl font-bold text-white flex items-center gap-2"><Server size={24} /> Petpooja</span>
+                      <span className="text-2xl font-bold text-white flex items-center gap-2"><Database size={24} /> Posist</span>
+                      <span className="text-2xl font-bold text-white flex items-center gap-2"><Globe size={24} /> Zomato</span>
+                      <span className="text-2xl font-bold text-white flex items-center gap-2"><MapPin size={24} /> Swiggy</span>
+                      <span className="text-2xl font-bold text-white flex items-center gap-2"><DollarSign size={24} /> Razorpay</span>
+                      <span className="text-2xl font-bold text-white flex items-center gap-2"><LayoutDashboard size={24} /> UrbanPiper</span>
+                  </React.Fragment>
+              ))}
+          </div>
       </div>
 
-      {/* Features Grid */}
-      <section className="py-24 bg-white relative overflow-hidden">
-        <div className="max-w-7xl mx-auto px-6">
-            <div className="text-center max-w-3xl mx-auto mb-16">
-                <h2 className="text-4xl font-bold text-slate-900 mb-4">Complete Kitchen Intelligence</h2>
-                <p className="text-lg text-slate-600">Replace disconnected spreadsheets with a unified operating system designed for growth.</p>
-            </div>
+      {/* Comparison Section */}
+      <section className="py-24 bg-white">
+          <div className="max-w-7xl mx-auto px-6">
+              <div className="text-center mb-16">
+                  <h2 className="text-3xl font-bold text-slate-900 mb-4">Stop Managing Chaos. Start Managing Growth.</h2>
+                  <p className="text-lg text-slate-600 max-w-2xl mx-auto">The old way of running restaurants is broken. Spreadsheets, gut feelings, and WhatsApp chaos are costing you money.</p>
+              </div>
 
-            <div className="grid md:grid-cols-3 gap-8">
-                {[
-                    {
-                        icon: ChefHat,
-                        color: 'yellow',
-                        title: 'Precision Recipe Costing',
-                        desc: 'Calculate exact food costs down to the gram. Our AI suggests menu pricing based on real-time ingredient rates and margin goals.',
-                        tags: ['Menu Engineering', 'Margin Protection']
-                    },
-                    {
-                        icon: FileText,
-                        color: 'emerald',
-                        title: 'AI SOP Generator',
-                        desc: 'Standardize operations instantly. Type "Opening Checklist" and generate detailed, compliant procedures in seconds.',
-                        tags: ['Staff Training', 'Quality Control']
-                    },
-                    {
-                        icon: Zap,
-                        color: 'purple',
-                        title: 'Strategy & Forecasting',
-                        desc: 'Your personal AI CFO. Chat with your data to uncover sales trends, waste patterns, and actionable revenue opportunities.',
-                        tags: ['Predictive Analytics', 'Growth Hacking']
-                    }
-                ].map((feature, idx) => (
-                    <div key={idx} className="group p-8 rounded-2xl bg-slate-50 border border-slate-100 hover:border-slate-200 hover:shadow-xl transition-all duration-300 relative overflow-hidden">
-                        <div className={`absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity bg-${feature.color}-500 rounded-bl-2xl`}>
-                            <feature.icon size={64} className={`text-${feature.color}-600`} />
-                        </div>
-                        
-                        <div className={`w-14 h-14 bg-white rounded-xl shadow-sm border border-slate-100 flex items-center justify-center mb-6 text-${feature.color}-600`}>
-                            <feature.icon size={28} />
-                        </div>
-                        
-                        <h3 className="text-xl font-bold text-slate-900 mb-3">{feature.title}</h3>
-                        <p className="text-slate-600 leading-relaxed mb-6">
-                            {feature.desc}
-                        </p>
-                        
-                        <div className="flex flex-wrap gap-2">
-                            {feature.tags.map(tag => (
-                                <span key={tag} className="text-[10px] font-bold uppercase tracking-wide px-2 py-1 bg-white border border-slate-200 rounded text-slate-500">
-                                    {tag}
-                                </span>
-                            ))}
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </div>
+              <div className="grid md:grid-cols-2 gap-12">
+                  {/* The Old Way */}
+                  <div className="bg-slate-50 p-8 rounded-2xl border border-slate-200">
+                      <h3 className="text-xl font-bold text-slate-500 mb-6 flex items-center gap-2">
+                          <X className="text-red-500" /> The Old Way
+                      </h3>
+                      <ul className="space-y-4">
+                          {[
+                              "Guessing food costs & margins",
+                              "SOPs buried in WhatsApp groups",
+                              "Manually checking inventory",
+                              "Pricing based on competitor menu",
+                              "Reactive fire-fighting mode"
+                          ].map((item, i) => (
+                              <li key={i} className="flex gap-3 text-slate-500">
+                                  <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center shrink-0">
+                                      <span className="text-xs font-bold text-slate-500">×</span>
+                                  </div>
+                                  {item}
+                              </li>
+                          ))}
+                      </ul>
+                  </div>
+
+                  {/* The BistroIntel Way */}
+                  <div className="bg-emerald-50 p-8 rounded-2xl border border-emerald-100 relative overflow-hidden">
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-200 rounded-full blur-3xl opacity-20 -translate-y-1/2 translate-x-1/2"></div>
+                      <h3 className="text-xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+                          <CheckCircle2 className="text-emerald-600" /> The BistroIntel Way
+                      </h3>
+                      <ul className="space-y-4 relative z-10">
+                          {[
+                              "Real-time cost & margin tracking",
+                              "Standardized, digital SOPs",
+                              "AI-predicted inventory needs",
+                              "Data-backed menu engineering",
+                              "Proactive strategic growth"
+                          ].map((item, i) => (
+                              <li key={i} className="flex gap-3 text-slate-800 font-medium">
+                                  <div className="w-6 h-6 rounded-full bg-emerald-200 text-emerald-800 flex items-center justify-center shrink-0">
+                                      <CheckCircle2 size={14} />
+                                  </div>
+                                  {item}
+                              </li>
+                          ))}
+                      </ul>
+                  </div>
+              </div>
+          </div>
       </section>
 
-      {/* How It Works Section */}
-      <section className="py-20 bg-slate-50 border-t border-slate-200">
-        <div className="max-w-7xl mx-auto px-6">
-            <div className="text-center mb-16">
-                <h2 className="text-3xl font-bold text-slate-900">How BistroIntelligence Works</h2>
-                <p className="text-slate-600 mt-2">Transform your operations in three simple steps.</p>
-            </div>
-            
-            <div className="grid md:grid-cols-3 gap-8 relative">
-                <div className="hidden md:block absolute top-12 left-0 right-0 h-0.5 bg-slate-200 z-0 mx-24"></div>
-                
-                {[
-                    { title: "Connect", desc: "Sync your POS & Inventory", icon: Server },
-                    { title: "Analyze", desc: "AI scans for inefficiencies", icon: BarChart3 },
-                    { title: "Optimize", desc: "Execute profitable strategies", icon: ArrowUpRight }
-                ].map((step, i) => (
-                    <div key={i} className="relative z-10 text-center">
-                        <div className="w-24 h-24 bg-white rounded-full border-4 border-slate-100 flex items-center justify-center mx-auto mb-6 shadow-sm">
-                            <step.icon size={32} className="text-emerald-600" />
-                        </div>
-                        <h3 className="text-xl font-bold text-slate-900 mb-2">{step.title}</h3>
-                        <p className="text-slate-500">{step.desc}</p>
-                    </div>
-                ))}
-            </div>
-        </div>
+      {/* Bento Grid Features */}
+      <section className="py-24 bg-slate-50">
+          <div className="max-w-7xl mx-auto px-6">
+              <div className="text-center mb-16">
+                  <div className="inline-block px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-bold uppercase tracking-wider mb-4">Features</div>
+                  <h2 className="text-4xl font-bold text-slate-900">Everything You Need to Scale</h2>
+                  <p className="text-lg text-slate-600 mt-2">A complete suite of tools to digitize your operations.</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 auto-rows-[minmax(250px,auto)]">
+                  {/* Feature 1 - Large */}
+                  <div className="md:col-span-2 bg-white p-8 rounded-3xl border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300 relative overflow-hidden group">
+                      <div className="relative z-10 max-w-md">
+                          <div className="w-12 h-12 bg-yellow-100 text-yellow-700 rounded-2xl flex items-center justify-center mb-6">
+                              <ChefHat size={28} />
+                          </div>
+                          <h3 className="text-2xl font-bold text-slate-900 mb-2">Recipe Costing Engine</h3>
+                          <p className="text-slate-600">Calculate plate costs instantly. Update one ingredient price, and watch it auto-update across your entire menu. Protect your margins automatically.</p>
+                      </div>
+                      <div className="absolute right-[-20px] bottom-[-20px] w-64 h-64 bg-yellow-50 rounded-full opacity-50 group-hover:scale-110 transition-transform"></div>
+                      <img src="https://cdn-icons-png.flaticon.com/512/3075/3075977.png" className="absolute bottom-4 right-4 w-32 opacity-10 rotate-12" alt="icon" />
+                  </div>
+
+                  {/* Feature 2 */}
+                  <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300 group">
+                      <div className="w-12 h-12 bg-emerald-100 text-emerald-700 rounded-2xl flex items-center justify-center mb-6">
+                          <FileText size={28} />
+                      </div>
+                      <h3 className="text-xl font-bold text-slate-900 mb-2">SOP Generator</h3>
+                      <p className="text-slate-600 text-sm">Type a topic, get a standard procedure. Ensure consistency across all outlets.</p>
+                  </div>
+
+                  {/* Feature 3 */}
+                  <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300 group">
+                      <div className="w-12 h-12 bg-purple-100 text-purple-700 rounded-2xl flex items-center justify-center mb-6">
+                          <Brain size={28} />
+                      </div>
+                      <h3 className="text-xl font-bold text-slate-900 mb-2">AI Strategy Consultant</h3>
+                      <p className="text-slate-600 text-sm">Your 24/7 CFO. Ask questions about sales trends, wastage, and growth opportunities.</p>
+                  </div>
+
+                  {/* Feature 4 - Large */}
+                  <div className="md:col-span-2 bg-slate-900 p-8 rounded-3xl border border-slate-800 shadow-xl relative overflow-hidden group">
+                      <div className="relative z-10 text-white">
+                          <div className="w-12 h-12 bg-slate-800 text-cyan-400 rounded-2xl flex items-center justify-center mb-6 border border-slate-700">
+                              <LayoutDashboard size={28} />
+                          </div>
+                          <h3 className="text-2xl font-bold mb-2">Central Command Center</h3>
+                          <p className="text-slate-400 max-w-lg">Connect your POS, Inventory, and Accounting software. Get a single source of truth for your entire restaurant business.</p>
+                      </div>
+                      <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-l from-cyan-500/10 to-transparent"></div>
+                  </div>
+              </div>
+          </div>
       </section>
 
-      {/* Kitchen Visuals Gallery - Updated Images */}
-      <section className="py-20 bg-white">
+      {/* ROI Calculator */}
+      <section className="py-24 bg-white border-t border-slate-100">
         <div className="max-w-7xl mx-auto px-6">
-            <div className="text-center mb-12">
-                <h2 className="text-3xl font-bold text-slate-900">Built for the Heat of the Kitchen</h2>
-                <p className="text-slate-600 mt-2 max-w-2xl mx-auto">
-                    Designed by restaurateurs, for restaurateurs. We understand the chaos of service and the precision required for profitability.
-                </p>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-4 grid-rows-2 gap-4 h-[600px]">
-                {/* Large Left Image */}
-                <div className="md:col-span-2 md:row-span-2 relative rounded-2xl overflow-hidden group shadow-lg">
-                    <div className="absolute inset-0 bg-slate-900/20 group-hover:bg-slate-900/0 transition-colors z-10"></div>
-                    <img 
-                        src="https://images.unsplash.com/photo-1559339352-11d035aa65de?auto=format&fit=crop&w=1000&q=80" 
-                        alt="Plated Food" 
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                        referrerPolicy="no-referrer"
-                    />
-                    <div className="absolute bottom-0 left-0 p-6 z-20 bg-gradient-to-t from-black/80 to-transparent w-full">
-                        <p className="text-white font-bold text-lg">Streamlined Workflow</p>
-                        <p className="text-slate-200 text-sm">Orchestrate your team with digital precision.</p>
-                    </div>
-                </div>
-
-                {/* Top Right Small */}
-                <div className="relative rounded-2xl overflow-hidden group shadow-lg">
-                    <img 
-                        src="https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?auto=format&fit=crop&w=800&q=80" 
-                        alt="Bar service" 
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                        referrerPolicy="no-referrer"
-                    />
-                </div>
-
-                {/* Top Right Small 2 */}
-                <div className="relative rounded-2xl overflow-hidden group shadow-lg">
-                    <img 
-                        src="https://images.unsplash.com/photo-1550989460-0adf9ea622e2?auto=format&fit=crop&w=800&q=80" 
-                        alt="Cafe atmosphere" 
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                        referrerPolicy="no-referrer"
-                    />
-                </div>
-
-                {/* Bottom Wide */}
-                <div className="md:col-span-2 relative rounded-2xl overflow-hidden group shadow-lg">
-                     <div className="absolute inset-0 bg-slate-900/20 group-hover:bg-slate-900/0 transition-colors z-10"></div>
-                    <img 
-                        src="https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1200&q=80" 
-                        alt="Fresh ingredients" 
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                        referrerPolicy="no-referrer"
-                    />
-                    <div className="absolute bottom-0 left-0 p-6 z-20 bg-gradient-to-t from-black/80 to-transparent w-full">
-                        <p className="text-white font-bold text-lg">Inventory Control</p>
-                        <p className="text-slate-200 text-sm">Track every gram, reducing waste and boosting margin.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-      </section>
-
-      {/* ROI Calculator - Updated Design */}
-      <section className="py-24 bg-slate-900 text-white">
-        <div className="max-w-7xl mx-auto px-6">
-            <div className="text-center mb-16">
-                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/20 text-emerald-400 text-sm font-bold uppercase tracking-wide mb-6 border border-emerald-500/30">
-                    <Calculator size={16} /> Profit Simulator
-                </div>
-                <h2 className="text-4xl font-bold mb-4">Calculate Your ROI</h2>
-                <p className="text-slate-400 text-lg max-w-2xl mx-auto">
-                    Visualize how optimizing food and labor costs directly impacts your bottom line.
-                </p>
-            </div>
-
-            <div className="grid md:grid-cols-12 gap-12 items-center bg-slate-800/50 p-8 rounded-3xl border border-slate-700">
-                {/* Controls */}
-                <div className="md:col-span-5 space-y-8">
-                    <div>
-                        <div className="flex justify-between text-sm font-bold mb-3 text-slate-300">
-                            <span>Avg. Monthly Revenue</span>
-                            <span className="text-emerald-400">₹{(revenue/100000).toFixed(1)} Lakhs</span>
+            <div className="grid md:grid-cols-2 gap-16 items-center">
+                <div>
+                    <h2 className="text-4xl font-bold text-slate-900 mb-6">Calculate Your Potential</h2>
+                    <p className="text-lg text-slate-600 mb-8">See how small optimizations in food and labor cost can lead to massive profit jumps over a year.</p>
+                    
+                    <div className="space-y-8">
+                        <div>
+                            <label className="flex justify-between text-sm font-bold text-slate-700 mb-2">
+                                <span>Monthly Revenue</span>
+                                <span className="text-emerald-600">₹{(revenue/100000).toFixed(1)} Lakhs</span>
+                            </label>
+                            <input 
+                                type="range" 
+                                min="500000" 
+                                max="10000000" 
+                                step="100000"
+                                value={revenue}
+                                onChange={(e) => setRevenue(parseInt(e.target.value))}
+                                className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600"
+                            />
                         </div>
-                        <input 
-                            type="range" 
-                            min="500000" 
-                            max="10000000" 
-                            step="100000"
-                            value={revenue}
-                            onChange={(e) => setRevenue(parseInt(e.target.value))}
-                            className="w-full h-3 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-emerald-500 hover:accent-emerald-400"
-                        />
-                    </div>
-
-                    <div>
-                        <div className="flex justify-between text-sm font-bold mb-3 text-slate-300">
-                            <span className="flex items-center gap-2"><ChefHat size={16}/> Food Cost %</span>
-                            <span className="text-white">{foodCostPct}%</span>
+                        <div>
+                            <label className="flex justify-between text-sm font-bold text-slate-700 mb-2">
+                                <span>Current Food Cost</span>
+                                <span>{foodCostPct}%</span>
+                            </label>
+                            <input 
+                                type="range" min="20" max="50" step="1" value={foodCostPct} onChange={(e) => setFoodCostPct(parseInt(e.target.value))}
+                                className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-600"
+                            />
                         </div>
-                        <input 
-                            type="range" 
-                            min="20" 
-                            max="50" 
-                            step="1"
-                            value={foodCostPct}
-                            onChange={(e) => setFoodCostPct(parseInt(e.target.value))}
-                            className="w-full h-3 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-yellow-500 hover:accent-yellow-400"
-                        />
-                    </div>
-
-                    <div>
-                        <div className="flex justify-between text-sm font-bold mb-3 text-slate-300">
-                            <span className="flex items-center gap-2"><Users size={16}/> Labor Cost %</span>
-                            <span className="text-white">{laborCostPct}%</span>
+                        <div>
+                            <label className="flex justify-between text-sm font-bold text-slate-700 mb-2">
+                                <span>Current Labor Cost</span>
+                                <span>{laborCostPct}%</span>
+                            </label>
+                            <input 
+                                type="range" min="15" max="40" step="1" value={laborCostPct} onChange={(e) => setLaborCostPct(parseInt(e.target.value))}
+                                className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-slate-600"
+                            />
                         </div>
-                        <input 
-                            type="range" 
-                            min="15" 
-                            max="40" 
-                            step="1"
-                            value={laborCostPct}
-                            onChange={(e) => setLaborCostPct(parseInt(e.target.value))}
-                            className="w-full h-3 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-blue-500 hover:accent-blue-400"
-                        />
                     </div>
+                </div>
 
-                    <div className="p-4 bg-slate-800 rounded-xl border border-slate-700 mt-6">
-                        <p className="text-xs text-slate-400 uppercase font-bold mb-1">Your Potential Annual Extra Profit</p>
-                        <div className="text-4xl font-bold text-emerald-400">
+                <div className="bg-slate-950 p-8 rounded-3xl text-white border border-slate-800 relative shadow-2xl">
+                    <div className="absolute top-4 right-4 bg-emerald-500 text-slate-950 text-xs font-bold px-3 py-1 rounded-full animate-pulse">
+                        Potential Savings
+                    </div>
+                    
+                    <div className="mb-8 text-center">
+                        <p className="text-slate-400 text-sm font-bold uppercase tracking-wide">Annual Profit Increase</p>
+                        <div className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-400 mt-2">
                             ₹{extraProfit.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                         </div>
-                        <p className="text-xs text-slate-500 mt-2">
-                            Based on conservative 7% food cost reduction and 10% labor efficiency gain.
-                        </p>
                     </div>
-                </div>
 
-                {/* Chart */}
-                <div className="md:col-span-7 h-[400px] bg-slate-800 rounded-xl p-6 border border-slate-700 relative">
-                    <h4 className="text-center text-sm font-bold text-slate-400 mb-6 uppercase tracking-wider">Annual Net Profit Comparison</h4>
-                    <ResponsiveContainer width="100%" height="90%">
-                        <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }} barSize={60}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                            <XAxis dataKey="name" stroke="#94a3b8" tick={{fontSize: 14, fontWeight: 'bold'}} axisLine={false} tickLine={false} dy={10} />
-                            <YAxis stroke="#64748b" tickFormatter={(val) => `₹${val/100000}L`} axisLine={false} tickLine={false} />
-                            <Tooltip 
-                                cursor={{fill: 'transparent'}}
-                                contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px', color: '#fff' }}
-                                itemStyle={{ color: '#fff' }}
-                                formatter={(val: number) => [`₹${val.toLocaleString()}`, 'Annual Profit']}
-                            />
-                            <Bar dataKey="profit" radius={[8, 8, 0, 0]}>
-                                {chartData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={entry.color} />
-                                ))}
-                            </Bar>
-                        </BarChart>
-                    </ResponsiveContainer>
-                    
-                    {/* Floating Badge on Optimized Bar */}
-                    <div className="absolute top-1/3 right-[15%] bg-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg transform -translate-y-1/2 animate-bounce">
-                        +{((extraProfit / currentAnnualProfit) * 100).toFixed(0)}% Growth
+                    <div className="h-[250px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={chartData} barSize={60}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                                <XAxis dataKey="name" stroke="#94a3b8" tick={{fontSize: 12, fontWeight: 'bold'}} axisLine={false} tickLine={false} />
+                                <Tooltip 
+                                    cursor={{fill: 'transparent'}}
+                                    contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#fff' }}
+                                    formatter={(val: number) => [`₹${val.toLocaleString()}`, 'Profit']}
+                                />
+                                <Bar dataKey="profit" radius={[6, 6, 0, 0]}>
+                                    {chartData.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={entry.color} />
+                                    ))}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
                     </div>
                 </div>
-            </div>
-            
-            <div className="text-center mt-12">
-                <button 
-                    onClick={onGetStarted}
-                    className="px-10 py-4 bg-white text-slate-900 font-bold rounded-xl shadow-xl hover:bg-emerald-50 transition-colors text-lg"
-                >
-                    Start Optimizing Now
-                </button>
             </div>
         </div>
       </section>
 
-      {/* Social Proof / Wall of Love */}
-      <section className="py-24 bg-white text-slate-900 relative">
-          <div className="max-w-7xl mx-auto px-6 relative z-10">
+      {/* Social Proof */}
+      <section className="py-24 bg-slate-50">
+          <div className="max-w-7xl mx-auto px-6">
               <div className="text-center mb-16">
-                   <div className="mb-4 flex justify-center">
-                        {[1,2,3,4,5].map(i => <Star key={i} size={24} className="text-yellow-400 fill-yellow-400" />)}
-                   </div>
-                   <h2 className="text-4xl font-bold mb-4">Loved by Restaurateurs Across India</h2>
-                   <p className="text-slate-500 text-lg">Join hundreds of businesses transforming their operations.</p>
+                   <h2 className="text-3xl font-bold mb-4">Trusted by the Best</h2>
+                   <p className="text-slate-600 text-lg">Join the community of data-driven restaurateurs.</p>
               </div>
 
               <div className="grid md:grid-cols-3 gap-8">
                   {TESTIMONIALS.map((t, i) => (
-                      <div key={i} className="bg-slate-50 p-8 rounded-2xl border border-slate-200 hover:border-slate-300 transition-colors">
-                          <Quote className="text-yellow-500 mb-6 opacity-50" size={32} />
-                          <p className="text-lg text-slate-600 mb-8 leading-relaxed italic">
+                      <div key={i} className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all">
+                          <Quote className="text-emerald-500 mb-6 opacity-30" size={40} />
+                          <p className="text-lg text-slate-700 mb-8 leading-relaxed font-medium">
                               "{t.quote}"
                           </p>
                           <div className="flex items-center gap-4">
-                              <div className="w-12 h-12 rounded-full border-2 border-white shadow-sm overflow-hidden shrink-0">
-                                  <img src={t.image} alt={t.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                              <div className="w-12 h-12 rounded-full overflow-hidden shrink-0 border border-slate-100">
+                                  <img src={t.image} alt={t.name} className="w-full h-full object-cover" />
                               </div>
                               <div>
                                   <p className="font-bold text-slate-900">{t.name}</p>
@@ -577,56 +530,55 @@ export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
       </section>
 
       {/* Pricing */}
-      <section className="py-24 bg-slate-50 border-t border-slate-200">
+      <section className="py-24 bg-white border-t border-slate-100">
           <div className="max-w-7xl mx-auto px-6">
             <div className="text-center mb-12">
-                <h2 className="text-4xl font-bold text-slate-900">Simple, Transparent Pricing</h2>
-                <p className="text-lg text-slate-600 mt-2">Start for free. Upgrade as you scale.</p>
+                <h2 className="text-4xl font-bold text-slate-900">Plans for Every Stage</h2>
+                <p className="text-lg text-slate-600 mt-2">No hidden fees. Cancel anytime.</p>
             </div>
 
-            {/* Billing Toggle */}
-            <div className="flex items-center justify-center gap-3 mb-12">
-                <span className={`text-sm font-bold ${!isQuarterly ? 'text-slate-900' : 'text-slate-500'}`}>Monthly</span>
+            <div className="flex items-center justify-center gap-4 mb-12 bg-slate-100 p-1.5 rounded-xl w-fit mx-auto">
                 <button 
-                    onClick={() => setIsQuarterly(!isQuarterly)}
-                    className="w-12 h-6 bg-emerald-600 rounded-full relative transition-colors focus:outline-none"
+                    onClick={() => setIsQuarterly(false)}
+                    className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${!isQuarterly ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
                 >
-                    <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-transform duration-200 ${isQuarterly ? 'left-7' : 'left-1'}`}></div>
+                    Monthly
                 </button>
-                <span className={`text-sm font-bold ${isQuarterly ? 'text-slate-900' : 'text-slate-500'}`}>Quarterly</span>
-                <span className="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">Save ~10%</span>
+                <button 
+                    onClick={() => setIsQuarterly(true)}
+                    className={`px-6 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${isQuarterly ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                    Quarterly <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 rounded uppercase">Save 10%</span>
+                </button>
             </div>
             
             <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
                 {Object.entries(PLANS).map(([key, plan]) => {
                     const isPro = key === 'PRO';
-                    const isPlus = key === 'PRO_PLUS';
                     const displayPrice = isQuarterly ? plan.quarterlyPrice : plan.price;
                     
                     return (
-                        <div key={key} className={`bg-white rounded-2xl p-8 flex flex-col relative transition-transform duration-300 hover:-translate-y-2 ${isPro ? 'border-2 border-yellow-400 shadow-2xl z-10 scale-105' : 'border border-slate-200 shadow-lg'}`}>
+                        <div key={key} className={`bg-white rounded-3xl p-8 flex flex-col relative transition-all ${isPro ? 'border-2 border-slate-900 shadow-2xl scale-105 z-10' : 'border border-slate-200 shadow-lg'}`}>
                             {isPro && (
-                                <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-yellow-400 text-slate-900 px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wide shadow-md">
+                                <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-slate-900 text-white px-4 py-1 rounded-full text-xs font-bold uppercase tracking-wide">
                                     Most Popular
                                 </div>
                             )}
                             <div className="mb-6">
-                                <h3 className={`text-xl font-bold ${isPlus ? 'text-purple-600' : 'text-slate-900'}`}>{plan.name}</h3>
+                                <h3 className="text-xl font-bold text-slate-900">{plan.name}</h3>
+                                <p className="text-sm text-slate-500 mt-1">{plan.description}</p>
                                 <div className="flex items-baseline mt-4">
-                                    <span className="text-4xl font-extrabold text-slate-900">₹{displayPrice.toLocaleString()}</span>
+                                    <span className="text-4xl font-black text-slate-900">₹{displayPrice.toLocaleString()}</span>
                                     <span className="text-slate-500 font-medium ml-1">/{isQuarterly ? 'qtr' : 'mo'}</span>
                                 </div>
-                                <p className="text-xs text-slate-400 mt-2">+ Taxes applicable</p>
                             </div>
 
                             <div className="h-px bg-slate-100 mb-6"></div>
 
                             <ul className="space-y-4 mb-8 flex-1">
                                 {plan.features.map(f => (
-                                    <li key={f} className="flex items-start gap-3 text-sm text-slate-600">
-                                        <div className={`mt-0.5 rounded-full p-0.5 ${isPro ? 'bg-yellow-100 text-yellow-700' : isPlus ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-600'}`}>
-                                            <CheckCircle2 size={12} />
-                                        </div>
+                                    <li key={f} className="flex items-start gap-3 text-sm text-slate-700">
+                                        <CheckCircle2 size={16} className="text-emerald-500 shrink-0 mt-0.5" />
                                         {f}
                                     </li>
                                 ))}
@@ -636,7 +588,7 @@ export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
                                 onClick={onGetStarted}
                                 className={`w-full py-4 rounded-xl font-bold transition-all ${
                                     isPro 
-                                    ? 'bg-slate-900 text-white hover:bg-slate-800 shadow-lg' 
+                                    ? 'bg-slate-900 text-white hover:bg-slate-800' 
                                     : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                                 }`}
                             >
@@ -649,45 +601,70 @@ export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
           </div>
       </section>
 
+      {/* FAQ Section */}
+      <section className="py-24 bg-slate-50">
+          <div className="max-w-3xl mx-auto px-6">
+              <h2 className="text-3xl font-bold text-slate-900 text-center mb-12">Frequently Asked Questions</h2>
+              <div className="space-y-4">
+                  {FAQS.map((faq, i) => (
+                      <div key={i} className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                          <button 
+                            onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                            className="w-full flex items-center justify-between p-6 text-left"
+                          >
+                              <span className="font-bold text-slate-800">{faq.q}</span>
+                              {openFaq === i ? <ChevronUp size={20} className="text-slate-400" /> : <ChevronDown size={20} className="text-slate-400" />}
+                          </button>
+                          {openFaq === i && (
+                              <div className="px-6 pb-6 text-slate-600 text-sm leading-relaxed border-t border-slate-50 pt-4">
+                                  {faq.a}
+                              </div>
+                          )}
+                      </div>
+                  ))}
+              </div>
+          </div>
+      </section>
+
       {/* CTA Band */}
-      <section className="py-20 bg-emerald-600 text-white">
-            <div className="max-w-4xl mx-auto px-6 text-center">
-                <h2 className="text-3xl font-bold mb-6">Ready to optimize your kitchen?</h2>
-                <p className="text-emerald-100 text-lg mb-8">Join over 2,000 restaurants using BistroIntelligence to save costs and boost efficiency.</p>
-                <button 
-                    onClick={onGetStarted}
-                    className="px-10 py-4 bg-white text-emerald-800 font-bold rounded-xl shadow-xl hover:bg-slate-50 transition-colors"
-                >
-                    Get Started for Free
-                </button>
+      <section className="py-24 bg-slate-900 text-white relative overflow-hidden">
+            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10"></div>
+            <div className="max-w-4xl mx-auto px-6 text-center relative z-10">
+                <h2 className="text-4xl md:text-5xl font-black mb-6 tracking-tight">Ready to optimize your kitchen?</h2>
+                <p className="text-slate-400 text-xl mb-10 max-w-2xl mx-auto">Join the new wave of profitable restaurants. Start your 3-day free trial today.</p>
+                <div className="flex justify-center gap-4">
+                    <button 
+                        onClick={onGetStarted}
+                        className="px-10 py-4 bg-emerald-500 text-white font-bold rounded-xl shadow-xl hover:bg-emerald-400 transition-colors text-lg"
+                    >
+                        Get Started Now
+                    </button>
+                </div>
             </div>
       </section>
 
       {/* Footer */}
-      <footer className="bg-slate-900 text-slate-400 py-16 border-t border-slate-800">
+      <footer className="bg-slate-950 text-slate-400 py-16 border-t border-slate-900">
           <div className="max-w-7xl mx-auto px-6 grid md:grid-cols-4 gap-12 mb-12">
               <div className="col-span-1 md:col-span-2">
-                  <Logo iconSize={24} light={true} />
+                  <Logo iconSize={28} light={true} />
                   <p className="mt-6 text-slate-500 text-sm leading-relaxed max-w-sm">
                       BistroIntelligence is the modern operating system for forward-thinking restaurants. 
                       We combine AI with operational expertise to help you build a more profitable business.
                   </p>
-                  <p className="text-xs text-yellow-500 font-bold mt-4 uppercase tracking-widest">
-                      Built in India 🇮🇳 for the World's F&B Industry
+                  <p className="text-xs text-yellow-500 font-bold mt-4 uppercase tracking-widest flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-yellow-500"></span>
+                      Built in India 🇮🇳
                   </p>
-                  <div className="flex gap-4 mt-6">
-                      {/* Social placeholders */}
-                      {[1,2,3].map(i => <div key={i} className="w-8 h-8 rounded bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer"></div>)}
-                  </div>
               </div>
               
               <div>
                   <h4 className="font-bold text-white mb-6">Legal</h4>
                   <ul className="space-y-3 text-sm">
-                      <li><button onClick={() => setActiveLegal('privacy')} className="hover:text-yellow-400 transition-colors text-left">Privacy Policy</button></li>
-                      <li><button onClick={() => setActiveLegal('terms')} className="hover:text-yellow-400 transition-colors text-left">Terms & Conditions</button></li>
-                      <li><button onClick={() => setActiveLegal('refund')} className="hover:text-yellow-400 transition-colors text-left">Return & Refund Policy</button></li>
-                      <li><button onClick={() => setActiveLegal('cancellation')} className="hover:text-yellow-400 transition-colors text-left">Cancellation Policy</button></li>
+                      <li><button onClick={() => setActiveLegal('privacy')} className="hover:text-emerald-400 transition-colors text-left">Privacy Policy</button></li>
+                      <li><button onClick={() => setActiveLegal('terms')} className="hover:text-emerald-400 transition-colors text-left">Terms & Conditions</button></li>
+                      <li><button onClick={() => setActiveLegal('refund')} className="hover:text-emerald-400 transition-colors text-left">Return & Refund Policy</button></li>
+                      <li><button onClick={() => setActiveLegal('cancellation')} className="hover:text-emerald-400 transition-colors text-left">Cancellation Policy</button></li>
                   </ul>
               </div>
               
@@ -695,52 +672,36 @@ export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
                   <h4 className="font-bold text-white mb-6">Contact</h4>
                   <ul className="space-y-4 text-sm">
                       <li className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded bg-slate-800 flex items-center justify-center text-yellow-400">
-                             <Mail size={16} />
-                          </div>
-                          info@bistroconnect.in
+                          <Mail size={16} className="text-emerald-500"/> info@bistroconnect.in
                       </li>
                       <li className="flex items-center gap-3">
-                           <div className="w-8 h-8 rounded bg-slate-800 flex items-center justify-center text-yellow-400">
-                             <Phone size={16} />
-                          </div>
-                          0731-6981639
+                           <Phone size={16} className="text-emerald-500"/> 0731-6981639
                       </li>
                       <li className="flex items-center gap-3">
-                           <div className="w-8 h-8 rounded bg-slate-800 flex items-center justify-center text-yellow-400">
-                             <MapPin size={16} />
-                          </div>
-                          Mumbai, Indore, Hyderabad
-                      </li>
-                      <li className="mt-4 pt-4 border-t border-slate-800">
-                          <a 
-                            href="https://bistroconnect.in/" 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-2 text-yellow-400 hover:text-white transition-colors font-bold"
-                          >
-                              Start a New Restaurant <ExternalLink size={14} />
-                          </a>
+                           <MapPin size={16} className="text-emerald-500"/> Mumbai, Indore, Hyderabad
                       </li>
                   </ul>
               </div>
           </div>
-          <div className="max-w-7xl mx-auto px-6 border-t border-slate-800 pt-8 text-center text-sm text-slate-600">
-              © 2024 BistroIntelligence Inc. All rights reserved.
+          <div className="max-w-7xl mx-auto px-6 border-t border-slate-900 pt-8 text-center text-sm text-slate-600 flex justify-between items-center">
+              <p>© 2024 BistroIntelligence Inc. All rights reserved.</p>
+              <div className="flex gap-4">
+                  {/* Social Icons Placeholder */}
+              </div>
           </div>
       </footer>
 
       {/* Demo Video Modal */}
       {showDemo && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/90 backdrop-blur-md animate-fade-in">
-          <div className="relative w-full max-w-5xl aspect-video bg-black rounded-2xl shadow-2xl overflow-hidden border border-slate-700">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-fade-in">
+          <div className="relative w-full max-w-5xl aspect-video bg-black rounded-2xl shadow-2xl overflow-hidden border border-slate-800">
             <button 
               onClick={() => setShowDemo(false)}
               className="absolute top-4 right-4 p-2 bg-black/50 hover:bg-slate-800 text-white rounded-full z-10 transition-all backdrop-blur-sm border border-white/10"
             >
               <X size={24} />
             </button>
-            <div className="w-full h-full flex items-center justify-center text-white bg-slate-800">
+            <div className="w-full h-full flex items-center justify-center text-white bg-slate-900">
                 <iframe 
                     width="100%" 
                     height="100%" 
@@ -758,7 +719,7 @@ export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
 
       {/* Legal Modal */}
       {activeLegal && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
               <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col border border-slate-200">
                   <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-2xl">
                       <h3 className="text-xl font-bold text-slate-900">{LEGAL_CONTENT[activeLegal].title}</h3>

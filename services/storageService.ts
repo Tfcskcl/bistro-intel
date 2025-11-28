@@ -1,9 +1,5 @@
 
-
-
-
-
-import { RecipeCard, SOP, AppNotification, UserRole, POSChangeRequest, MenuItem, PlanConfig, PlanType, RecipeRequest, SOPRequest, MarketingRequest, CreditTransaction } from '../types';
+import { RecipeCard, SOP, AppNotification, UserRole, POSChangeRequest, MenuItem, PlanConfig, PlanType, RecipeRequest, SOPRequest, MarketingRequest, CreditTransaction, SocialStats } from '../types';
 import { MOCK_MENU, MOCK_SALES_DATA, MOCK_INGREDIENT_PRICES, PLANS as DEFAULT_PLANS } from '../constants';
 import { ingredientService } from './ingredientService';
 
@@ -33,6 +29,20 @@ export const storageService = {
 
     setItem: (userId: string, key: string, data: any) => {
         localStorage.setItem(getKey(userId, key), JSON.stringify(data));
+    },
+
+    // Completely reset the app state
+    clearAllData: () => {
+        // Only clear keys related to this app
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && (key.startsWith('bistro_') || key === 'theme')) {
+                keysToRemove.push(key);
+            }
+        }
+        keysToRemove.forEach(k => localStorage.removeItem(k));
+        window.location.reload();
     },
 
     // --- PLANS (SYSTEM WIDE) ---
@@ -186,6 +196,15 @@ export const storageService = {
 
     saveSalesData: (userId: string, data: any[]) => {
         storageService.setItem(userId, 'sales', data);
+    },
+
+    // --- SOCIAL STATS ---
+    getSocialStats: (userId: string): SocialStats[] => {
+        return storageService.getItem<SocialStats[]>(userId, 'social_stats', []);
+    },
+
+    saveSocialStats: (userId: string, stats: SocialStats[]) => {
+        storageService.setItem(userId, 'social_stats', stats);
     },
 
     // --- RECIPES ---

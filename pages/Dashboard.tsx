@@ -1,17 +1,16 @@
 
-
-
 import React, { useState, useEffect, useRef } from 'react';
-import { DollarSign, ShoppingBag, Utensils, AlertTriangle, Users, Clock, TrendingUp, Activity, MapPin, Globe, Eye, UserX, UserPlus, Zap, Edit, Save, Brain, Database, ArrowRight, X, ChevronRight, Search, Mail, Phone, Calendar, Shield, ShieldCheck, Trash2, Terminal, UploadCloud, FileText, CheckCircle2, Sliders, Cpu, Layers, Loader2, BarChart3, PlusCircle, Wallet, RefreshCw } from 'lucide-react';
+import { DollarSign, ShoppingBag, Utensils, AlertTriangle, Users, Clock, TrendingUp, Activity, MapPin, Globe, Eye, UserX, UserPlus, Zap, Edit, Save, Brain, Database, ArrowRight, X, ChevronRight, Search, Mail, Phone, Calendar, Shield, ShieldCheck, Trash2, Terminal, UploadCloud, FileText, CheckCircle2, Sliders, Cpu, Layers, Loader2, BarChart3, PlusCircle, Wallet, RefreshCw, Instagram, Facebook, Megaphone, Sparkles } from 'lucide-react';
 import { StatCard } from '../components/StatCard';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
-import { User, UserRole, PlanType, VisitorSession, PlanConfig } from '../types';
+import { User, UserRole, PlanType, VisitorSession, PlanConfig, SocialStats, AppView } from '../types';
 import { authService } from '../services/authService';
 import { storageService } from '../services/storageService';
 import { trackingService } from '../services/trackingService';
 
 interface DashboardProps {
     user: User;
+    onChangeView: (view: AppView) => void;
 }
 
 // Sub-component for Journey Visualization
@@ -109,6 +108,7 @@ const SuperAdminDashboard: React.FC = () => {
     const [trainingLogs, setTrainingLogs] = useState<string[]>([]);
     const [isTraining, setIsTraining] = useState(false);
     const logsEndRef = useRef<HTMLDivElement>(null);
+    const trainingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     useEffect(() => {
         const loadData = async () => {
@@ -130,6 +130,15 @@ const SuperAdminDashboard: React.FC = () => {
             logsEndRef.current.scrollIntoView({ behavior: 'smooth' });
         }
     }, [trainingLogs]);
+
+    // Cleanup training interval on unmount
+    useEffect(() => {
+        return () => {
+            if (trainingIntervalRef.current) {
+                clearInterval(trainingIntervalRef.current);
+            }
+        };
+    }, []);
 
     const handleCreateUser = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -171,13 +180,15 @@ const SuperAdminDashboard: React.FC = () => {
     };
 
     const startTraining = () => {
+        if (isTraining) return;
+        
         setIsTraining(true);
         setTrainingLogs(['Initializing training environment...', 'Loading datasets: [Recipes, Sales, Interactions]...']);
         
         let step = 0;
         const maxSteps = 15;
         
-        const interval = setInterval(() => {
+        trainingIntervalRef.current = setInterval(() => {
             step++;
             const loss = (Math.random() * 0.5 / step).toFixed(4);
             const acc = (0.5 + (step/maxSteps) * 0.45).toFixed(4);
@@ -188,7 +199,7 @@ const SuperAdminDashboard: React.FC = () => {
             ]);
 
             if (step >= maxSteps) {
-                clearInterval(interval);
+                if (trainingIntervalRef.current) clearInterval(trainingIntervalRef.current);
                 setTrainingLogs(prev => [...prev, 'Training Completed Successfully.', 'Model v2.4.1 deployed to inference engine.']);
                 setIsTraining(false);
             }
@@ -554,15 +565,18 @@ const SuperAdminDashboard: React.FC = () => {
     );
 };
 
-const OwnerDashboard: React.FC<{ user: User }> = ({ user }) => {
+const OwnerDashboard: React.FC<{ user: User, onChangeView: (view: AppView) => void }> = ({ user, onChangeView }) => {
     // Basic stats derived from dynamic storage instead of mock data
     const [salesData, setSalesData] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [timeRange, setTimeRange] = useState<'7' | '30'>('7');
+    const [socialStats, setSocialStats] = useState<SocialStats[]>([]);
 
     useEffect(() => {
         const data = storageService.getSalesData(user.id);
+        const social = storageService.getSocialStats(user.id);
         setSalesData(data);
+        setSocialStats(social);
         setLoading(false);
     }, [user.id]);
 
@@ -655,9 +669,17 @@ const OwnerDashboard: React.FC<{ user: User }> = ({ user }) => {
                     <div className="h-[300px] w-full flex items-center justify-center">
                         {!hasData ? (
                             <div className="text-center text-slate-400">
-                                <Database size={48} className="mx-auto mb-4 opacity-50" />
-                                <h4 className="text-lg font-bold text-slate-600 dark:text-slate-300">No Sales Data Found</h4>
-                                <p className="text-sm mt-2 max-w-sm mx-auto">Upload your sales reports or connect a POS in the Data & Integrations tab to see your revenue trends.</p>
+                                <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <Sparkles size={32} className="text-emerald-500" />
+                                </div>
+                                <h4 className="text-lg font-bold text-slate-600 dark:text-slate-300">Let's Get Started!</h4>
+                                <p className="text-sm mt-2 max-w-sm mx-auto mb-6">Your dashboard is waiting for data. Connect your POS or upload a sales report to unlock AI insights.</p>
+                                <button 
+                                    onClick={() => onChangeView(AppView.INTEGRATIONS)}
+                                    className="px-6 py-3 bg-emerald-600 text-white text-sm font-bold rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-500/20"
+                                >
+                                    Connect Data Source
+                                </button>
                             </div>
                         ) : (
                             <ResponsiveContainer width="100%" height="100%">
@@ -682,38 +704,80 @@ const OwnerDashboard: React.FC<{ user: User }> = ({ user }) => {
                 </div>
 
                 <div className="space-y-6">
-                    <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-6 rounded-xl shadow-lg relative overflow-hidden">
-                        <div className="absolute top-0 right-0 p-4 opacity-10">
-                             <Brain size={100} />
+                    {/* Social Media Pulse */}
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col">
+                        <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                            <Megaphone size={18} className="text-pink-500" /> Social Pulse
+                        </h3>
+                        
+                        <div className="flex-1 overflow-y-auto space-y-3 max-h-[300px] custom-scrollbar pr-1">
+                            {socialStats.length === 0 ? (
+                                <div className="text-center text-slate-400 py-8 border border-dashed border-slate-100 dark:border-slate-700 rounded-lg">
+                                    <p className="text-sm">No accounts connected.</p>
+                                    <p className="text-xs mt-1 mb-3">Add profiles in Integrations.</p>
+                                    <button 
+                                        onClick={() => onChangeView(AppView.INTEGRATIONS)}
+                                        className="text-[10px] font-bold text-pink-600 hover:underline"
+                                    >
+                                        Connect Accounts
+                                    </button>
+                                </div>
+                            ) : (
+                                socialStats.map((stat, i) => (
+                                    <div key={i} className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-100 dark:border-slate-700">
+                                        <div className="flex items-center gap-2 mb-3">
+                                            {stat.platform === 'instagram' ? <Instagram size={16} className="text-pink-600"/> : 
+                                             stat.platform === 'facebook' ? <Facebook size={16} className="text-blue-600"/> :
+                                             <MapPin size={16} className="text-blue-500"/>}
+                                            <p className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate">{stat.handle}</p>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {stat.metrics.slice(0, 2).map((m, j) => (
+                                                <div key={j}>
+                                                    <p className="text-[10px] text-slate-400 uppercase">{m.label}</p>
+                                                    <p className="text-sm font-bold text-slate-800 dark:text-white flex items-center gap-1">
+                                                        {m.value}
+                                                        {m.trend !== undefined && (
+                                                            <span className={`text-[8px] ${m.trend >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                                                                {m.trend >= 0 ? '↑' : '↓'}{Math.abs(m.trend)}%
+                                                            </span>
+                                                        )}
+                                                    </p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))
+                            )}
                         </div>
-                        <h3 className="font-bold text-lg mb-2 relative z-10">AI Insight</h3>
-                        <p className="text-slate-300 text-sm mb-4 relative z-10">
-                            {hasData 
-                             ? "Your 'Spicy Tuna Roll' has high margins but low sales. Consider running a weekend promotion to boost trial."
-                             : "Once you upload sales and menu data, I can identify high-margin items and waste reduction opportunities."}
-                        </p>
-                        <button className="w-full py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-bold transition-colors border border-white/10 relative z-10">
-                            View Strategy
-                        </button>
                     </div>
 
                     <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
                         <h3 className="font-bold text-slate-800 dark:text-white mb-4">Quick Actions</h3>
                         <div className="grid grid-cols-2 gap-3">
-                            <button className="p-3 bg-slate-50 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg border border-slate-100 dark:border-slate-700 transition-colors group text-left">
+                            <button 
+                                onClick={() => onChangeView(AppView.RECIPES)}
+                                className="p-3 bg-slate-50 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg border border-slate-100 dark:border-slate-700 transition-colors group text-left"
+                            >
                                 <div className="p-2 bg-white dark:bg-slate-700 rounded-full w-fit mb-2 group-hover:text-emerald-500 shadow-sm">
                                     <Utensils size={18} />
                                 </div>
                                 <span className="text-xs font-bold text-slate-600 dark:text-slate-300">New Recipe</span>
                             </button>
-                            <button className="p-3 bg-slate-50 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg border border-slate-100 dark:border-slate-700 transition-colors group text-left">
+                            <button 
+                                onClick={() => onChangeView(AppView.SOP)}
+                                className="p-3 bg-slate-50 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg border border-slate-100 dark:border-slate-700 transition-colors group text-left"
+                            >
                                 <div className="p-2 bg-white dark:bg-slate-700 rounded-full w-fit mb-2 group-hover:text-blue-500 shadow-sm">
                                     <FileText size={18} />
                                 </div>
                                 <span className="text-xs font-bold text-slate-600 dark:text-slate-300">Create SOP</span>
                             </button>
                             {!hasData && (
-                                <button className="col-span-2 p-3 bg-slate-50 dark:bg-slate-800 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg border border-slate-100 dark:border-slate-700 transition-colors group text-left flex items-center gap-3">
+                                <button 
+                                    onClick={() => onChangeView(AppView.INTEGRATIONS)}
+                                    className="col-span-2 p-3 bg-slate-50 dark:bg-slate-800 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg border border-slate-100 dark:border-slate-700 transition-colors group text-left flex items-center gap-3"
+                                >
                                     <div className="p-2 bg-white dark:bg-slate-700 rounded-full w-fit group-hover:text-purple-500 shadow-sm">
                                         <UploadCloud size={18} />
                                     </div>
@@ -731,11 +795,11 @@ const OwnerDashboard: React.FC<{ user: User }> = ({ user }) => {
     );
 };
 
-export const Dashboard: React.FC<DashboardProps> = ({ user }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ user, onChangeView }) => {
     // Role-based Dashboard Switching
     if (user.role === UserRole.SUPER_ADMIN) {
         return <SuperAdminDashboard />;
     }
 
-    return <OwnerDashboard user={user} />;
+    return <OwnerDashboard user={user} onChangeView={onChangeView} />;
 };
