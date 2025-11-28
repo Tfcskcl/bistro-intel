@@ -1,8 +1,7 @@
 
-
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
 import { SYSTEM_INSTRUCTION } from "../constants";
-import { RecipeCard, SOP, StrategyReport, ImplementationGuide, MenuItem } from "../types";
+import { RecipeCard, SOP, StrategyReport, ImplementationGuide, MenuItem, MenuGenerationRequest } from "../types";
 import { ingredientService } from "./ingredientService";
 
 const getApiKey = (): string => {
@@ -17,10 +16,15 @@ const parseJSON = <T>(text: string | undefined): T => {
     if (!text) throw new Error("Empty response from AI");
     
     try {
-        // 1. Remove markdown code blocks (```json ... ```)
+        // 1. First attempt: Direct parse if it looks clean
+        if (text.trim().startsWith('{') && text.trim().endsWith('}')) {
+             return JSON.parse(text) as T;
+        }
+
+        // 2. Remove markdown code blocks (```json ... ```)
         let clean = text.replace(/```json\n?|```/g, '');
         
-        // 2. Extract the first valid JSON object if there's extra text
+        // 3. Extract the first valid JSON object if there's extra text
         const firstOpen = clean.indexOf('{');
         const lastClose = clean.lastIndexOf('}');
         
@@ -31,7 +35,16 @@ const parseJSON = <T>(text: string | undefined): T => {
         return JSON.parse(clean) as T;
     } catch (e) {
         console.error("JSON Parse Error. Raw text:", text);
-        throw new Error("Failed to parse AI response. Please try again.");
+        // Fallback: Try to find any JSON-like structure
+        try {
+            const match = text.match(/\{[\s\S]*\}/);
+            if (match) {
+                return JSON.parse(match[0]) as T;
+            }
+        } catch (e2) {
+            // Ignore secondary error
+        }
+        throw new Error("Failed to parse AI response. The model might be overloaded or returned invalid data.");
     }
 };
 
@@ -64,7 +77,7 @@ const formatError = (error: any): string => {
 
 export const verifyLocationWithMaps = async (locationQuery: string): Promise<string> => {
   const apiKey = getApiKey();
-  if (!apiKey) return "Simulated: Location verified (Mock Mode).";
+  if (!apiKey) return "API Key Required for Location Verification.";
 
   const ai = new GoogleGenAI({ apiKey });
   
@@ -90,6 +103,8 @@ const recipeSchema = {
   properties: {
     sku_id: { type: Type.STRING },
     name: { type: Type.STRING },
+    category: { type: Type.STRING },
+    current_price: { type: Type.NUMBER },
     yield: { type: Type.NUMBER },
     ingredients: {
       type: Type.ARRAY,
@@ -124,38 +139,7 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
   const apiKey = getApiKey();
   
   if (!apiKey) {
-    console.warn("API Key missing. Returning mock data.");
-    await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate latency
-    return {
-      ...item,
-      yield: 4,
-      ingredients: item.ingredients ? item.ingredients.map(ing => ({
-        ...ing,
-        qty_per_serving: 100,
-        cost_per_unit: 100,
-        cost_per_serving: 25,
-        unit: ing.unit || 'g'
-      })) : [],
-      preparation_steps: [
-        "Prepare all ingredients and equipment.",
-        `Combine ingredients for ${item.name}.`,
-        "Cook according to standard procedure (Simulated Step).",
-        "Garnish and serve immediately."
-      ],
-      equipment_needed: ["Chef's Knife", "Mixing Bowl", "Pan"],
-      portioning_guideline: "One standard serving",
-      allergens: ["Check ingredients"],
-      prep_time_min: item.prep_time_min || 15,
-      shelf_life_hours: 24,
-      food_cost_per_serving: (item.current_price || 100) * 0.3,
-      suggested_selling_price: item.current_price || 300,
-      tags: ["Mock Data", "Demo"],
-      human_summary: "This is a simulated recipe because the API Key is missing. Add an API Key to generate real AI recipes.",
-      reasoning: "Mock reasoning for demo purposes.",
-      confidence: "High",
-      category: item.category,
-      current_price: item.current_price
-    };
+    throw new Error("API Key is missing. Please configure your API key to generate recipes.");
   }
 
   const ai = new GoogleGenAI({ apiKey });
@@ -175,6 +159,8 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
     - If specific ingredient prices are not found in context, estimate reasonable market rates.
     - Ensure 'food_cost_per_serving' is calculated based on ingredient quantities and costs.
     - 'sku_id' should match the input or be generated if missing.
+    - 'category' should be one of: main, snack, beverage, dessert.
+    - 'current_price' should be the current selling price or estimated if unknown.
   `;
 
   try {
@@ -198,15 +184,7 @@ export const generateRecipeVariation = async (userId: string, originalRecipe: Re
   const apiKey = getApiKey();
 
   if (!apiKey) {
-    console.warn("API Key missing. Returning mock variation.");
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    return {
-      ...originalRecipe,
-      name: `${variationType} - ${originalRecipe.name}`,
-      human_summary: `This is a simulated ${variationType} variation.`,
-      tags: [...(originalRecipe.tags || []), variationType, "Mock"],
-      reasoning: "Mock variation logic."
-    };
+    throw new Error("API Key is missing. Please configure your API key to generate variations.");
   }
 
   const ai = new GoogleGenAI({ apiKey });
@@ -248,24 +226,7 @@ export const generateSOP = async (topic: string): Promise<SOP> => {
   const apiKey = getApiKey();
 
   if (!apiKey) {
-    console.warn("API Key missing. Returning mock SOP.");
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    return {
-      sop_id: `mock-sop-${Date.now()}`,
-      title: topic,
-      scope: "General Operations (Demo)",
-      prerequisites: "None",
-      materials_equipment: ["Checklist", "Standard Tools"],
-      stepwise_procedure: [
-        { step_no: 1, action: "Identify requirements.", responsible_role: "Staff" },
-        { step_no: 2, action: "Execute procedure according to safety standards.", responsible_role: "Staff" },
-        { step_no: 3, action: "Verify results and log completion.", responsible_role: "Supervisor" }
-      ],
-      critical_control_points: ["Ensure safety compliance at all times."],
-      monitoring_checklist: ["Procedure completed", "Area cleaned", "Logged in system"],
-      kpis: ["100% Adherence"],
-      quick_troubleshooting: "Contact manager if issues arise."
-    };
+    throw new Error("API Key is missing. Please configure your API key to generate SOPs.");
   }
 
   const ai = new GoogleGenAI({ apiKey });
@@ -307,25 +268,7 @@ export const generateStrategy = async (role: string, context: string): Promise<S
   const apiKey = getApiKey();
 
   if (!apiKey) {
-    console.warn("API Key missing. Returning mock strategy.");
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    return {
-      summary: [
-        "This is a simulated strategy report for demonstration purposes.",
-        "To get real AI insights, please configure a valid API Key."
-      ],
-      causes: ["Missing API Configuration", "Demo Mode Active"],
-      action_plan: [
-        { initiative: "Configure API Key", impact_estimate: "Enable Real AI", cost_estimate: "None", priority: "High" },
-        { initiative: "Explore Demo Features", impact_estimate: "High Learning", cost_estimate: "None", priority: "Medium" }
-      ],
-      seasonal_menu_suggestions: [
-        { type: "add", item: "Demo Special Salad", reason: "High margin item for testing." }
-      ],
-      roadmap: [
-        { phase_name: "Setup", duration: "1 Day", steps: ["Add API Key"], milestone: "Full Access" }
-      ]
-    };
+    throw new Error("API Key is missing. Please configure your API key to generate strategy reports.");
   }
 
   const ai = new GoogleGenAI({ apiKey });
@@ -373,26 +316,7 @@ export const generateImplementationPlan = async (initiative: string): Promise<Im
     const apiKey = getApiKey();
 
     if (!apiKey) {
-      console.warn("API Key missing. Returning mock plan.");
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      return {
-        objective: `Implement: ${initiative} (Demo)`,
-        estimated_timeline: "2 Weeks",
-        phases: [
-          {
-            phase_name: "Preparation",
-            steps: ["Analyze requirements", "Assemble team"],
-            resources_needed: ["Time", "Personnel"],
-            kpi_to_track: "Readiness Score"
-          },
-          {
-            phase_name: "Execution",
-            steps: ["Launch initiative", "Monitor progress"],
-            resources_needed: ["Budget"],
-            kpi_to_track: "Completion Rate"
-          }
-        ]
-      };
+      throw new Error("API Key is missing. Please configure your API key.");
     }
 
     const ai = new GoogleGenAI({ apiKey });
@@ -552,6 +476,84 @@ export const generateMarketingImage = async (prompt: string, aspectRatio: string
 
         return `data:image/png;base64,${base64Image}`;
 
+    } catch (error: any) {
+        throw new Error(formatError(error));
+    }
+};
+
+export const generateKitchenWorkflow = async (description: string): Promise<string> => {
+    const apiKey = getApiKey();
+    if (!apiKey) throw new Error("API Key is missing.");
+
+    const ai = new GoogleGenAI({ apiKey });
+    
+    // Provide a structure for the workflow in markdown
+    const prompt = `
+        Design an efficient kitchen workflow based on the following user requirements and context.
+        The user has uploaded media (images/videos) which imply the layout described below.
+        
+        User Description: "${description}"
+        
+        Output a detailed Workflow Plan in Markdown format. Include:
+        1. **Zone Layout Strategy**: How to arrange prep, cooking, and plating areas.
+        2. **Process Flow**: Step-by-step movement of food and staff.
+        3. **Equipment Placement Recommendations**.
+        4. **Safety & Efficiency Checkpoints**.
+        
+        Keep it professional, operational, and easy to read.
+    `;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: [{ parts: [{ text: prompt }] }],
+            config: {
+                systemInstruction: SYSTEM_INSTRUCTION
+            }
+        });
+        
+        return response.text || "Failed to generate workflow content.";
+    } catch (error: any) {
+        throw new Error(formatError(error));
+    }
+};
+
+export const generateMenu = async (req: MenuGenerationRequest): Promise<string> => {
+    const apiKey = getApiKey();
+    if (!apiKey) throw new Error("API Key is missing.");
+
+    const ai = new GoogleGenAI({ apiKey });
+
+    const prompt = `
+        Design a complete restaurant menu based on these requirements:
+        
+        Restaurant Name: ${req.restaurantName}
+        Cuisine: ${req.cuisineType}
+        Target Audience: ${req.targetAudience}
+        Budget Range: ${req.budgetRange}
+        Must Include: ${req.mustIncludeItems}
+        Dietary Restrictions: ${req.dietaryRestrictions.join(', ')}
+        
+        Output the menu in nicely formatted Markdown. Structure it by categories (Appetizers, Mains, Desserts, etc.).
+        For each item, include:
+        - Dish Name
+        - A mouth-watering description
+        - Estimated Selling Price (based on the budget range)
+        - Key Ingredients
+        
+        Also include a brief "Menu Strategy" section at the end explaining why these items fit the target audience.
+    `;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: [{ parts: [{ text: prompt }] }],
+            config: {
+                systemInstruction: SYSTEM_INSTRUCTION
+            }
+        });
+        
+        return response.text || "Failed to generate menu.";
     } catch (error: any) {
         throw new Error(formatError(error));
     }

@@ -11,6 +11,7 @@ import { Login } from './pages/Login';
 import { Integrations } from './pages/Integrations';
 import { Billing } from './pages/Billing';
 import { Landing } from './pages/Landing';
+import { KitchenWorkflow } from './pages/KitchenWorkflow';
 import { AppView, User, PlanType } from './types';
 import { authService } from './services/authService';
 import { trackingService } from './services/trackingService';
@@ -113,6 +114,8 @@ function App() {
             return <Strategy user={user} onUserUpdate={onUserUpdate} />;
           case AppView.VIDEO:
             return <VideoStudio user={user} />;
+          case AppView.KITCHEN_WORKFLOW:
+            return <KitchenWorkflow user={user} onUserUpdate={onUserUpdate} />;
           case AppView.INTEGRATIONS:
             return <Integrations />;
           case AppView.BILLING:

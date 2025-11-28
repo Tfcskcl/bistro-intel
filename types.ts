@@ -1,5 +1,4 @@
 
-
 export interface Ingredient {
   ingredient_id: string;
   name: string;
@@ -86,6 +85,33 @@ export interface MarketingRequest {
     requestDate: string;
     completedDate?: string;
     outputUrl?: string; // URI for video or Base64/URL for image
+}
+
+export interface KitchenWorkflowRequest {
+    id: string;
+    userId: string;
+    userName: string;
+    title: string;
+    description: string;
+    mediaFiles: { name: string; type: 'image' | 'video'; size: string }[];
+    status: 'pending' | 'in_review' | 'approved' | 'rejected';
+    adminResponse?: string; // The generated workflow markdown
+    requestDate: string;
+    completedDate?: string;
+}
+
+export interface MenuGenerationRequest {
+    id: string;
+    userId: string;
+    userName: string;
+    restaurantName: string;
+    cuisineType: string;
+    targetAudience: string;
+    budgetRange: string;
+    mustIncludeItems: string;
+    dietaryRestrictions: string[];
+    requestDate: string;
+    generatedMenu?: string;
 }
 
 export interface RoadmapPhase {
@@ -187,6 +213,7 @@ export enum AppView {
   SOP = 'SOP',
   STRATEGY = 'STRATEGY',
   VIDEO = 'VIDEO',
+  KITCHEN_WORKFLOW = 'KITCHEN_WORKFLOW',
   INTEGRATIONS = 'INTEGRATIONS',
   BILLING = 'BILLING'
 }

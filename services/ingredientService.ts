@@ -5,10 +5,14 @@ export const ingredientService = {
   // Get all ingredients for specific user
   getAll: (userId: string): any[] => {
     const key = `bistro_${userId}_ingredients`;
-    const stored = localStorage.getItem(key);
-    // Return empty by default for fresh users
-    if (stored) {
-      return JSON.parse(stored);
+    try {
+        const stored = localStorage.getItem(key);
+        // Return empty by default for fresh users
+        if (stored) {
+          return JSON.parse(stored);
+        }
+    } catch (e) {
+        console.error("Error parsing ingredients:", e);
     }
     return []; 
   },
@@ -16,7 +20,11 @@ export const ingredientService = {
   // Save ingredients
   save: (userId: string, ingredients: any[]) => {
     const key = `bistro_${userId}_ingredients`;
-    localStorage.setItem(key, JSON.stringify(ingredients));
+    try {
+        localStorage.setItem(key, JSON.stringify(ingredients));
+    } catch (e) {
+        console.error("Error saving ingredients:", e);
+    }
   },
 
   // Import CSV

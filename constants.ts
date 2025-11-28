@@ -1,5 +1,4 @@
 
-
 import { MenuItem, Ingredient, PlanType } from './types';
 
 export const SYSTEM_INSTRUCTION = `
@@ -20,7 +19,8 @@ export const CREDIT_COSTS = {
     STRATEGY: 12,
     VIDEO: 50,
     IMAGE: 20,
-    EXPERT_CONNECT: 50
+    EXPERT_CONNECT: 50,
+    WORKFLOW: 50
 };
 
 export const RECHARGE_RATE = 10; // INR per credit

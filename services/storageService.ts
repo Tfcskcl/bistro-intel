@@ -1,5 +1,5 @@
 
-import { RecipeCard, SOP, AppNotification, UserRole, POSChangeRequest, MenuItem, PlanConfig, PlanType, RecipeRequest, SOPRequest, MarketingRequest, CreditTransaction, SocialStats } from '../types';
+import { RecipeCard, SOP, AppNotification, UserRole, POSChangeRequest, MenuItem, PlanConfig, PlanType, RecipeRequest, SOPRequest, MarketingRequest, CreditTransaction, SocialStats, KitchenWorkflowRequest, MenuGenerationRequest } from '../types';
 import { MOCK_MENU, MOCK_SALES_DATA, MOCK_INGREDIENT_PRICES, PLANS as DEFAULT_PLANS } from '../constants';
 import { ingredientService } from './ingredientService';
 
@@ -8,6 +8,8 @@ const PLANS_KEY = 'bistro_system_plans';
 const GLOBAL_RECIPE_REQUESTS_KEY = 'bistro_global_recipe_requests';
 const GLOBAL_SOP_REQUESTS_KEY = 'bistro_global_sop_requests';
 const GLOBAL_MARKETING_REQUESTS_KEY = 'bistro_global_marketing_requests';
+const GLOBAL_KITCHEN_WORKFLOW_REQUESTS_KEY = 'bistro_global_kitchen_workflow_requests';
+const GLOBAL_MENU_GENERATION_REQUESTS_KEY = 'bistro_global_menu_gen_requests';
 const GLOBAL_NOTIFICATIONS_KEY = 'bistro_global_notifications';
 
 // Seed Notifications for new users (Generic welcome)
@@ -23,37 +25,54 @@ const WELCOME_NOTIFICATION: AppNotification = {
 export const storageService = {
     // --- GENERIC HELPERS ---
     getItem: <T>(userId: string, key: string, defaultValue: T): T => {
-        const stored = localStorage.getItem(getKey(userId, key));
-        return stored ? JSON.parse(stored) : defaultValue;
+        try {
+            const stored = localStorage.getItem(getKey(userId, key));
+            return stored ? JSON.parse(stored) : defaultValue;
+        } catch (e) {
+            console.error(`Error parsing storage key ${key} for user ${userId}:`, e);
+            return defaultValue;
+        }
     },
 
     setItem: (userId: string, key: string, data: any) => {
-        localStorage.setItem(getKey(userId, key), JSON.stringify(data));
+        try {
+            localStorage.setItem(getKey(userId, key), JSON.stringify(data));
+        } catch (e) {
+            console.error(`Error saving storage key ${key} for user ${userId}:`, e);
+        }
     },
 
     // Completely reset the app state
     clearAllData: () => {
-        // Only clear keys related to this app
-        const keysToRemove: string[] = [];
-        for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (key && (key.startsWith('bistro_') || key === 'theme')) {
-                keysToRemove.push(key);
+        try {
+            // Only clear keys related to this app
+            const keysToRemove: string[] = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && (key.startsWith('bistro_') || key === 'theme')) {
+                    keysToRemove.push(key);
+                }
             }
+            keysToRemove.forEach(k => localStorage.removeItem(k));
+            window.location.reload();
+        } catch (e) {
+            console.error("Error clearing data:", e);
         }
-        keysToRemove.forEach(k => localStorage.removeItem(k));
-        window.location.reload();
     },
 
     // --- PLANS (SYSTEM WIDE) ---
     getPlans: (): Record<PlanType, PlanConfig> => {
-        const stored = localStorage.getItem(PLANS_KEY);
-        if (stored) {
-            return JSON.parse(stored);
+        try {
+            const stored = localStorage.getItem(PLANS_KEY);
+            if (stored) {
+                return JSON.parse(stored);
+            }
+            // Initialize if empty
+            localStorage.setItem(PLANS_KEY, JSON.stringify(DEFAULT_PLANS));
+            return DEFAULT_PLANS;
+        } catch (e) {
+            return DEFAULT_PLANS;
         }
-        // Initialize if empty
-        localStorage.setItem(PLANS_KEY, JSON.stringify(DEFAULT_PLANS));
-        return DEFAULT_PLANS;
     },
 
     savePlans: (plans: Record<PlanType, PlanConfig>) => {
@@ -62,17 +81,11 @@ export const storageService = {
 
     // --- CREDITS & TRANSACTIONS ---
     getUserCredits: (userId: string): number => {
-        // We sync credits from authService user object usually, but for direct storage access:
-        // This is a fallback or for admin views
-        const userKey = 'bistro_current_user_cache'; // Rough check if same user
-        // In a real app, this comes from DB. Here we rely on Auth State mostly.
-        // But let's assume we store credit balance separately for safer persistence in mock
         return storageService.getItem<number>(userId, 'credits_balance', 0);
     },
 
     saveUserCredits: (userId: string, credits: number) => {
         storageService.setItem(userId, 'credits_balance', credits);
-        // Also update Auth Service cache if possible or rely on re-fetch
     },
 
     getTransactions: (userId: string): CreditTransaction[] => {
@@ -130,7 +143,6 @@ export const storageService = {
             const lines = csvText.split(/\r\n|\n/);
             const newItems: MenuItem[] = [];
             
-            // Check for header row (heuristic: check if first row has 'name' or 'sku')
             const hasHeader = lines[0].toLowerCase().includes('name') || lines[0].toLowerCase().includes('sku');
             const startIndex = hasHeader ? 1 : 0;
 
@@ -138,8 +150,6 @@ export const storageService = {
                 const line = lines[i].trim();
                 if (!line) continue;
 
-                // Simple split by comma. 
-                // Format: sku_id, name, category, price, prep_time
                 const parts = line.split(',').map(p => p.trim());
                 
                 if (parts.length >= 2) {
@@ -170,7 +180,6 @@ export const storageService = {
             }
 
             const currentMenu = storageService.getMenu(userId);
-            // Avoid duplicate SKUs if possible
             const currentSkus = new Set(currentMenu.map(m => m.sku_id));
             const uniqueNewItems = newItems.filter(i => !currentSkus.has(i.sku_id));
             
@@ -225,8 +234,10 @@ export const storageService = {
 
     // --- RECIPE REQUESTS (GLOBAL/ADMIN ACCESS) ---
     getAllRecipeRequests: (): RecipeRequest[] => {
-        const stored = localStorage.getItem(GLOBAL_RECIPE_REQUESTS_KEY);
-        return stored ? JSON.parse(stored) : [];
+        try {
+            const stored = localStorage.getItem(GLOBAL_RECIPE_REQUESTS_KEY);
+            return stored ? JSON.parse(stored) : [];
+        } catch (e) { return []; }
     },
 
     saveRecipeRequest: (request: RecipeRequest) => {
@@ -234,7 +245,6 @@ export const storageService = {
         requests.push(request);
         localStorage.setItem(GLOBAL_RECIPE_REQUESTS_KEY, JSON.stringify(requests));
 
-        // Send Notification to Super Admin
         storageService.sendSystemNotification({
             id: `notif_req_${request.id}`,
             title: 'New Recipe Request',
@@ -273,8 +283,10 @@ export const storageService = {
 
     // --- SOP REQUESTS ---
     getAllSOPRequests: (): SOPRequest[] => {
-        const stored = localStorage.getItem(GLOBAL_SOP_REQUESTS_KEY);
-        return stored ? JSON.parse(stored) : [];
+        try {
+            const stored = localStorage.getItem(GLOBAL_SOP_REQUESTS_KEY);
+            return stored ? JSON.parse(stored) : [];
+        } catch (e) { return []; }
     },
 
     saveSOPRequest: (request: SOPRequest) => {
@@ -282,7 +294,6 @@ export const storageService = {
         requests.push(request);
         localStorage.setItem(GLOBAL_SOP_REQUESTS_KEY, JSON.stringify(requests));
 
-        // Send Notification to Super Admin
         storageService.sendSystemNotification({
             id: `notif_sop_${request.id}`,
             title: 'New SOP Request',
@@ -303,10 +314,12 @@ export const storageService = {
         }
     },
 
-    // --- MARKETING REQUESTS (VIDEO & IMAGE) ---
+    // --- MARKETING REQUESTS ---
     getAllMarketingRequests: (): MarketingRequest[] => {
-        const stored = localStorage.getItem(GLOBAL_MARKETING_REQUESTS_KEY);
-        return stored ? JSON.parse(stored) : [];
+        try {
+            const stored = localStorage.getItem(GLOBAL_MARKETING_REQUESTS_KEY);
+            return stored ? JSON.parse(stored) : [];
+        } catch (e) { return []; }
     },
 
     saveMarketingRequest: (request: MarketingRequest) => {
@@ -314,7 +327,6 @@ export const storageService = {
         requests.push(request);
         localStorage.setItem(GLOBAL_MARKETING_REQUESTS_KEY, JSON.stringify(requests));
 
-        // Send Notification to Super Admin
         storageService.sendSystemNotification({
             id: `notif_mkt_${request.id}`,
             title: `New ${request.type === 'image' ? 'Image' : 'Video'} Request`,
@@ -333,6 +345,63 @@ export const storageService = {
             requests[index] = updatedRequest;
             localStorage.setItem(GLOBAL_MARKETING_REQUESTS_KEY, JSON.stringify(requests));
         }
+    },
+
+    // --- KITCHEN WORKFLOW REQUESTS ---
+    getAllKitchenWorkflowRequests: (): KitchenWorkflowRequest[] => {
+        try {
+            const stored = localStorage.getItem(GLOBAL_KITCHEN_WORKFLOW_REQUESTS_KEY);
+            return stored ? JSON.parse(stored) : [];
+        } catch (e) { return []; }
+    },
+
+    saveKitchenWorkflowRequest: (request: KitchenWorkflowRequest) => {
+        const requests = storageService.getAllKitchenWorkflowRequests();
+        requests.push(request);
+        localStorage.setItem(GLOBAL_KITCHEN_WORKFLOW_REQUESTS_KEY, JSON.stringify(requests));
+
+        storageService.sendSystemNotification({
+            id: `notif_kw_${request.id}`,
+            title: 'New Kitchen Workflow Request',
+            message: `${request.userName} submitted a kitchen analysis request.`,
+            type: 'info',
+            read: false,
+            date: new Date().toISOString(),
+            role: [UserRole.SUPER_ADMIN, UserRole.ADMIN]
+        });
+    },
+
+    updateKitchenWorkflowRequest: (updatedRequest: KitchenWorkflowRequest) => {
+        const requests = storageService.getAllKitchenWorkflowRequests();
+        const index = requests.findIndex(r => r.id === updatedRequest.id);
+        if (index >= 0) {
+            requests[index] = updatedRequest;
+            localStorage.setItem(GLOBAL_KITCHEN_WORKFLOW_REQUESTS_KEY, JSON.stringify(requests));
+        }
+    },
+
+    // --- MENU GENERATION REQUESTS ---
+    getAllMenuGenerationRequests: (): MenuGenerationRequest[] => {
+        try {
+            const stored = localStorage.getItem(GLOBAL_MENU_GENERATION_REQUESTS_KEY);
+            return stored ? JSON.parse(stored) : [];
+        } catch (e) { return []; }
+    },
+
+    saveMenuGenerationRequest: (request: MenuGenerationRequest) => {
+        const requests = storageService.getAllMenuGenerationRequests();
+        requests.push(request);
+        localStorage.setItem(GLOBAL_MENU_GENERATION_REQUESTS_KEY, JSON.stringify(requests));
+
+        storageService.sendSystemNotification({
+            id: `notif_menu_${request.id}`,
+            title: 'New Menu Generated',
+            message: `${request.userName} generated a menu for ${request.restaurantName}.`,
+            type: 'info',
+            read: false,
+            date: new Date().toISOString(),
+            role: [UserRole.SUPER_ADMIN, UserRole.ADMIN]
+        });
     },
 
     // --- POS REQUESTS ---
@@ -365,142 +434,104 @@ export const storageService = {
 
     // --- NOTIFICATIONS SYSTEM ---
 
-    // Helper to send a notification to a specific role globally
     sendSystemNotification: (notification: AppNotification) => {
-        const stored = localStorage.getItem(GLOBAL_NOTIFICATIONS_KEY);
-        const notifications: AppNotification[] = stored ? JSON.parse(stored) : [];
-        notifications.push(notification);
-        localStorage.setItem(GLOBAL_NOTIFICATIONS_KEY, JSON.stringify(notifications));
+        try {
+            const stored = localStorage.getItem(GLOBAL_NOTIFICATIONS_KEY);
+            const notifications: AppNotification[] = stored ? JSON.parse(stored) : [];
+            notifications.push(notification);
+            localStorage.setItem(GLOBAL_NOTIFICATIONS_KEY, JSON.stringify(notifications));
+        } catch (e) {
+            console.error("Error sending system notification", e);
+        }
     },
 
     getNotifications: (userId: string, userRole: UserRole): AppNotification[] => {
-        // 1. Get Personal Notifications
-        const storedPersonal = localStorage.getItem(getKey(userId, 'notifications'));
-        let notifications: AppNotification[] = storedPersonal ? JSON.parse(storedPersonal) : [WELCOME_NOTIFICATION];
-        
-        // 2. Get Global Notifications
-        const storedGlobal = localStorage.getItem(GLOBAL_NOTIFICATIONS_KEY);
-        if (storedGlobal) {
-            const globalNotifs: AppNotification[] = JSON.parse(storedGlobal);
-            // Filter global notifications relevant to this user's role
-            const applicableGlobal = globalNotifs.filter(n => !n.role || n.role.includes(userRole));
-            notifications = [...notifications, ...applicableGlobal];
-        }
+        try {
+            // 1. Get Personal Notifications
+            const storedPersonal = localStorage.getItem(getKey(userId, 'notifications'));
+            let notifications: AppNotification[] = storedPersonal ? JSON.parse(storedPersonal) : [WELCOME_NOTIFICATION];
+            
+            // 2. Get Global Notifications
+            const storedGlobal = localStorage.getItem(GLOBAL_NOTIFICATIONS_KEY);
+            if (storedGlobal) {
+                const globalNotifs: AppNotification[] = JSON.parse(storedGlobal);
+                // Filter global notifications relevant to this user's role
+                const applicableGlobal = globalNotifs.filter(n => !n.role || n.role.includes(userRole));
+                notifications = [...notifications, ...applicableGlobal];
+            }
 
-        // 3. Sort by date
-        return notifications.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+            // 3. Sort by date
+            return notifications.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        } catch (e) {
+            return [WELCOME_NOTIFICATION];
+        }
     },
 
     markAsRead: (userId: string, id: string) => {
-        // 1. Try marking in Personal Storage
-        const personalKey = getKey(userId, 'notifications');
-        const storedPersonal = localStorage.getItem(personalKey);
-        let foundInPersonal = false;
+        try {
+            // 1. Try marking in Personal Storage
+            const personalKey = getKey(userId, 'notifications');
+            const storedPersonal = localStorage.getItem(personalKey);
+            let foundInPersonal = false;
 
-        if (storedPersonal) {
-            let notifications: AppNotification[] = JSON.parse(storedPersonal);
-            const index = notifications.findIndex(n => n.id === id);
-            if (index !== -1) {
-                notifications[index].read = true;
-                localStorage.setItem(personalKey, JSON.stringify(notifications));
-                foundInPersonal = true;
-            }
-        }
-
-        // 2. If not found in personal, try marking in Global Storage
-        // Note: Marking a global notification read marks it read for everyone in this simple implementation
-        if (!foundInPersonal) {
-            const storedGlobal = localStorage.getItem(GLOBAL_NOTIFICATIONS_KEY);
-            if (storedGlobal) {
-                let global: AppNotification[] = JSON.parse(storedGlobal);
-                const index = global.findIndex(n => n.id === id);
+            if (storedPersonal) {
+                let notifications: AppNotification[] = JSON.parse(storedPersonal);
+                const index = notifications.findIndex(n => n.id === id);
                 if (index !== -1) {
-                    global[index].read = true;
-                    localStorage.setItem(GLOBAL_NOTIFICATIONS_KEY, JSON.stringify(global));
+                    notifications[index].read = true;
+                    localStorage.setItem(personalKey, JSON.stringify(notifications));
+                    foundInPersonal = true;
                 }
             }
+
+            // 2. If not found in personal, try marking in Global Storage
+            if (!foundInPersonal) {
+                const storedGlobal = localStorage.getItem(GLOBAL_NOTIFICATIONS_KEY);
+                if (storedGlobal) {
+                    let global: AppNotification[] = JSON.parse(storedGlobal);
+                    const index = global.findIndex(n => n.id === id);
+                    if (index !== -1) {
+                        global[index].read = true;
+                        localStorage.setItem(GLOBAL_NOTIFICATIONS_KEY, JSON.stringify(global));
+                    }
+                }
+            }
+        } catch (e) {
+            console.error("Error marking read", e);
         }
     },
 
     markAllRead: (userId: string, userRole: UserRole) => {
-        // 1. Mark all personal read
-        const personalKey = getKey(userId, 'notifications');
-        const storedPersonal = localStorage.getItem(personalKey);
-        if (storedPersonal) {
-            let notifications: AppNotification[] = JSON.parse(storedPersonal);
-            const updated = notifications.map(n => ({ ...n, read: true }));
-            localStorage.setItem(personalKey, JSON.stringify(updated));
-        }
+        try {
+            // 1. Mark all personal read
+            const personalKey = getKey(userId, 'notifications');
+            const storedPersonal = localStorage.getItem(personalKey);
+            if (storedPersonal) {
+                let notifications: AppNotification[] = JSON.parse(storedPersonal);
+                const updated = notifications.map(n => ({ ...n, read: true }));
+                localStorage.setItem(personalKey, JSON.stringify(updated));
+            }
 
-        // 2. Mark all visible global read
-        const storedGlobal = localStorage.getItem(GLOBAL_NOTIFICATIONS_KEY);
-        if (storedGlobal) {
-            let global: AppNotification[] = JSON.parse(storedGlobal);
-            const updated = global.map(n => {
-                // If the notification targets this user's role, mark it read
-                if (!n.role || n.role.includes(userRole)) {
-                    return { ...n, read: true };
-                }
-                return n;
-            });
-            localStorage.setItem(GLOBAL_NOTIFICATIONS_KEY, JSON.stringify(updated));
+            // 2. Mark all visible global read
+            const storedGlobal = localStorage.getItem(GLOBAL_NOTIFICATIONS_KEY);
+            if (storedGlobal) {
+                let global: AppNotification[] = JSON.parse(storedGlobal);
+                const updated = global.map(n => {
+                    // If the notification targets this user's role, mark it read
+                    if (!n.role || n.role.includes(userRole)) {
+                        return { ...n, read: true };
+                    }
+                    return n;
+                });
+                localStorage.setItem(GLOBAL_NOTIFICATIONS_KEY, JSON.stringify(updated));
+            }
+        } catch (e) {
+            console.error("Error marking all read", e);
         }
     },
 
     // --- DEMO SEEDING ---
-    // Only called for Quick Demo Access users, not new signups
     seedDemoData: (userId: string) => {
-        if (!localStorage.getItem(getKey(userId, 'seeded'))) {
-            console.log(`Seeding demo data for ${userId}...`);
-            storageService.setItem(userId, 'menu', MOCK_MENU);
-            storageService.setItem(userId, 'sales', MOCK_SALES_DATA);
-            
-            // Seed Ingredients via service
-            ingredientService.save(userId, MOCK_INGREDIENT_PRICES);
-
-            // Seed a sample SOP
-            const sampleSOP: SOP = {
-                sop_id: 'demo_sop_1',
-                title: 'Daily Opening Checklist',
-                scope: 'Front of House & Kitchen',
-                prerequisites: 'Staff must be in uniform',
-                materials_equipment: ['Keys', 'Tablet', 'Sanitizer'],
-                stepwise_procedure: [
-                    { step_no: 1, action: 'Disable Alarm', responsible_role: 'Manager', time_limit: '08:00 AM' },
-                    { step_no: 2, action: 'Turn on HVAC and Lights', responsible_role: 'Manager' },
-                    { step_no: 3, action: 'Check Inventory Deliveries', responsible_role: 'Head Chef' },
-                    { step_no: 4, action: 'Boot up POS Terminals', responsible_role: 'Server' }
-                ],
-                critical_control_points: ['Fridge Temp Check < 4°C'],
-                monitoring_checklist: ['Music On', 'Floors Clean', 'Bathrooms Stocked'],
-                kpis: ['Opened by 08:30 AM'],
-                quick_troubleshooting: 'Call maintenance if HVAC fails'
-            };
-            storageService.setItem(userId, 'saved_sops', [sampleSOP]);
-            
-            // Seed sample notifications
-            const demoNotifs: AppNotification[] = [
-                {
-                    id: 'n_demo_1',
-                    title: 'Food Cost Alert',
-                    message: 'Avocado prices have spiked 15%. Consider adjusting the "Smashed Avo Toast" price.',
-                    type: 'warning',
-                    read: false,
-                    date: new Date().toISOString()
-                },
-                {
-                    id: 'n_demo_2',
-                    title: 'Weekly Sales Report',
-                    message: 'Revenue is up 12% compared to last week. Great job!',
-                    type: 'success',
-                    read: false,
-                    date: new Date(Date.now() - 86400000).toISOString()
-                },
-                WELCOME_NOTIFICATION
-            ];
-            storageService.setItem(userId, 'notifications', demoNotifs);
-
-            localStorage.setItem(getKey(userId, 'seeded'), 'true');
-        }
+       // Disabled for live
     }
 };
