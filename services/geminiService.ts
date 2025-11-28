@@ -1,5 +1,6 @@
 
-import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
+
+import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
 import { SYSTEM_INSTRUCTION } from "../constants";
 import { RecipeCard, SOP, StrategyReport, ImplementationGuide, MenuItem } from "../types";
 import { ingredientService } from "./ingredientService";
@@ -61,6 +62,64 @@ const formatError = (error: any): string => {
     return error.message || "An unexpected error occurred. Please try again.";
 };
 
+export const verifyLocationWithMaps = async (locationQuery: string): Promise<string> => {
+  const apiKey = getApiKey();
+  if (!apiKey) return "Simulated: Location verified (Mock Mode).";
+
+  const ai = new GoogleGenAI({ apiKey });
+  
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: [{ parts: [{ text: `Verify this location for a business registration: "${locationQuery}". Return the official formatted address and a very brief description of the area type (e.g. commercial, residential).` }] }],
+      config: {
+        tools: [{ googleMaps: {} }],
+        // responseMimeType is not allowed when using the googleMaps tool.
+      }
+    });
+    
+    return response.text || "Could not verify location.";
+  } catch (error: any) {
+    console.error("Maps verification failed:", error);
+    return "Verification unavailable.";
+  }
+};
+
+const recipeSchema = {
+  type: Type.OBJECT,
+  properties: {
+    sku_id: { type: Type.STRING },
+    name: { type: Type.STRING },
+    yield: { type: Type.NUMBER },
+    ingredients: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          ingredient_id: { type: Type.STRING },
+          name: { type: Type.STRING },
+          qty_per_serving: { type: Type.NUMBER },
+          unit: { type: Type.STRING },
+          cost_per_unit: { type: Type.NUMBER },
+          cost_per_serving: { type: Type.NUMBER }
+        }
+      }
+    },
+    preparation_steps: { type: Type.ARRAY, items: { type: Type.STRING } },
+    equipment_needed: { type: Type.ARRAY, items: { type: Type.STRING } },
+    portioning_guideline: { type: Type.STRING },
+    allergens: { type: Type.ARRAY, items: { type: Type.STRING } },
+    prep_time_min: { type: Type.NUMBER },
+    shelf_life_hours: { type: Type.NUMBER },
+    food_cost_per_serving: { type: Type.NUMBER },
+    suggested_selling_price: { type: Type.NUMBER },
+    tags: { type: Type.ARRAY, items: { type: Type.STRING } },
+    human_summary: { type: Type.STRING },
+    reasoning: { type: Type.STRING },
+    confidence: { type: Type.STRING }
+  }
+};
+
 export const generateRecipeCard = async (userId: string, item: MenuItem, requirements?: string): Promise<RecipeCard> => {
   const apiKey = getApiKey();
   
@@ -112,34 +171,20 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
     Menu Item: ${JSON.stringify(item)}
     Ingredient Prices (Use these for costing if matches found, otherwise estimate): ${JSON.stringify(currentIngredients)}
 
-    Output as valid JSON conforming to this structure:
-    {
-      "sku_id": "string",
-      "name": "string",
-      "yield": number,
-      "ingredients": [{"ingredient_id": "string", "name": "string", "qty_per_serving": number, "unit": "string", "cost_per_unit": number, "cost_per_serving": number}],
-      "preparation_steps": ["string"],
-      "equipment_needed": ["string"],
-      "portioning_guideline": "string",
-      "allergens": ["string"],
-      "prep_time_min": number,
-      "shelf_life_hours": number,
-      "food_cost_per_serving": number,
-      "suggested_selling_price": number,
-      "tags": ["string"],
-      "human_summary": "string",
-      "reasoning": "string",
-      "confidence": "High|Medium|Low"
-    }
+    Important:
+    - If specific ingredient prices are not found in context, estimate reasonable market rates.
+    - Ensure 'food_cost_per_serving' is calculated based on ingredient quantities and costs.
+    - 'sku_id' should match the input or be generated if missing.
   `;
 
   try {
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
-      contents: prompt,
+      contents: [{ parts: [{ text: prompt }] }],
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
-        responseMimeType: 'application/json'
+        responseMimeType: 'application/json',
+        responseSchema: recipeSchema
       }
     });
 
@@ -180,17 +225,16 @@ export const generateRecipeVariation = async (userId: string, originalRecipe: Re
     2. Adjust preparation steps accordingly.
     3. Recalculate estimated food cost and price.
     4. Update the name to reflect the variation.
-
-    Output as valid JSON conforming to the exact same RecipeCard structure as the input.
   `;
 
   try {
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
-      contents: prompt,
+      contents: [{ parts: [{ text: prompt }] }],
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
-        responseMimeType: 'application/json'
+        responseMimeType: 'application/json',
+        responseSchema: recipeSchema
       }
     });
 
@@ -246,7 +290,7 @@ export const generateSOP = async (topic: string): Promise<SOP> => {
   try {
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
-      contents: prompt,
+      contents: [{ parts: [{ text: prompt }] }],
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         responseMimeType: 'application/json'
@@ -312,7 +356,7 @@ export const generateStrategy = async (role: string, context: string): Promise<S
   try {
     const response: GenerateContentResponse = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
-      contents: prompt,
+      contents: [{ parts: [{ text: prompt }] }],
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         responseMimeType: 'application/json'
@@ -373,7 +417,7 @@ export const generateImplementationPlan = async (initiative: string): Promise<Im
     try {
         const response: GenerateContentResponse = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
-            contents: prompt,
+            contents: [{ parts: [{ text: prompt }] }],
             config: {
                 systemInstruction: SYSTEM_INSTRUCTION,
                 responseMimeType: 'application/json'
@@ -386,7 +430,7 @@ export const generateImplementationPlan = async (initiative: string): Promise<Im
     }
 };
 
-export const generateMarketingVideo = async (images: string[], prompt: string, aspectRatio: '16:9' | '9:16'): Promise<string> => {
+export const generateMarketingVideo = async (images: string[], prompt: string, aspectRatio: '16:9' | '9:16' | '1:1'): Promise<string> => {
   const apiKey = getApiKey();
   if (!apiKey) {
       throw new Error("API Key required for video generation");
@@ -394,6 +438,9 @@ export const generateMarketingVideo = async (images: string[], prompt: string, a
 
   // NOTE: Users must select their own API key via window.aistudio.openSelectKey() in the UI before calling this.
   const ai = new GoogleGenAI({ apiKey });
+
+  // Veo models only support 16:9 or 9:16. Default 1:1 to 16:9 to prevent 500 error.
+  const safeAspectRatio = (aspectRatio === '16:9' || aspectRatio === '9:16') ? aspectRatio : '16:9';
 
   try {
       let operation;
@@ -419,7 +466,7 @@ export const generateMarketingVideo = async (images: string[], prompt: string, a
                   aspectRatio: '16:9' // Fixed for this model
               }
           });
-      } else {
+      } else if (images.length === 1) {
           // Single image -> Use veo-3.1-fast-generate-preview
           operation = await ai.models.generateVideos({
               model: 'veo-3.1-fast-generate-preview',
@@ -431,7 +478,18 @@ export const generateMarketingVideo = async (images: string[], prompt: string, a
               config: {
                   numberOfVideos: 1,
                   resolution: '720p',
-                  aspectRatio: aspectRatio
+                  aspectRatio: safeAspectRatio
+              }
+          });
+      } else {
+          // Text only -> Use veo-3.1-fast-generate-preview
+          operation = await ai.models.generateVideos({
+              model: 'veo-3.1-fast-generate-preview',
+              prompt: prompt,
+              config: {
+                  numberOfVideos: 1,
+                  resolution: '720p',
+                  aspectRatio: safeAspectRatio
               }
           });
       }

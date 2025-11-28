@@ -1,8 +1,4 @@
 
-
-
-
-
 import React, { useState, useEffect } from 'react';
 import { generateStrategy, generateImplementationPlan } from '../services/geminiService';
 import { StrategyReport, UserRole, User, PlanType, ImplementationGuide } from '../types';
@@ -27,19 +23,22 @@ const ROLE_SPECIFIC_PROMPTS = {
         "Analyze last month's profit margins",
         "Suggest a price increase strategy",
         "Expansion plan for a new outlet",
-        "How to reduce overall food cost?"
+        "How to reduce overall food cost?",
+        "Marketing ideas for weekdays"
     ],
     [UserRole.ADMIN]: [
         "Create a weekend staff roster",
         "Kitchen opening checklist",
         "Reduce vegetable wastage",
-        "Inventory ordering schedule"
+        "Inventory ordering schedule",
+        "Equipment maintenance log"
     ],
     [UserRole.SUPER_ADMIN]: [
         "Analyze global user churn",
         "System latency report",
         "Revenue forecast for Q4",
-        "Compare outlet performance"
+        "Compare outlet performance",
+        "Feature usage statistics"
     ]
 };
 
@@ -446,7 +445,7 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                 <select 
                     value={role}
                     onChange={(e) => setRole(e.target.value as UserRole)}
-                    className="bg-white border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block p-2.5"
+                    className="bg-white border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block p-2.5 outline-none"
                 >
                     <option value={UserRole.OWNER}>Owner Context</option>
                     <option value={UserRole.ADMIN}>Admin / Ops Context</option>
@@ -927,12 +926,12 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
       <div className="p-4 bg-white border-t border-slate-200 z-30">
         <div className="max-w-4xl mx-auto space-y-3">
             {/* Quick Chips */}
-            <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+            <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar mask-linear-fade">
                 {ROLE_SPECIFIC_PROMPTS[role].map((prompt, idx) => (
                     <button
                         key={idx}
                         onClick={() => setQuery(prompt)}
-                        className="whitespace-nowrap px-3 py-1.5 bg-slate-100 hover:bg-emerald-50 text-slate-600 hover:text-emerald-700 border border-slate-200 hover:border-emerald-200 rounded-full text-xs font-medium transition-colors flex items-center gap-1.5"
+                        className="whitespace-nowrap px-3 py-1.5 bg-slate-100 hover:bg-emerald-50 text-slate-600 hover:text-emerald-700 border border-slate-200 hover:border-emerald-200 rounded-full text-xs font-medium transition-colors flex items-center gap-1.5 shrink-0"
                     >
                         <Sparkles size={12} className="text-yellow-500" />
                         {prompt}
@@ -948,11 +947,12 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                     onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                     placeholder="Enter your business goal or challenge (e.g. 'Increase delivery revenue by 20%')..."
                     className="flex-1 px-4 py-3 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none shadow-sm"
+                    autoFocus
                 />
                 <button 
                     onClick={handleClear}
                     title="Clear Chat"
-                    className="px-3 py-3 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-100"
+                    className="px-3 py-3 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-100 flex items-center justify-center"
                 >
                     <Trash2 size={20} />
                 </button>

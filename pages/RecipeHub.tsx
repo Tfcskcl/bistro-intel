@@ -1,6 +1,5 @@
 
-
-
+// ... existing imports
 import React, { useState, useRef, useEffect } from 'react';
 import { PLANS, CREDIT_COSTS } from '../constants';
 import { generateRecipeCard, generateRecipeVariation } from '../services/geminiService';
@@ -16,6 +15,7 @@ interface RecipeHubProps {
 }
 
 export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
+  // ... existing state ...
   const [selectedSku, setSelectedSku] = useState<string | null>(null);
   const [generatedRecipe, setGeneratedRecipe] = useState<RecipeCard | null>(null);
   const [loading, setLoading] = useState(false);
@@ -783,13 +783,13 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="bg-white border border-slate-200 p-4 rounded-xl shadow-sm">
                                     <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1">Food Cost (Per Serving)</p>
-                                    <p className="text-2xl font-bold text-slate-800">₹{generatedRecipe.food_cost_per_serving.toFixed(2)}</p>
+                                    <p className="text-2xl font-bold text-slate-800">₹{generatedRecipe.food_cost_per_serving?.toFixed(2)}</p>
                                 </div>
                                 <div className="bg-white border border-slate-200 p-4 rounded-xl shadow-sm">
                                     <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1">Suggested Price</p>
                                     <p className="text-2xl font-bold text-emerald-600">₹{generatedRecipe.suggested_selling_price}</p>
                                     <p className="text-[10px] text-slate-400 mt-1">
-                                        ~{((generatedRecipe.food_cost_per_serving / generatedRecipe.suggested_selling_price) * 100).toFixed(1)}% Cost
+                                        ~{generatedRecipe.suggested_selling_price > 0 ? ((generatedRecipe.food_cost_per_serving / generatedRecipe.suggested_selling_price) * 100).toFixed(1) : 0}% Cost
                                     </p>
                                 </div>
                             </div>
@@ -809,7 +809,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
-                                            {generatedRecipe.ingredients.map((ing, i) => (
+                                            {generatedRecipe.ingredients?.map((ing, i) => (
                                                 <tr key={i} className="hover:bg-slate-50">
                                                     <td className="px-4 py-2 font-medium text-slate-700">{ing.name}</td>
                                                     <td className="px-4 py-2 text-right text-slate-500">{ing.qty_per_serving} {ing.unit}</td>
@@ -827,7 +827,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                     <ChefHat size={18} className="text-slate-400"/> Preparation
                                 </h3>
                                 <div className="space-y-3">
-                                    {generatedRecipe.preparation_steps.map((step, i) => (
+                                    {generatedRecipe.preparation_steps?.map((step, i) => (
                                         <div key={i} className="flex gap-3 text-sm text-slate-700">
                                             <span className="font-bold text-slate-300 select-none">{i + 1}.</span>
                                             <p>{step}</p>

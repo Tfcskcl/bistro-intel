@@ -1,13 +1,11 @@
 
-
-
-
 import React, { useState } from 'react';
-import { ArrowRight, AlertCircle, CheckCircle2, ArrowLeft, Mail, KeyRound, Store, MapPin, ChefHat, ShieldCheck, User as UserIcon, Shield, FileText, Upload, Loader2 } from 'lucide-react';
+import { ArrowRight, AlertCircle, CheckCircle2, ArrowLeft, Mail, KeyRound, Store, MapPin, ChefHat, ShieldCheck, User as UserIcon, Shield, FileText, Upload, Loader2, Sparkles, Map } from 'lucide-react';
 import { User, UserRole, PlanType } from '../types';
 import { authService } from '../services/authService';
 import { storageService } from '../services/storageService';
 import { Logo } from '../components/Logo';
+import { verifyLocationWithMaps } from '../services/geminiService';
 
 interface LoginProps {
   onLogin: (user: User) => void;
@@ -27,6 +25,10 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
   const [location, setLocation] = useState('');
   const [cuisineType, setCuisineType] = useState('');
   
+  // Maps Verification State
+  const [verifyingLoc, setVerifyingLoc] = useState(false);
+  const [locDetails, setLocDetails] = useState<string | null>(null);
+  
   // Compliance & Menu Fields
   const [gstNumber, setGstNumber] = useState('');
   const [fssaiNumber, setFssaiNumber] = useState('');
@@ -39,6 +41,20 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
   const handleMenuUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.files && e.target.files[0]) {
           setMenuFileName(e.target.files[0].name);
+      }
+  };
+
+  const handleVerifyLocation = async () => {
+      if (!location.trim()) return;
+      setVerifyingLoc(true);
+      setLocDetails(null);
+      try {
+          const result = await verifyLocationWithMaps(location);
+          setLocDetails(result);
+      } catch (e) {
+          setLocDetails("Verification unavailable.");
+      } finally {
+          setVerifyingLoc(false);
       }
   };
 
@@ -240,16 +256,33 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
                             className="w-full px-3 py-2 text-sm rounded border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white outline-none focus:border-blue-500"
                         />
                         <div className="flex gap-3">
-                            <div className="flex-1 relative">
-                                <MapPin size={14} className="absolute left-2 top-2.5 text-slate-400"/>
-                                <input 
-                                    type="text" 
-                                    required
-                                    value={location}
-                                    onChange={e => setLocation(e.target.value)}
-                                    placeholder="City / Area"
-                                    className="w-full pl-7 pr-3 py-2 text-sm rounded border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white outline-none focus:border-blue-500"
-                                />
+                            <div className="flex-1 space-y-2">
+                                <div className="relative">
+                                    <MapPin size={14} className="absolute left-2 top-2.5 text-slate-400"/>
+                                    <input 
+                                        type="text" 
+                                        required
+                                        value={location}
+                                        onChange={e => setLocation(e.target.value)}
+                                        placeholder="City / Area"
+                                        className="w-full pl-7 pr-3 py-2 text-sm rounded border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white outline-none focus:border-blue-500"
+                                    />
+                                </div>
+                                <button 
+                                    type="button" 
+                                    onClick={handleVerifyLocation}
+                                    disabled={verifyingLoc || !location}
+                                    className="text-[10px] flex items-center gap-1 text-blue-600 hover:text-blue-700 font-bold bg-white dark:bg-slate-800 px-2 py-1 rounded border border-blue-100 dark:border-slate-700"
+                                >
+                                    {verifyingLoc ? <Loader2 size={10} className="animate-spin"/> : <Map size={10} />} 
+                                    Verify with Maps
+                                </button>
+                                {locDetails && (
+                                    <div className="text-[10px] text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 p-2 rounded border border-slate-200 dark:border-slate-700 leading-relaxed animate-fade-in">
+                                        <span className="font-bold text-blue-600 block mb-1">Google Maps Data:</span>
+                                        {locDetails}
+                                    </div>
+                                )}
                             </div>
                              <div className="flex-1 relative">
                                 <ChefHat size={14} className="absolute left-2 top-2.5 text-slate-400"/>
