@@ -1,6 +1,4 @@
 
-
-
 import React, { useState, useEffect } from 'react';
 import { generateSOP } from '../services/geminiService';
 import { SOP, User, UserRole, SOPRequest } from '../types';
@@ -20,8 +18,8 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // View Modes
-  const [viewMode, setViewMode] = useState<'generator' | 'request-form' | 'saved' | 'requests'>('generator');
+  // View Modes - Default to 'saved' to show library first
+  const [viewMode, setViewMode] = useState<'generator' | 'request-form' | 'saved' | 'requests'>('saved');
   
   const [savedSOPs, setSavedSOPs] = useState<SOP[]>([]);
   const [saveStatus, setSaveStatus] = useState<string | null>(null);
@@ -36,11 +34,6 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
   useEffect(() => {
       setSavedSOPs(storageService.getSavedSOPs(user.id));
       refreshRequests();
-      
-      // Set initial view mode based on role
-      if (!isAdmin) {
-          setViewMode('request-form');
-      }
   }, [user.id, user.role]);
 
   const refreshRequests = () => {
