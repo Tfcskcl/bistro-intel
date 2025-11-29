@@ -146,11 +146,31 @@ export const storageService = {
             const hasHeader = lines[0].toLowerCase().includes('name') || lines[0].toLowerCase().includes('sku');
             const startIndex = hasHeader ? 1 : 0;
 
+            // Helper to parse CSV line handling quotes
+            const parseCSVLine = (line: string) => {
+                const values: string[] = [];
+                let current = '';
+                let inQuotes = false;
+                for (let i = 0; i < line.length; i++) {
+                    const char = line[i];
+                    if (char === '"') {
+                        inQuotes = !inQuotes;
+                    } else if (char === ',' && !inQuotes) {
+                        values.push(current.trim().replace(/^"|"$/g, '')); 
+                        current = '';
+                    } else {
+                        current += char;
+                    }
+                }
+                values.push(current.trim().replace(/^"|"$/g, ''));
+                return values;
+            };
+
             for (let i = startIndex; i < lines.length; i++) {
                 const line = lines[i].trim();
                 if (!line) continue;
 
-                const parts = line.split(',').map(p => p.trim());
+                const parts = parseCSVLine(line);
                 
                 if (parts.length >= 2) {
                     const sku_id = parts[0] || `IMP-${Date.now()}-${i}`;
@@ -532,6 +552,57 @@ export const storageService = {
 
     // --- DEMO SEEDING ---
     seedDemoData: (userId: string) => {
-       // Disabled for live
+        if (!localStorage.getItem(getKey(userId, 'seeded'))) {
+            console.log(`Seeding demo data for ${userId}...`);
+            storageService.setItem(userId, 'menu', MOCK_MENU);
+            storageService.setItem(userId, 'sales', MOCK_SALES_DATA);
+            
+            // Seed Ingredients via service
+            ingredientService.seedDefaults(userId);
+
+            // Seed a sample SOP
+            const sampleSOP: SOP = {
+                sop_id: 'demo_sop_1',
+                title: 'Daily Opening Checklist',
+                scope: 'Front of House & Kitchen',
+                prerequisites: 'Staff must be in uniform',
+                materials_equipment: ['Keys', 'Tablet', 'Sanitizer'],
+                stepwise_procedure: [
+                    { step_no: 1, action: 'Disable Alarm', responsible_role: 'Manager', time_limit: '08:00 AM' },
+                    { step_no: 2, action: 'Turn on HVAC and Lights', responsible_role: 'Manager' },
+                    { step_no: 3, action: 'Check Inventory Deliveries', responsible_role: 'Head Chef' },
+                    { step_no: 4, action: 'Boot up POS Terminals', responsible_role: 'Server' }
+                ],
+                critical_control_points: ['Fridge Temp Check < 4°C'],
+                monitoring_checklist: ['Music On', 'Floors Clean', 'Bathrooms Stocked'],
+                kpis: ['Opened by 08:30 AM'],
+                quick_troubleshooting: 'Call maintenance if HVAC fails'
+            };
+            storageService.setItem(userId, 'saved_sops', [sampleSOP]);
+            
+            // Seed sample notifications
+            const demoNotifs: AppNotification[] = [
+                {
+                    id: 'n_demo_1',
+                    title: 'Food Cost Alert',
+                    message: 'Avocado prices have spiked 15%. Consider adjusting the "Smashed Avo Toast" price.',
+                    type: 'warning',
+                    read: false,
+                    date: new Date().toISOString()
+                },
+                {
+                    id: 'n_demo_2',
+                    title: 'Weekly Sales Report',
+                    message: 'Revenue is up 12% compared to last week. Great job!',
+                    type: 'success',
+                    read: false,
+                    date: new Date(Date.now() - 86400000).toISOString()
+                },
+                WELCOME_NOTIFICATION
+            ];
+            storageService.setItem(userId, 'notifications', demoNotifs);
+
+            localStorage.setItem(getKey(userId, 'seeded'), 'true');
+        }
     }
 };

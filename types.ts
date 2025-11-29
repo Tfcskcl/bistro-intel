@@ -110,6 +110,7 @@ export interface MenuGenerationRequest {
     budgetRange: string;
     mustIncludeItems: string;
     dietaryRestrictions: string[];
+    numberOfItems?: number;
     requestDate: string;
     generatedMenu?: string;
 }
@@ -214,6 +215,7 @@ export enum AppView {
   STRATEGY = 'STRATEGY',
   VIDEO = 'VIDEO',
   KITCHEN_WORKFLOW = 'KITCHEN_WORKFLOW',
+  MENU_GENERATOR = 'MENU_GENERATOR',
   INTEGRATIONS = 'INTEGRATIONS',
   BILLING = 'BILLING'
 }
@@ -271,7 +273,7 @@ export interface RazorpayResponse {
 declare global {
     interface Window {
         Razorpay: new (options: RazorpayOptions) => { open: () => void };
-        // aistudio: any; // Removed to avoid conflict with existing global definition
+        // aistudio definition removed to avoid conflict with existing global type
     }
 }
 

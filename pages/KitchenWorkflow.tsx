@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import { User, KitchenWorkflowRequest, UserRole } from '../types';
 import { storageService } from '../services/storageService';
@@ -45,7 +46,7 @@ export const KitchenWorkflow: React.FC<KitchenWorkflowProps> = ({ user, onUserUp
 
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
-            const newFiles = Array.from(e.target.files).map(file => ({
+            const newFiles = Array.from(e.target.files).map((file: File) => ({
                 name: file.name,
                 type: file.type.startsWith('video') ? 'video' : 'image' as any,
                 size: (file.size / 1024 / 1024).toFixed(2) + ' MB'

@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { LayoutDashboard, ChefHat, FileText, TrendingUp, Database, CreditCard, LogOut, Clapperboard, RefreshCw, GitMerge } from 'lucide-react';
+import { LayoutDashboard, ChefHat, FileText, TrendingUp, Database, CreditCard, LogOut, Clapperboard, RefreshCw, GitMerge, BookOpen } from 'lucide-react';
 import { AppView, User, PlanType, UserRole } from '../types';
 import { Logo } from './Logo';
 import { storageService } from '../services/storageService';
@@ -25,10 +25,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
     { id: AppView.DASHBOARD, label: 'Dashboard', icon: LayoutDashboard },
     { id: AppView.INTEGRATIONS, label: 'Data & Integrations', icon: Database, allowedRoles: [UserRole.OWNER, UserRole.SUPER_ADMIN, UserRole.ADMIN] },
     { id: AppView.RECIPES, label: 'Recipe & Costing', icon: ChefHat, allowedRoles: [UserRole.OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN] },
+    { id: AppView.MENU_GENERATOR, label: 'Menu Generator', icon: BookOpen, allowedRoles: [UserRole.OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN] },
     { id: AppView.SOP, label: 'SOP Studio', icon: FileText, allowedRoles: [UserRole.OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN] },
     { id: AppView.KITCHEN_WORKFLOW, label: 'Kitchen Workflow', icon: GitMerge, allowedRoles: [UserRole.OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN] },
     { id: AppView.VIDEO, label: 'Marketing Studio', icon: Clapperboard, allowedRoles: [UserRole.OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN] },
-    // Strategy is now open to all plans via Credit System, but we can keep it marked or just open
     { id: AppView.STRATEGY, label: 'Strategy AI', icon: TrendingUp, allowedRoles: [UserRole.OWNER, UserRole.SUPER_ADMIN] },
     { id: AppView.BILLING, label: 'Plans & Billing', icon: CreditCard, allowedRoles: [UserRole.OWNER] },
   ];
@@ -46,7 +46,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
       
       <nav className="flex-1 p-4 space-y-2 overflow-y-auto custom-scrollbar">
         {menuItems.map((item) => {
-          // Role Check
           if (item.allowedRoles && !item.allowedRoles.includes(user.role)) {
               return null;
           }
@@ -54,24 +53,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
           const Icon = item.icon;
           const isActive = currentView === item.id;
           
-          // Legacy lock logic removed in favor of Credit System
-          const isLocked = false; 
-
           return (
             <button
               key={item.id}
-              onClick={() => !isLocked && onChangeView(item.id)}
+              onClick={() => onChangeView(item.id)}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
                 isActive 
                   ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-yellow-500/10 dark:text-yellow-400 dark:border-yellow-500/50' 
-                  : isLocked 
-                    ? 'text-slate-400 cursor-not-allowed' 
-                    : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'
+                  : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'
               }`}
             >
               <Icon size={20} />
               <span className="font-medium flex-1 text-left">{item.label}</span>
-              {isLocked && <span className="text-[10px] px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded uppercase">Lock</span>}
             </button>
           );
         })}

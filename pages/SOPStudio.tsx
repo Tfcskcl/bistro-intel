@@ -1,433 +1,319 @@
 
 import React, { useState, useEffect } from 'react';
+import { User, SOP, SOPRequest, UserRole } from '../types';
 import { generateSOP } from '../services/geminiService';
-import { SOP, User, UserRole, SOPRequest } from '../types';
-import { FileText, Loader2, CheckSquare, AlertTriangle, PlayCircle, Lock, Save, Trash2, Zap, AlertCircle, Inbox, UserCheck, Clock3, CheckCircle2, Sparkles, Send, Wallet } from 'lucide-react';
 import { storageService } from '../services/storageService';
 import { CREDIT_COSTS } from '../constants';
+import { FileText, Loader2, Sparkles, Save, Search, AlertCircle, CheckCircle2, Clock, Wallet, BookOpen, Printer, Share2, User as UserIcon } from 'lucide-react';
 
 interface SOPStudioProps {
-    user: User;
-    onUserUpdate?: (user: User) => void;
+  user: User;
+  onUserUpdate?: (user: User) => void;
 }
 
 export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
-  const [topic, setTopic] = useState('');
-  const [details, setDetails] = useState(''); // New field for request details
-  const [sop, setSop] = useState<SOP | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  
-  // View Modes - Default to 'saved' to show library first
-  const [viewMode, setViewMode] = useState<'generator' | 'request-form' | 'saved' | 'requests'>('saved');
-  
-  const [savedSOPs, setSavedSOPs] = useState<SOP[]>([]);
-  const [saveStatus, setSaveStatus] = useState<string | null>(null);
-
-  // Request State
-  const [myRequests, setMyRequests] = useState<SOPRequest[]>([]);
-  const [adminQueue, setAdminQueue] = useState<SOPRequest[]>([]);
-  const [activeRequest, setActiveRequest] = useState<SOPRequest | null>(null);
-
   const isAdmin = [UserRole.ADMIN, UserRole.SUPER_ADMIN].includes(user.role);
+  const [viewMode, setViewMode] = useState<'create' | 'saved' | 'requests'>('create');
+  
+  // Generator State
+  const [topic, setTopic] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedSOP, setGeneratedSOP] = useState<SOP | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // Saved SOPs
+  const [savedSOPs, setSavedSOPs] = useState<SOP[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Requests
+  const [requests, setRequests] = useState<SOPRequest[]>([]);
 
   useEffect(() => {
-      setSavedSOPs(storageService.getSavedSOPs(user.id));
-      refreshRequests();
-  }, [user.id, user.role]);
-
-  const refreshRequests = () => {
-    const allRequests = storageService.getAllSOPRequests();
+    loadSavedSOPs();
     if (isAdmin) {
-        setAdminQueue(allRequests.filter(r => r.status === 'pending'));
-    } else {
-        setMyRequests(allRequests.filter(r => r.userId === user.id));
+      loadRequests();
     }
+  }, [user.id, isAdmin]);
+
+  const loadSavedSOPs = () => {
+    setSavedSOPs(storageService.getSavedSOPs(user.id));
   };
 
-  const checkCredits = (): boolean => {
-      if (isAdmin) return true;
-      const cost = CREDIT_COSTS.SOP;
-      if (user.credits < cost) {
-          setError(`Insufficient Credits. SOP requires ${cost} credits. Balance: ${user.credits}.`);
-          return false;
-      }
-      return true;
+  const loadRequests = () => {
+    setRequests(storageService.getAllSOPRequests().filter(r => r.status === 'pending'));
   };
 
-  const deductCredits = () => {
-      if (!isAdmin && onUserUpdate) {
-          const cost = CREDIT_COSTS.SOP;
-          const success = storageService.deductCredits(user.id, cost, 'SOP Request');
-          if (success) {
-              onUserUpdate({ ...user, credits: user.credits - cost });
-          }
-      }
-  };
-
-  // 1. Submit Generation (Admin Only)
-  const handleGenerate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!topic.trim()) return;
+  const handleGenerate = async () => {
+    if (!topic) return;
     
-    // Admins just generate, no credits deducted usually for them unless configured
-    setLoading(true);
-    setSop(null);
-    setError(null);
-    try {
-      const fullPrompt = details ? `${topic}. Context: ${details}` : topic;
-      const result = await generateSOP(fullPrompt);
-      setSop(result);
-    } catch (err: any) {
-      setError(err.message || "Failed to generate SOP.");
-    } finally {
-      setLoading(false);
+    if (!isAdmin) {
+      if (user.credits < CREDIT_COSTS.SOP) {
+        setError(`Insufficient credits. Required: ${CREDIT_COSTS.SOP}, Available: ${user.credits}`);
+        return;
+      }
     }
-  };
 
-  // 2. Submit Request (Owner Only)
-  const handleRequestSubmit = async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!topic.trim()) return;
-      if (!checkCredits()) return;
+    setIsGenerating(true);
+    setError(null);
 
-      deductCredits();
+    try {
+      if (!isAdmin && onUserUpdate) {
+        const success = storageService.deductCredits(user.id, CREDIT_COSTS.SOP, `SOP Generation: ${topic}`);
+        if (!success) throw new Error("Credit deduction failed");
+        onUserUpdate({ ...user, credits: user.credits - CREDIT_COSTS.SOP });
+      }
 
-      const newRequest: SOPRequest = {
-          id: `sop_req_${Date.now()}`,
-          userId: user.id,
-          userName: user.name,
-          topic: topic,
-          details: details,
-          status: 'pending',
-          requestDate: new Date().toISOString()
-      };
-
-      storageService.saveSOPRequest(newRequest);
-      refreshRequests();
-      setTopic('');
-      setDetails('');
-      alert(`SOP Request sent! ${CREDIT_COSTS.SOP} credits deducted.`);
-      setViewMode('requests');
-  };
-
-  // 3. Admin Fulfill Request
-  const handleFulfillRequest = (req: SOPRequest) => {
-      setActiveRequest(req);
-      setTopic(req.topic);
-      setDetails(req.details || '');
-      setViewMode('generator');
+      const sop = await generateSOP(topic);
+      setGeneratedSOP(sop);
+    } catch (err: any) {
+      setError(err.message || "Failed to generate SOP");
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handleSave = () => {
-      if (sop) {
-          if (isAdmin && activeRequest) {
-              // Save to Requester's Library
-              storageService.saveSOP(activeRequest.userId, sop);
-              
-              // Mark request complete
-              const completedReq: SOPRequest = {
-                  ...activeRequest,
-                  status: 'completed',
-                  completedDate: new Date().toISOString()
-              };
-              storageService.updateSOPRequest(completedReq);
-              
-              refreshRequests();
-              setActiveRequest(null);
-              setSaveStatus(`Sent to ${activeRequest.userName}`);
-              setTopic('');
-              setDetails('');
-              setSop(null);
-              setViewMode('requests');
-          } else {
-              // Save to My Library (Standard Save)
-              storageService.saveSOP(user.id, sop);
-              setSavedSOPs(storageService.getSavedSOPs(user.id));
-              setSaveStatus("Saved to library");
-          }
-          setTimeout(() => setSaveStatus(null), 2000);
-      }
+    if (generatedSOP) {
+      storageService.saveSOP(user.id, generatedSOP);
+      loadSavedSOPs();
+      setViewMode('saved');
+      setGeneratedSOP(null);
+      setTopic('');
+    }
+  };
+
+  const handleFulfillRequest = async (req: SOPRequest) => {
+    setIsGenerating(true);
+    try {
+        const sop = await generateSOP(req.topic);
+        storageService.updateSOPRequest({
+            ...req,
+            status: 'completed',
+            completedDate: new Date().toISOString()
+        });
+        loadRequests();
+    } catch (err: any) {
+        alert("Failed to generate SOP for request: " + err.message);
+    } finally {
+        setIsGenerating(false);
+    }
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
-       {/* Top Bar */}
-       <div className="flex justify-between items-center mb-6">
-            <div className="flex gap-2 mx-auto">
-                {isAdmin ? (
-                    <button 
-                        onClick={() => setViewMode('generator')}
-                        className={`px-6 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-2 ${viewMode === 'generator' ? 'bg-slate-900 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'}`}
-                    >
-                        <Sparkles size={16} /> Generator
-                    </button>
-                ) : (
-                    <button 
-                        onClick={() => setViewMode('request-form')}
-                        className={`px-6 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-2 ${viewMode === 'request-form' ? 'bg-slate-900 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'}`}
-                    >
-                        <Send size={16} /> Request SOP
-                    </button>
-                )}
-                
-                <button 
-                    onClick={() => setViewMode('saved')}
-                    className={`px-6 py-2 rounded-lg text-sm font-bold transition-colors ${viewMode === 'saved' ? 'bg-slate-900 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'}`}
-                >
-                    Saved SOPs ({savedSOPs.length})
-                </button>
-
-                <button 
-                    onClick={() => setViewMode('requests')}
-                    className={`px-6 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-2 ${viewMode === 'requests' ? 'bg-slate-900 text-white shadow-md' : 'bg-white text-slate-600 hover:bg-slate-50 border border-slate-200'}`}
-                >
-                    {isAdmin ? (
-                        <>
-                            Request Queue
-                            {adminQueue.length > 0 && <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{adminQueue.length}</span>}
-                        </>
-                    ) : (
-                        <>
-                            My Requests
-                            {myRequests.filter(r => r.status === 'pending').length > 0 && <span className="bg-yellow-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{myRequests.filter(r => r.status === 'pending').length}</span>}
-                        </>
-                    )}
-                </button>
-            </div>
-            
-            <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-400 rounded-full text-xs font-bold absolute right-8">
-                <Wallet size={12} fill="currentColor" />
-                Credits: {user.credits}
-            </div>
+    <div className="h-[calc(100vh-6rem)] flex flex-col gap-6">
+      <div className="flex justify-between items-center">
+        <div className="flex gap-2">
+          <button 
+             onClick={() => setViewMode('create')}
+             className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${viewMode === 'create' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`}
+           >
+             Create SOP
+           </button>
+           <button 
+             onClick={() => setViewMode('saved')}
+             className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${viewMode === 'saved' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`}
+           >
+             Saved Library
+           </button>
+           {isAdmin && (
+             <button 
+               onClick={() => setViewMode('requests')}
+               className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${viewMode === 'requests' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`}
+             >
+               User Requests
+             </button>
+           )}
+        </div>
+        <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-800 rounded-full text-xs font-bold">
+            <Wallet size={12} fill="currentColor" />
+            Credits: {user.credits}
+        </div>
       </div>
 
-      {viewMode === 'requests' && (
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 overflow-y-auto flex-1 animate-fade-in">
-              <h2 className="text-xl font-bold text-slate-800 mb-4">{isAdmin ? 'Customer SOP Requests' : 'My SOP Requests'}</h2>
-              
-              <div className="space-y-3">
-                  {(isAdmin ? adminQueue : myRequests).length === 0 ? (
-                      <p className="text-slate-500 text-center py-8">No pending requests found.</p>
-                  ) : (
-                      (isAdmin ? adminQueue : myRequests).map((req, i) => (
-                          <div key={i} className="flex justify-between items-center p-4 border border-slate-100 rounded-lg hover:border-slate-300 transition-colors bg-slate-50">
-                              <div className="flex items-start gap-4">
-                                  <div className={`p-3 rounded-full ${req.status === 'completed' ? 'bg-emerald-100 text-emerald-600' : 'bg-yellow-100 text-yellow-600'}`}>
-                                      {req.status === 'completed' ? <CheckCircle2 size={20} /> : <Clock3 size={20} />}
-                                  </div>
-                                  <div>
-                                      <h4 className="font-bold text-slate-800">{req.topic}</h4>
-                                      <p className="text-xs text-slate-500">Requested by: <span className="font-semibold">{req.userName}</span> • {new Date(req.requestDate).toLocaleString()}</p>
-                                      {req.details && <p className="text-xs text-slate-600 mt-1 italic max-w-lg bg-white p-2 rounded border border-slate-100">{req.details}</p>}
-                                  </div>
-                              </div>
-                              
-                              <div>
-                                  {req.status === 'completed' ? (
-                                      <span className="px-3 py-1 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-full">Completed</span>
-                                  ) : (
-                                      isAdmin ? (
-                                          <button 
-                                            onClick={() => handleFulfillRequest(req)}
-                                            className="px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded hover:bg-emerald-600 transition-colors flex items-center gap-2"
-                                          >
-                                              <Sparkles size={14} fill="currentColor" /> Generate
-                                          </button>
-                                      ) : (
-                                          <span className="px-3 py-1 bg-yellow-100 text-yellow-700 text-xs font-bold rounded-full flex items-center gap-1">
-                                              <Clock3 size={12} /> Pending Admin
-                                          </span>
-                                      )
-                                  )}
-                              </div>
-                          </div>
-                      ))
-                  )}
-              </div>
-          </div>
-      )}
+      <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+        {viewMode === 'create' && (
+          <div className="flex h-full">
+            <div className="w-1/3 border-r border-slate-200 p-6 bg-slate-50 overflow-y-auto">
+               <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
+                 <FileText className="text-blue-600" /> Standard Operating Procedure
+               </h3>
+               
+               <div className="space-y-4">
+                 <div>
+                   <label className="block text-xs font-bold text-slate-500 uppercase mb-2">SOP Topic / Title</label>
+                   <input 
+                     type="text" 
+                     value={topic}
+                     onChange={(e) => setTopic(e.target.value)}
+                     placeholder="e.g. Daily Kitchen Opening Checklist"
+                     className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none"
+                   />
+                 </div>
 
-      {viewMode === 'saved' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fade-in">
-              {savedSOPs.length === 0 ? (
-                  <div className="col-span-full text-center py-12 text-slate-400 bg-white rounded-xl border border-slate-200">
-                      <FileText size={48} className="mx-auto mb-4 opacity-50" />
-                      <p>No SOPs saved yet. {isAdmin ? 'Create' : 'Request'} one to standardise your ops!</p>
-                  </div>
-              ) : (
-                  savedSOPs.map((s, idx) => (
-                      <div key={idx} className="bg-white p-6 rounded-xl border border-slate-200 hover:border-emerald-300 transition-all shadow-sm group">
-                          <div className="flex justify-between items-start mb-4">
-                              <h3 className="font-bold text-slate-800 text-lg">{s.title}</h3>
-                              <div className="bg-slate-100 p-2 rounded-lg text-slate-400 group-hover:text-emerald-600 transition-colors">
-                                  <FileText size={20} />
-                              </div>
-                          </div>
-                          <p className="text-sm text-slate-500 line-clamp-2 mb-4">{s.scope}</p>
-                          <div className="flex items-center gap-4 text-xs text-slate-400">
-                              <span>{s.stepwise_procedure.length} Steps</span>
-                              <span>•</span>
-                              <span>{s.critical_control_points.length} CCPs</span>
-                          </div>
-                          <button 
-                             onClick={() => {
-                                 setSop(s);
-                                 setViewMode('generator'); 
-                             }}
-                             className="w-full mt-4 py-2 border border-slate-200 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-50 hover:text-emerald-700 transition-colors"
-                          >
-                              View Full Document
-                          </button>
-                      </div>
-                  ))
-              )}
-          </div>
-      )}
-      
-      {/* Generator / Request Form View */}
-      {(viewMode === 'generator' || viewMode === 'request-form') && (
-        <>
-            <div className="bg-white p-8 rounded-xl border border-slate-200 shadow-sm text-center">
-                <h2 className="text-2xl font-bold text-slate-800 mb-2">
-                    {isAdmin ? (activeRequest ? 'Fulfilling SOP Request' : 'SOP Studio Generator') : 'Request New SOP'}
-                </h2>
-                <p className="text-slate-500 mb-6">
-                    {isAdmin ? 'Create standardized operational procedures instantly.' : `Cost: ${CREDIT_COSTS.SOP} Credits. Our admins will generate it for you.`}
-                </p>
-                
-                {activeRequest && (
-                    <div className="mb-4 inline-block bg-yellow-50 border border-yellow-200 px-4 py-2 rounded-lg text-sm text-yellow-800 font-medium">
-                        <UserCheck size={16} className="inline mr-2" /> Fulfilling request for: {activeRequest.userName}
+                 {error && (
+                    <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg flex items-center gap-2">
+                        <AlertCircle size={16} />
+                        {error}
                     </div>
-                )}
-                
-                <form onSubmit={isAdmin ? handleGenerate : handleRequestSubmit} className="flex flex-col gap-4 max-w-2xl mx-auto">
-                    <div className="flex flex-col gap-2 text-left">
-                        <label className="text-xs font-bold text-slate-500 uppercase">SOP Topic / Title</label>
-                        <input
-                            type="text"
-                            value={topic}
-                            onChange={(e) => setTopic(e.target.value)}
-                            placeholder="e.g., Cold chain storage for smoothie bowls, Opening checklist..."
-                            className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
-                        />
-                    </div>
-                    
-                    <div className="flex flex-col gap-2 text-left">
-                         <label className="text-xs font-bold text-slate-500 uppercase">Additional Details / Context</label>
-                         <textarea
-                            value={details}
-                            onChange={(e) => setDetails(e.target.value)}
-                            placeholder="e.g. Include specific temperature checks, mention 'Head Chef' as responsible role..."
-                            rows={3}
-                            className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none resize-none"
-                         />
-                    </div>
-                    
-                    <button 
-                        type="submit" 
-                        disabled={loading || !topic}
-                        className="mt-2 px-6 py-3 bg-slate-900 text-white rounded-lg font-bold hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all shadow-lg"
-                    >
-                        {loading ? <Loader2 className="animate-spin" size={20} /> : isAdmin ? <Sparkles size={20} fill="currentColor" /> : <Inbox size={20} />}
-                        {loading ? 'Processing...' : isAdmin ? 'Generate SOP' : `Submit Request (${CREDIT_COSTS.SOP} CR)`}
-                    </button>
-                    
-                    {error && (
-                        <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-200 p-3 rounded-lg mt-2 text-left">
-                            <AlertCircle size={16} className="shrink-0" />
-                            <span>{error}</span>
-                        </div>
-                    )}
-                </form>
+                 )}
+
+                 <button 
+                   onClick={handleGenerate}
+                   disabled={isGenerating || !topic}
+                   className="w-full py-3 bg-slate-900 text-white font-bold rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                 >
+                   {isGenerating ? <Loader2 className="animate-spin" size={20} /> : <Sparkles size={20} />}
+                   Generate ({CREDIT_COSTS.SOP} CR)
+                 </button>
+               </div>
             </div>
 
-            {sop && (
-                <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden animate-fade-in">
-                <div className="bg-slate-50 px-8 py-6 border-b border-slate-200 flex justify-between items-center">
-                    <div>
-                    <span className="text-xs font-mono text-slate-400 block mb-1">ID: {sop.sop_id}</span>
-                    <h1 className="text-2xl font-bold text-slate-800">{sop.title}</h1>
+            <div className="flex-1 p-8 overflow-y-auto bg-slate-50/50">
+               {generatedSOP ? (
+                 <div className="max-w-4xl mx-auto bg-white p-8 rounded-xl shadow-sm border border-slate-200 animate-fade-in">
+                    <div className="flex justify-between items-start mb-8 border-b border-slate-100 pb-4">
+                       <div>
+                         <h1 className="text-2xl font-bold text-slate-900">{generatedSOP.title}</h1>
+                         <p className="text-slate-500 mt-1">ID: {generatedSOP.sop_id} • Scope: {generatedSOP.scope}</p>
+                       </div>
+                       <button 
+                         onClick={handleSave}
+                         className="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 flex items-center gap-2 shadow-lg shadow-blue-500/20"
+                       >
+                         <Save size={18} /> Save SOP
+                       </button>
                     </div>
-                    <div className="flex gap-3">
-                        <button 
-                            onClick={handleSave}
-                            className="flex items-center gap-2 text-emerald-600 bg-white border border-emerald-200 hover:bg-emerald-50 px-4 py-2 rounded-lg font-bold shadow-sm transition-all"
-                        >
-                            <Save size={18} /> {saveStatus || (activeRequest ? 'Send to User' : 'Save to Library')}
-                        </button>
-                    </div>
-                </div>
 
-                <div className="p-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    <div className="lg:col-span-2 space-y-8">
-                    <section>
-                        <h3 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
-                        <FileText size={18} className="text-emerald-600" /> Procedure
-                        </h3>
-                        <div className="space-y-4">
-                        {sop.stepwise_procedure.map((step, idx) => (
-                            <div key={idx} className="flex gap-4 p-4 rounded-lg border border-slate-100 bg-slate-50/50">
-                            <div className="w-8 h-8 rounded-full bg-slate-800 text-white flex items-center justify-center font-bold text-sm shrink-0">
-                                {step.step_no}
-                            </div>
-                            <div>
-                                <p className="text-slate-700 font-medium">{step.action}</p>
-                                <div className="flex gap-4 mt-2 text-xs text-slate-500 uppercase tracking-wide">
-                                <span>Role: {step.responsible_role}</span>
-                                {step.time_limit && <span>Time: {step.time_limit}</span>}
+                    <div className="grid grid-cols-2 gap-8 mb-8">
+                       <div>
+                          <h3 className="font-bold text-slate-800 mb-2 uppercase text-xs tracking-wider">Prerequisites</h3>
+                          <p className="text-sm text-slate-600 bg-slate-50 p-3 rounded border border-slate-100">{generatedSOP.prerequisites}</p>
+                       </div>
+                       <div>
+                          <h3 className="font-bold text-slate-800 mb-2 uppercase text-xs tracking-wider">Materials Needed</h3>
+                          <div className="flex flex-wrap gap-2">
+                             {generatedSOP.materials_equipment.map((item, i) => (
+                               <span key={i} className="px-2 py-1 bg-slate-100 text-slate-600 text-xs rounded border border-slate-200">{item}</span>
+                             ))}
+                          </div>
+                       </div>
+                    </div>
+
+                    <div className="mb-8">
+                       <h3 className="font-bold text-slate-800 mb-4 uppercase text-xs tracking-wider">Step-by-Step Procedure</h3>
+                       <div className="space-y-3">
+                          {generatedSOP.stepwise_procedure.map((step, i) => (
+                             <div key={i} className="flex gap-4 p-4 border border-slate-100 rounded-lg hover:border-blue-200 transition-colors bg-white">
+                                <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold shrink-0">
+                                   {step.step_no}
                                 </div>
-                            </div>
-                            </div>
-                        ))}
-                        </div>
-                    </section>
-
-                    <section>
-                        <h3 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
-                        <AlertTriangle size={18} className="text-amber-500" /> Critical Control Points (CCP)
-                        </h3>
-                        <ul className="list-disc pl-5 space-y-1 text-slate-700">
-                        {sop.critical_control_points.map((ccp, i) => (
-                            <li key={i}>{ccp}</li>
-                        ))}
-                        </ul>
-                    </section>
+                                <div className="flex-1">
+                                   <p className="font-bold text-slate-800 text-sm">{step.action}</p>
+                                   <div className="flex gap-4 mt-2 text-xs text-slate-500">
+                                      <span className="flex items-center gap-1"><UserIcon size={12} className="inline"/> {step.responsible_role}</span>
+                                      {step.time_limit && <span className="flex items-center gap-1"><Clock size={12} className="inline"/> {step.time_limit}</span>}
+                                   </div>
+                                </div>
+                             </div>
+                          ))}
+                       </div>
                     </div>
 
-                    <div className="space-y-8">
-                    <div className="bg-emerald-50 p-6 rounded-lg border border-emerald-100">
-                        <h3 className="font-bold text-emerald-900 mb-3">Materials & Equipment</h3>
-                        <ul className="space-y-2">
-                        {sop.materials_equipment.map((item, i) => (
-                            <li key={i} className="flex items-center gap-2 text-sm text-emerald-800">
-                            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
-                            {item}
-                            </li>
-                        ))}
-                        </ul>
+                    <div className="grid grid-cols-2 gap-8">
+                       <div className="bg-red-50 p-4 rounded-lg border border-red-100">
+                          <h3 className="font-bold text-red-800 mb-2 text-sm">Critical Control Points</h3>
+                          <ul className="list-disc pl-4 space-y-1 text-sm text-red-700">
+                             {generatedSOP.critical_control_points.map((pt, i) => (
+                               <li key={i}>{pt}</li>
+                             ))}
+                          </ul>
+                       </div>
+                       <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-100">
+                          <h3 className="font-bold text-emerald-800 mb-2 text-sm">KPIs & Monitoring</h3>
+                          <ul className="list-disc pl-4 space-y-1 text-sm text-emerald-700">
+                             {generatedSOP.kpis.map((kpi, i) => (
+                               <li key={i}>{kpi}</li>
+                             ))}
+                          </ul>
+                       </div>
                     </div>
 
-                    <div>
-                        <h3 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
-                        <CheckSquare size={18} className="text-blue-600" /> Monitoring Checklist
-                        </h3>
-                        <div className="space-y-2">
-                        {sop.monitoring_checklist.map((item, i) => (
-                            <label key={i} className="flex items-start gap-3 p-2 hover:bg-slate-50 rounded cursor-pointer">
-                            <input type="checkbox" className="mt-1 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
-                            <span className="text-sm text-slate-600">{item}</span>
-                            </label>
-                        ))}
-                        </div>
+                 </div>
+               ) : (
+                 <div className="h-full flex flex-col items-center justify-center text-slate-400 opacity-60">
+                    <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mb-6">
+                      <BookOpen size={48} />
                     </div>
-                    </div>
+                    <p className="text-lg font-medium">Standardize your operations</p>
+                    <p className="text-sm">Generate checklists, training manuals, and procedures instantly.</p>
+                 </div>
+               )}
+            </div>
+          </div>
+        )}
+
+        {viewMode === 'saved' && (
+           <div className="p-6 h-full flex flex-col">
+              <div className="flex gap-4 mb-6">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
+                  <input 
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search SOPs..."
+                    className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
                 </div>
-                </div>
-            )}
-        </>
-      )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 overflow-y-auto">
+                 {savedSOPs
+                   .filter(s => s.title.toLowerCase().includes(searchQuery.toLowerCase()))
+                   .map((sop, idx) => (
+                     <div key={idx} className="bg-white border border-slate-200 rounded-xl p-5 hover:border-blue-500 transition-colors shadow-sm group cursor-pointer" onClick={() => setGeneratedSOP(sop)}>
+                        <h4 className="font-bold text-lg text-slate-800 group-hover:text-blue-700 mb-2">{sop.title}</h4>
+                        <p className="text-xs text-slate-500 line-clamp-2 mb-4">{sop.scope}</p>
+                        <div className="flex justify-between items-center pt-4 border-t border-slate-100">
+                           <span className="text-xs font-bold text-slate-400">{sop.stepwise_procedure.length} Steps</span>
+                           <button className="text-slate-400 hover:text-blue-600"><Printer size={16} /></button>
+                        </div>
+                     </div>
+                   ))}
+              </div>
+           </div>
+        )}
+
+        {viewMode === 'requests' && isAdmin && (
+           <div className="p-6 h-full overflow-y-auto">
+              <h3 className="text-lg font-bold text-slate-800 mb-6">Pending SOP Requests</h3>
+              <div className="space-y-4">
+                 {requests.length === 0 ? <p className="text-slate-500 text-center py-12">No requests pending.</p> : requests.map(req => (
+                    <div key={req.id} className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center justify-between">
+                       <div>
+                          <h4 className="font-bold text-slate-800">{req.topic}</h4>
+                          <p className="text-sm text-slate-600 mt-1">{req.details}</p>
+                          <p className="text-xs text-slate-400 mt-2">Requested by: {req.userName}</p>
+                       </div>
+                       <div>
+                          {req.status === 'completed' ? (
+                             <span className="px-3 py-1 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-full">Completed</span>
+                          ) : (
+                             <button 
+                               onClick={() => handleFulfillRequest(req)}
+                               disabled={isGenerating}
+                               className="px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded hover:bg-blue-600 transition-colors flex items-center gap-2"
+                             >
+                               {isGenerating ? <Loader2 className="animate-spin" size={14} /> : <Sparkles size={14} />} Fulfill
+                             </button>
+                          )}
+                       </div>
+                    </div>
+                 ))}
+              </div>
+           </div>
+        )}
+      </div>
     </div>
   );
 };

@@ -1,11 +1,10 @@
 
-// ... existing imports
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { PLANS, CREDIT_COSTS } from '../constants';
 import { generateRecipeCard, generateRecipeVariation } from '../services/geminiService';
 import { ingredientService } from '../services/ingredientService';
 import { RecipeCard, MenuItem, User, UserRole, POSChangeRequest, RecipeRequest } from '../types';
-import { Loader2, ChefHat, Scale, Clock, AlertCircle, Upload, Lock, Sparkles, Check, Save, RefreshCw, Search, Plus, Store, Zap, Trash2, Building2, FileSignature, X, AlignLeft, UtensilsCrossed, Inbox, UserCheck, CheckCircle2, Clock3, Carrot, Type, Wallet } from 'lucide-react';
+import { Loader2, ChefHat, Scale, Clock, AlertCircle, Upload, Lock, Sparkles, Check, Save, RefreshCw, Search, Plus, Store, Zap, Trash2, Building2, FileSignature, X, AlignLeft, UtensilsCrossed, Inbox, UserCheck, CheckCircle2, Clock3, Carrot, Type, Wallet, Filter, Tag, Eye, Flame, Wand2, Eraser, FileDown } from 'lucide-react';
 import { storageService } from '../services/storageService';
 import { authService } from '../services/authService';
 
@@ -14,8 +13,23 @@ interface RecipeHubProps {
   onUserUpdate?: (user: User) => void;
 }
 
+const SAMPLE_DISHES = [
+    { name: "Truffle Mushroom Risotto", desc: "Creamy arborio rice, wild mushrooms, parmesan crisp, truffle oil drizzle.", cuisine: "Italian", ingredients: "Arborio Rice, Wild Mushrooms, Truffle Oil, Parmesan", dietary: ["Vegetarian", "Gluten-Free"] },
+    { name: "Spicy Tuna Tartare", desc: "Fresh tuna cubes, avocado mousse, sesame soy dressing, crispy wonton chips.", cuisine: "Asian Fusion", ingredients: "Tuna, Avocado, Sesame Oil, Wonton Wrappers", dietary: ["Pescatarian", "Dairy-Free"] },
+    { name: "Vegan Jackfruit Tacos", desc: "Pulled bbq jackfruit, pineapple salsa, cilantro lime slaw, corn tortillas.", cuisine: "Mexican", ingredients: "Young Jackfruit, Corn Tortillas, Pineapple, Cilantro", dietary: ["Vegan", "Gluten-Free"] },
+    { name: "Classic Beef Wellington", desc: "Filet mignon, mushroom duxelles, prosciutto, puff pastry, red wine jus.", cuisine: "French / British", ingredients: "Beef Tenderloin, Puff Pastry, Mushrooms, Prosciutto", dietary: [] },
+    { name: "Matcha Lava Cake", desc: "Warm green tea chocolate fondant with vanilla bean ice cream.", cuisine: "Japanese Fusion", ingredients: "White Chocolate, Matcha Powder, Eggs, Flour", dietary: ["Vegetarian"] }
+];
+
+const POPULAR_IDEAS = [
+    { name: "Avocado Toast", desc: "Sourdough toast, smashed avocado, poached egg, chili flakes.", cuisine: "Modern Cafe", ingredients: "Sourdough, Avocado, Egg, Chili Flakes", dietary: ["Vegetarian"] },
+    { name: "Pad Thai", desc: "Rice noodles, tamarind sauce, peanuts, bean sprouts, lime, shrimp/tofu.", cuisine: "Thai", ingredients: "Rice Noodles, Tamarind Paste, Peanuts, Bean Sprouts", dietary: ["Gluten-Free", "Dairy-Free"] },
+    { name: "Caesar Salad", desc: "Romaine lettuce, croutons, parmesan, creamy caesar dressing.", cuisine: "American", ingredients: "Romaine Lettuce, Parmesan, Croutons, Anchovies", dietary: [] },
+    { name: "Butter Chicken", desc: "Tandoori chicken in a rich tomato and butter gravy.", cuisine: "Indian", ingredients: "Chicken, Tomato, Butter, Cream, Garam Masala", dietary: ["Gluten-Free"] },
+    { name: "Acai Bowl", desc: "Frozen acai blend topped with granola, banana, and berries.", cuisine: "Health Food", ingredients: "Acai Pulp, Banana, Granola, Berries", dietary: ["Vegan", "Dairy-Free"] }
+];
+
 export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
-  // ... existing state ...
   const [selectedSku, setSelectedSku] = useState<string | null>(null);
   const [generatedRecipe, setGeneratedRecipe] = useState<RecipeCard | null>(null);
   const [loading, setLoading] = useState(false);
@@ -23,41 +37,40 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
   const [error, setError] = useState<string | null>(null);
   const [importStatus, setImportStatus] = useState<string | null>(null);
   
-  // View Modes: 'generator' is now Contextual (Request Form for Owner / Generator for Admin)
+  // View Modes
   const [viewMode, setViewMode] = useState<'generator' | 'saved' | 'requests'>('generator');
   
   const [savedRecipes, setSavedRecipes] = useState<RecipeCard[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   
+  // Search & Filter State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
+
   // Request Management
   const [myRequests, setMyRequests] = useState<RecipeRequest[]>([]);
   const [adminQueue, setAdminQueue] = useState<RecipeRequest[]>([]);
-  const [activeRequest, setActiveRequest] = useState<RecipeRequest | null>(null); // For Admin fulfilling
+  const [activeRequest, setActiveRequest] = useState<RecipeRequest | null>(null); 
+  const [previewRequest, setPreviewRequest] = useState<RecipeRequest | null>(null); 
 
   const [posPushStatus, setPosPushStatus] = useState<string | null>(null);
-  const [customItemName, setCustomItemName] = useState('');
   
   const [restaurants, setRestaurants] = useState<User[]>([]);
   const [selectedRestaurantId, setSelectedRestaurantId] = useState<string>('');
 
-  // Loading states for actions
+  // Loading states
   const [isSaving, setIsSaving] = useState(false);
   const [isPushing, setIsPushing] = useState(false);
 
-  // Requirement Form State
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [formItem, setFormItem] = useState<MenuItem | null>(null);
-  const [formData, setFormData] = useState<{
-      cuisine: string;
-      dietary: string[];
-      notes: string;
-      ingredients: string;
-  }>({
-      cuisine: '',
-      dietary: [],
-      notes: '',
-      ingredients: ''
-  });
+  // Unified Form State
+  const [dishName, setDishName] = useState('');
+  const [cuisine, setCuisine] = useState('');
+  const [ingredients, setIngredients] = useState('');
+  const [dietary, setDietary] = useState<string[]>([]);
+  const [notes, setNotes] = useState('');
+  // Helper for sidebar input
+  const [customItemName, setCustomItemName] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isAdmin = [UserRole.ADMIN, UserRole.SUPER_ADMIN].includes(user.role);
@@ -80,15 +93,45 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
   useEffect(() => {
     const fetchRestaurants = async () => {
         const allUsers = await authService.getAllUsers();
-        // In a real app, you'd filter by an Org ID. Here we just get all Owners to simulate outlets.
         const owners = allUsers.filter(u => u.restaurantName && u.role === UserRole.OWNER);
         setRestaurants(owners);
     };
     fetchRestaurants();
   }, []);
 
+  // Filter Logic
+  const filteredRecipes = useMemo(() => {
+      return savedRecipes.filter(recipe => {
+          const matchesSearch = recipe.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                                recipe.sku_id.toLowerCase().includes(searchQuery.toLowerCase());
+          
+          const matchesTags = selectedTags.length === 0 || 
+                              selectedTags.every(tag => recipe.tags?.includes(tag));
+          
+          return matchesSearch && matchesTags;
+      });
+  }, [savedRecipes, searchQuery, selectedTags]);
+
+  const uniqueTags = useMemo(() => {
+      const tags = new Set<string>();
+      savedRecipes.forEach(r => r.tags?.forEach(t => tags.add(t)));
+      return Array.from(tags).sort();
+  }, [savedRecipes]);
+
+  const toggleTag = (tag: string) => {
+      setSelectedTags(prev => 
+          prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+      );
+  };
+
+  const toggleDietary = (tag: string) => {
+    setDietary(prev => 
+        prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+    );
+  };
+
   const checkCredits = (): boolean => {
-      if (isAdmin) return true; // Admins bypass credit checks for demo/ops purposes usually, or consume organization credits
+      if (isAdmin) return true;
       
       const cost = CREDIT_COSTS.RECIPE;
       if (user.credits < cost) {
@@ -98,91 +141,133 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       return true;
   };
 
-  const deductCredits = () => {
+  const deductCredits = (): boolean => {
       if (!isAdmin && onUserUpdate) {
           const cost = CREDIT_COSTS.RECIPE;
           const success = storageService.deductCredits(user.id, cost, 'Recipe Generation');
           if (success) {
               onUserUpdate({ ...user, credits: user.credits - cost });
+              return true;
+          } else {
+              setError("Transaction failed. Insufficient credits.");
+              return false;
           }
       }
+      return true;
   };
 
   const handleTabChange = (mode: 'generator' | 'saved' | 'requests', keepState = false) => {
       setViewMode(mode);
-      // Clear errors on tab switch
       setError(null);
       
       if (mode === 'generator' && !keepState) {
-          // Explicitly clear active request so Admin isn't stuck in "Fulfillment" mode
-          setActiveRequest(null);
-          setGeneratedRecipe(null);
-          setSelectedSku(null);
-          setCustomItemName('');
-          setPosPushStatus(null);
+          resetForm();
       }
   };
 
-  // 1. Open Form from List
-  const handleGenerateClick = (item: MenuItem) => {
-      setFormItem(item);
-      setFormData({ cuisine: '', dietary: [], notes: '', ingredients: '' });
-      setIsFormOpen(true);
+  const resetForm = () => {
+      setActiveRequest(null);
+      setGeneratedRecipe(null);
+      setSelectedSku(null);
+      setDishName('');
+      setCuisine('');
+      setIngredients('');
+      setDietary([]);
+      setNotes('');
+      setPosPushStatus(null);
+      setError(null);
+      setCustomItemName('');
   };
 
-  // 2. Open Form from Custom Input
+  const loadItemIntoForm = (item: MenuItem) => {
+      setDishName(item.name);
+      setSelectedSku(item.sku_id);
+      // Try to populate ingredients from existing item data
+      if (item.ingredients && item.ingredients.length > 0) {
+          setIngredients(item.ingredients.map(i => i.name).join(', '));
+      } else {
+          setIngredients('');
+      }
+      setCuisine(''); // Reset context fields
+      setDietary([]);
+      setNotes('');
+      setGeneratedRecipe(null);
+      setError(null);
+  };
+
+  const handleSurpriseMe = () => {
+      const random = SAMPLE_DISHES[Math.floor(Math.random() * SAMPLE_DISHES.length)];
+      setDishName(random.name);
+      setNotes(random.desc);
+      setCuisine(random.cuisine);
+      setIngredients(random.ingredients);
+      setDietary(random.dietary);
+      setError(null);
+      setSelectedSku(null);
+  };
+
+  const handlePopularIdea = (idea: typeof POPULAR_IDEAS[0]) => {
+      setDishName(idea.name);
+      setNotes(idea.desc);
+      setCuisine(idea.cuisine);
+      setIngredients(idea.ingredients);
+      setDietary(idea.dietary);
+      setError(null);
+      setSelectedSku(null);
+  };
+
+  // Populate form from sidebar input
   const handleGenerateCustomClick = () => {
       if (!customItemName.trim()) return;
+      setDishName(customItemName);
+      setCuisine('');
+      setIngredients('');
+      setDietary([]);
+      setNotes('');
+      setSelectedSku(null);
+      setError(null);
+      // Clear the sidebar input to show it moved to main form
+      setCustomItemName(''); 
+  };
 
-      const tempSku = `NEW-${Date.now().toString().slice(-4)}`;
+  const handleFormSubmit = async (e?: React.FormEvent) => {
+      if (e) e.preventDefault();
+      if (!dishName) {
+          setError("Please enter a dish name.");
+          return;
+      }
+
+      if (!checkCredits()) return;
+
+      setError(null);
+
+      // Construct rich requirements
+      const requirements = `
+          Cuisine Style: ${cuisine || 'Standard'}
+          Key Ingredients to Include: ${ingredients || 'AI Suggested'}
+          Dietary Restrictions: ${dietary.length > 0 ? dietary.join(', ') : 'None'}
+          Preparation Notes: ${notes || 'Standard preparation'}
+      `.trim();
+
+      // Create temp item for generation
       const tempItem: MenuItem = {
-          sku_id: tempSku,
-          name: customItemName,
+          sku_id: selectedSku || `NEW-${Date.now().toString().slice(-4)}`,
+          name: dishName,
           category: 'main',
           prep_time_min: 0,
           current_price: 0,
           ingredients: []
       };
-      
-      setFormItem(tempItem);
-      setFormData({ cuisine: '', dietary: [], notes: '', ingredients: '' });
-      setIsFormOpen(true);
-  };
-
-  // 3. Submit Form -> Handle Request or Admin Generation
-  const handleFormSubmit = async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!formItem) return;
-
-      // Credit Check before anything
-      if (!checkCredits()) {
-          setIsFormOpen(false);
-          return;
-      }
-
-      setIsFormOpen(false); // Close modal
-      setError(null);
-
-      const requirements = `
-          Cuisine Style: ${formData.cuisine || 'Standard'}
-          Key Ingredients to Include: ${formData.ingredients || 'AI Suggested'}
-          Dietary Restrictions: ${formData.dietary.length > 0 ? formData.dietary.join(', ') : 'None'}
-          Preparation Notes: ${formData.notes || 'Standard preparation'}
-      `;
 
       if (isAdmin) {
-          // Admin Flow: Direct Generation
-          await runAdminGeneration(formItem, requirements);
+          await runAdminGeneration(tempItem, requirements);
       } else {
-          // Customer Flow: Create Request
-          createRequest(formItem, requirements);
+          createRequest(tempItem, requirements);
       }
   };
 
   const createRequest = (item: MenuItem, requirements: string) => {
-      // NOTE: We do not deduct credits for REQUESTING, only when Admin fulfills? 
-      // OR Deduct immediately. Let's deduct immediately for simplicity of the flow "Pay per query"
-      deductCredits();
+      if (!deductCredits()) return;
 
       const newRequest: RecipeRequest = {
           id: `req_${Date.now()}`,
@@ -196,7 +281,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       
       storageService.saveRecipeRequest(newRequest);
       refreshRequests();
-      setCustomItemName('');
+      resetForm();
       
       // Save item to menu if new
       if (!menuItems.find(m => m.sku_id === item.sku_id)) {
@@ -209,9 +294,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       handleTabChange('requests');
   };
 
-  const runAdminGeneration = async (item: MenuItem, requirements: string) => {
-      // Ensure UI enters "viewing" mode immediately
-      setSelectedSku(item.sku_id);
+  const runAdminGeneration = async (item: MenuItem, requirements: string, targetUserId?: string) => {
       setLoading(true);
       setLoadingText(`Designing ${item.name}...`);
       setGeneratedRecipe(null);
@@ -220,11 +303,10 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       setError(null);
 
       try {
-          // If fulfilling a request, use the requester's ID for ingredient context
-          const contextUserId = activeRequest ? activeRequest.userId : user.id;
+          // Use target user ID to fetch correct ingredients
+          const contextUserId = targetUserId || (activeRequest ? activeRequest.userId : user.id);
           const card = await generateRecipeCard(contextUserId, item, requirements);
           setGeneratedRecipe(card);
-          // If Admin is generating for themselves, deduct credits? Maybe not for Admin role.
       } catch (e: any) {
           console.error(e);
           setError(e.message || "Failed to generate recipe card. Please check your inputs or API key.");
@@ -233,13 +315,21 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       }
   };
 
-  // Admin: Select a request to fulfill
+  // Admin: Open form pre-populated with request details
   const handleFulfillRequest = (req: RecipeRequest) => {
       setActiveRequest(req);
       setViewMode('generator');
+      
+      // Pre-populate form
+      setDishName(req.item.name);
       setSelectedSku(req.item.sku_id);
-      // Trigger generation immediately
-      runAdminGeneration(req.item, req.requirements);
+      setNotes(req.requirements); // Dump raw requirements into notes for Admin to refine
+      // Reset structured fields as they might be in the string
+      setCuisine('');
+      setIngredients('');
+      setDietary([]);
+      
+      setGeneratedRecipe(null); // Clear previous result to show form
   };
 
   const handleVariation = async (type: string) => {
@@ -252,9 +342,10 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
     setPosPushStatus(null);
 
     try {
-      const variant = await generateRecipeVariation(user.id, generatedRecipe, type);
-      setGeneratedRecipe(variant);
-      deductCredits();
+        if (deductCredits()) {
+            const variant = await generateRecipeVariation(user.id, generatedRecipe, type);
+            setGeneratedRecipe(variant);
+        }
     } catch (e) {
       setError(`Failed to create ${type} variation.`);
     } finally {
@@ -294,12 +385,10 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       
       setTimeout(() => {
         if (isAdmin && activeRequest) {
-            // Admin fulfilling request
             const recipeToSave = { ...generatedRecipe };
             // Save to REQUESTER'S library
             storageService.saveRecipe(activeRequest.userId, recipeToSave);
             
-            // Mark Request Complete
             const completedReq: RecipeRequest = { 
                 ...activeRequest, 
                 status: 'completed', 
@@ -308,10 +397,9 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
             storageService.updateRecipeRequest(completedReq);
             
             refreshRequests();
-            setActiveRequest(null);
+            resetForm();
             setImportStatus(`Sent to ${activeRequest.userName}!`);
             handleTabChange('requests');
-            setGeneratedRecipe(null);
         } else {
             // Regular Save
             const restaurant = restaurants.find(r => r.id === selectedRestaurantId);
@@ -367,134 +455,157 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       }, 1000);
   };
 
+  // --- DOWNLOAD PDF LOGIC ---
+  const handleDownloadPDF = () => {
+      if (!generatedRecipe) return;
+
+      const content = `
+        <html>
+          <head>
+            <title>${generatedRecipe.name} - Recipe Card</title>
+            <style>
+              body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #333; padding: 40px; }
+              .header { border-bottom: 2px solid #10b981; padding-bottom: 20px; margin-bottom: 30px; }
+              .header h1 { margin: 0; font-size: 28px; color: #111; }
+              .meta { display: flex; gap: 20px; color: #666; margin-top: 10px; font-size: 14px; }
+              .meta-item { background: #f3f4f6; padding: 4px 10px; border-radius: 4px; font-weight: bold; }
+              
+              .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 40px; }
+              .box { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; }
+              .box h3 { margin-top: 0; color: #10b981; font-size: 16px; text-transform: uppercase; letter-spacing: 1px; }
+              
+              table { width: 100%; border-collapse: collapse; font-size: 14px; }
+              th { text-align: left; border-bottom: 2px solid #eee; padding: 8px 0; color: #888; font-weight: 600; }
+              td { border-bottom: 1px solid #eee; padding: 8px 0; }
+              .text-right { text-align: right; }
+              
+              .steps ol { padding-left: 20px; margin: 0; }
+              .steps li { margin-bottom: 12px; line-height: 1.5; color: #444; }
+              
+              .footer { margin-top: 50px; text-align: center; font-size: 12px; color: #aaa; border-top: 1px solid #eee; padding-top: 20px; }
+              .cost { font-size: 18px; font-weight: bold; color: #111; }
+              
+              @media print {
+                 body { padding: 0; }
+                 .box { border: 1px solid #ccc; }
+              }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+               <h1>${generatedRecipe.name}</h1>
+               <div class="meta">
+                  <span class="meta-item">SKU: ${generatedRecipe.sku_id}</span>
+                  <span class="meta-item">Yield: ${generatedRecipe.yield}</span>
+                  <span class="meta-item">Prep: ${generatedRecipe.prep_time_min} mins</span>
+                  <span class="meta-item">${generatedRecipe.category.toUpperCase()}</span>
+               </div>
+            </div>
+            
+            <div class="grid">
+               <div class="box">
+                  <h3>Costing</h3>
+                  <table>
+                    <tr>
+                       <td>Food Cost</td>
+                       <td class="text-right cost">₹${generatedRecipe.food_cost_per_serving.toFixed(2)}</td>
+                    </tr>
+                    <tr>
+                       <td>Suggested Price</td>
+                       <td class="text-right cost">₹${generatedRecipe.suggested_selling_price}</td>
+                    </tr>
+                    <tr>
+                       <td>Margin</td>
+                       <td class="text-right" style="color: #10b981; font-weight: bold;">
+                         ${((generatedRecipe.suggested_selling_price - generatedRecipe.food_cost_per_serving) / generatedRecipe.suggested_selling_price * 100).toFixed(1)}%
+                       </td>
+                    </tr>
+                  </table>
+               </div>
+               
+               <div class="box">
+                  <h3>Ingredients</h3>
+                  <table>
+                    <thead>
+                       <tr><th>Item</th><th class="text-right">Qty</th></tr>
+                    </thead>
+                    <tbody>
+                       ${generatedRecipe.ingredients.map(ing => `
+                          <tr>
+                             <td>${ing.name}</td>
+                             <td class="text-right">${ing.qty_per_serving} ${ing.unit}</td>
+                          </tr>
+                       `).join('')}
+                    </tbody>
+                  </table>
+               </div>
+            </div>
+            
+            <div class="box steps">
+               <h3>Preparation</h3>
+               <ol>
+                  ${generatedRecipe.preparation_steps.map(step => `<li>${step}</li>`).join('')}
+               </ol>
+            </div>
+            
+            <div class="footer">
+               Generated by BistroIntelligence AI • ${new Date().toLocaleDateString()}
+            </div>
+            
+            <script>
+               window.onload = function() { window.print(); }
+            </script>
+          </body>
+        </html>
+      `;
+
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+          printWindow.document.write(content);
+          printWindow.document.close();
+      }
+  };
+
   return (
     <div className="h-[calc(100vh-6rem)] flex flex-col gap-4 relative">
-      {/* Requirement Form Modal */}
-      {isFormOpen && formItem && (
+      {/* Request Preview Modal (Admin Only) */}
+      {previewRequest && (
           <div className="absolute inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
-              <div className="bg-white dark:bg-slate-900 rounded-xl w-full max-w-lg shadow-2xl border border-slate-200 dark:border-slate-800 animate-scale-in overflow-hidden max-h-[90vh] overflow-y-auto custom-scrollbar">
-                  <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
-                      <div>
-                          <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2">
-                              <FileSignature className="text-emerald-600" size={20} /> 
-                              {isAdmin ? 'Generate Recipe' : 'Request Recipe'}
-                          </h3>
-                          <p className="text-xs text-slate-500 dark:text-slate-400">
-                             {isAdmin ? 'AI Co-pilot Configuration' : `Cost: ${CREDIT_COSTS.RECIPE} Credits`}
-                          </p>
-                      </div>
-                      <button onClick={() => setIsFormOpen(false)} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full text-slate-500">
+              <div className="bg-white rounded-xl w-full max-w-md shadow-2xl border border-slate-200 animate-scale-in">
+                  <div className="p-6 border-b border-slate-100 flex justify-between items-center">
+                      <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
+                          <Eye className="text-emerald-600" size={20} /> Request Preview
+                      </h3>
+                      <button onClick={() => setPreviewRequest(null)} className="p-2 hover:bg-slate-100 rounded-full text-slate-500">
                           <X size={20} />
                       </button>
                   </div>
-                  
-                  <form onSubmit={handleFormSubmit} className="p-6 space-y-4">
-                      {/* Dish Name Field */}
+                  <div className="p-6 space-y-4">
                       <div>
-                          <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Dish Name</label>
-                          <div className="relative">
-                              <Type size={16} className="absolute left-3 top-3 text-slate-400" />
-                              <input 
-                                  type="text" 
-                                  required
-                                  value={formItem.name}
-                                  onChange={e => setFormItem({...formItem, name: e.target.value})}
-                                  className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none font-medium"
-                              />
-                          </div>
+                          <p className="text-xs font-bold text-slate-500 uppercase">Item Name</p>
+                          <p className="text-lg font-bold text-slate-900">{previewRequest.item.name}</p>
                       </div>
-
-                      {/* Ingredients Field */}
                       <div>
-                          <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Key Ingredients (Optional)</label>
-                          <div className="relative">
-                              <Carrot size={16} className="absolute left-3 top-3 text-slate-400" />
-                              <input 
-                                  type="text" 
-                                  placeholder="e.g. Fresh Basil, San Marzano Tomatoes, Parmesan..."
-                                  value={formData.ingredients}
-                                  onChange={e => setFormData({...formData, ingredients: e.target.value})}
-                                  className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none"
-                              />
-                          </div>
+                          <p className="text-xs font-bold text-slate-500 uppercase">Requested By</p>
+                          <p className="text-sm text-slate-800">{previewRequest.userName}</p>
                       </div>
-
-                      <div>
-                          <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Cuisine Style</label>
-                          <div className="relative">
-                              <UtensilsCrossed size={16} className="absolute left-3 top-3 text-slate-400" />
-                              <input 
-                                  type="text" 
-                                  required
-                                  placeholder="e.g. Italian, Indian Fusion, keto-friendly..."
-                                  value={formData.cuisine}
-                                  onChange={e => setFormData({...formData, cuisine: e.target.value})}
-                                  className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none"
-                              />
-                          </div>
+                      <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
+                          <p className="text-xs font-bold text-slate-500 uppercase mb-2">Specific Requirements</p>
+                          <p className="text-sm text-slate-600 leading-relaxed">{previewRequest.requirements}</p>
                       </div>
-
-                      <div>
-                          <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Dietary Restrictions</label>
-                          <div className="flex flex-wrap gap-2">
-                              {['Vegetarian', 'Vegan', 'Gluten-Free', 'Dairy-Free', 'Keto', 'Nut-Free', 'Halal', 'Low-Carb'].map(opt => {
-                                  const isSelected = formData.dietary.includes(opt);
-                                  return (
-                                      <button
-                                          key={opt}
-                                          type="button"
-                                          onClick={() => {
-                                              setFormData(prev => ({
-                                                  ...prev,
-                                                  dietary: isSelected 
-                                                      ? prev.dietary.filter(d => d !== opt)
-                                                      : [...prev.dietary, opt]
-                                              }));
-                                          }}
-                                          className={`py-1.5 px-3 text-xs font-bold rounded-lg border transition-all ${
-                                              isSelected 
-                                              ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-500 text-emerald-700 dark:text-emerald-400' 
-                                              : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50'
-                                          }`}
-                                      >
-                                          {opt}
-                                      </button>
-                                  );
-                              })}
-                          </div>
-                      </div>
-
-                      <div>
-                          <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Preparation Notes</label>
-                          <div className="relative">
-                              <AlignLeft size={16} className="absolute left-3 top-3 text-slate-400" />
-                              <textarea 
-                                  rows={3}
-                                  placeholder="E.g. Use almond milk instead of dairy, make it spicy, target food cost < 25%..."
-                                  value={formData.notes}
-                                  onChange={e => setFormData({...formData, notes: e.target.value})}
-                                  className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none resize-none"
-                              />
-                          </div>
-                      </div>
-
-                      <div className="pt-4 flex justify-end gap-3 border-t border-slate-100 dark:border-slate-800 mt-2">
+                      <div className="pt-4 flex justify-end gap-2">
+                          <button onClick={() => setPreviewRequest(null)} className="px-4 py-2 text-sm text-slate-600 font-medium hover:bg-slate-100 rounded-lg">Close</button>
                           <button 
-                              type="button" 
-                              onClick={() => setIsFormOpen(false)}
-                              className="px-4 py-2 text-sm font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                              onClick={() => {
+                                  setPreviewRequest(null);
+                                  handleFulfillRequest(previewRequest);
+                              }}
+                              className="px-4 py-2 bg-slate-900 text-white text-sm font-bold rounded-lg hover:bg-emerald-600 transition-colors flex items-center gap-2"
                           >
-                              Cancel
-                          </button>
-                          <button 
-                              type="submit"
-                              className="px-6 py-2 bg-slate-900 dark:bg-emerald-600 text-white text-sm font-bold rounded-lg hover:opacity-90 flex items-center gap-2 shadow-lg shadow-emerald-500/20"
-                          >
-                              {isAdmin ? <Sparkles size={16} fill="currentColor" /> : <Inbox size={16} />} 
-                              {isAdmin ? 'Generate Recipe' : `Submit (${CREDIT_COSTS.RECIPE} CR)`}
+                              <Sparkles size={14} fill="currentColor" /> Fulfill Now
                           </button>
                       </div>
-                  </form>
+                  </div>
               </div>
           </div>
       )}
@@ -556,7 +667,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                   <div>
                                       <h4 className="font-bold text-slate-800">{req.item.name}</h4>
                                       <p className="text-xs text-slate-500">Requested by: <span className="font-semibold">{req.userName}</span> • {new Date(req.requestDate).toLocaleString()}</p>
-                                      {isAdmin && <p className="text-xs text-slate-600 mt-1 italic max-w-lg bg-white p-1 rounded border border-slate-100">{req.requirements}</p>}
+                                      {isAdmin && <p className="text-xs text-slate-600 mt-1 italic max-w-lg bg-white p-1 rounded border border-slate-100 truncate">{req.requirements}</p>}
                                   </div>
                               </div>
                               
@@ -565,12 +676,21 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                       <span className="px-3 py-1 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-full">Completed</span>
                                   ) : (
                                       isAdmin ? (
-                                          <button 
-                                            onClick={() => handleFulfillRequest(req)}
-                                            className="px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded hover:bg-emerald-600 transition-colors flex items-center gap-2"
-                                          >
-                                              <Sparkles size={14} fill="currentColor" /> Generate
-                                          </button>
+                                          <div className="flex gap-2">
+                                              <button 
+                                                  onClick={() => setPreviewRequest(req)}
+                                                  className="p-2 bg-white border border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-300 rounded-lg transition-colors"
+                                                  title="Quick Preview"
+                                              >
+                                                  <Eye size={16} />
+                                              </button>
+                                              <button 
+                                                onClick={() => handleFulfillRequest(req)}
+                                                className="px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded hover:bg-emerald-600 transition-colors flex items-center gap-2"
+                                              >
+                                                  <Sparkles size={14} fill="currentColor" /> Fulfill
+                                              </button>
+                                          </div>
                                       ) : (
                                           <span className="px-3 py-1 bg-yellow-100 text-yellow-700 text-xs font-bold rounded-full flex items-center gap-1">
                                               <Clock size={12} /> Pending Admin Review
@@ -586,39 +706,139 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       )}
 
       {viewMode === 'saved' && (
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 overflow-y-auto flex-1 animate-fade-in">
-              <h2 className="text-xl font-bold text-slate-800 mb-4">Your Saved Recipes</h2>
-              {savedRecipes.length === 0 ? (
-                  <p className="text-slate-500">No saved recipes yet. {isAdmin ? 'Generate' : 'Request'} one!</p>
-              ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {savedRecipes.map((recipe, idx) => (
-                          <div key={idx} className="border border-slate-200 rounded-lg p-4 hover:border-emerald-300 transition-all shadow-sm">
-                              <h3 className="font-bold text-slate-800">{recipe.name}</h3>
-                              <p className="text-xs text-slate-500 mb-2">{recipe.sku_id}</p>
-                              {recipe.assignedRestaurantName && (
-                                  <div className="flex items-center gap-1 text-[10px] text-blue-600 bg-blue-50 px-2 py-1 rounded w-fit mb-2">
-                                      <Store size={10} /> {recipe.assignedRestaurantName}
-                                  </div>
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col flex-1 animate-fade-in">
+              <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row justify-between items-center gap-4">
+                  <h2 className="text-xl font-bold text-slate-800">Your Saved Recipes</h2>
+                  
+                  {/* Search and Filter */}
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                      <div className="relative flex-1 sm:w-64">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                          <input 
+                              type="text" 
+                              placeholder="Search recipes..." 
+                              value={searchQuery}
+                              onChange={(e) => setSearchQuery(e.target.value)}
+                              className="w-full pl-9 pr-4 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+                          />
+                      </div>
+                      
+                      <div className="relative">
+                          <button 
+                              onClick={() => setShowFilterDropdown(!showFilterDropdown)}
+                              className={`p-2 rounded-lg border transition-colors flex items-center gap-2 ${showFilterDropdown || selectedTags.length > 0 ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'}`}
+                          >
+                              <Filter size={16} />
+                              <span className="text-xs font-bold hidden sm:inline">Filters</span>
+                              {selectedTags.length > 0 && (
+                                  <span className="bg-emerald-500 text-white text-[10px] px-1.5 rounded-full">{selectedTags.length}</span>
                               )}
-                              <div className="flex justify-between items-center mt-4">
-                                  <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-1 rounded text-sm">₹{recipe.food_cost_per_serving}</span>
-                                  <span className="text-xs text-slate-400">{new Date().toLocaleDateString()}</span>
+                          </button>
+
+                          {showFilterDropdown && (
+                              <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-slate-200 z-50 p-4 animate-scale-in">
+                                  <div className="flex justify-between items-center mb-3">
+                                      <h4 className="text-xs font-bold text-slate-500 uppercase">Filter by Tags</h4>
+                                      {selectedTags.length > 0 && (
+                                          <button onClick={() => setSelectedTags([])} className="text-[10px] text-red-500 hover:underline">Clear</button>
+                                      )}
+                                  </div>
+                                  <div className="max-h-48 overflow-y-auto custom-scrollbar space-y-1">
+                                      {uniqueTags.length === 0 ? (
+                                          <p className="text-xs text-slate-400 text-center py-2">No tags available</p>
+                                      ) : (
+                                          uniqueTags.map(tag => (
+                                              <label key={tag} className="flex items-center gap-2 p-2 hover:bg-slate-50 rounded cursor-pointer">
+                                                  <input 
+                                                      type="checkbox" 
+                                                      checked={selectedTags.includes(tag)}
+                                                      onChange={() => toggleTag(tag)}
+                                                      className="rounded text-emerald-600 focus:ring-emerald-500 border-slate-300"
+                                                  />
+                                                  <span className="text-sm text-slate-700">{tag}</span>
+                                              </label>
+                                          ))
+                                      )}
+                                  </div>
                               </div>
-                              <button 
-                                onClick={() => {
-                                    handleTabChange('generator', true);
-                                    setGeneratedRecipe(recipe);
-                                    setSelectedSku(recipe.sku_id);
-                                }}
-                                className="w-full mt-3 py-2 text-xs font-bold text-slate-600 border border-slate-200 rounded hover:bg-slate-50"
-                              >
-                                View Details
-                              </button>
+                          )}
+                      </div>
+                  </div>
+              </div>
+
+              {/* Active Filters Display */}
+              {selectedTags.length > 0 && (
+                  <div className="px-6 py-2 bg-slate-50 border-b border-slate-100 flex flex-wrap gap-2">
+                      {selectedTags.map(tag => (
+                          <div key={tag} className="bg-white border border-slate-200 text-slate-600 text-xs px-2 py-1 rounded-full flex items-center gap-1 shadow-sm">
+                              {tag}
+                              <button onClick={() => toggleTag(tag)} className="hover:text-red-500"><X size={12} /></button>
                           </div>
                       ))}
                   </div>
               )}
+
+              <div className="flex-1 overflow-y-auto p-6">
+                  {savedRecipes.length === 0 ? (
+                      <div className="h-full flex flex-col items-center justify-center text-slate-400">
+                          <ChefHat size={48} className="mb-4 opacity-50" />
+                          <p className="text-sm">No saved recipes yet.</p>
+                          <p className="text-xs mt-1">{isAdmin ? 'Generate' : 'Request'} one to populate your library!</p>
+                      </div>
+                  ) : filteredRecipes.length === 0 ? (
+                      <div className="h-full flex flex-col items-center justify-center text-slate-400">
+                          <Search size={48} className="mb-4 opacity-50" />
+                          <p className="text-sm">No recipes match your filters.</p>
+                          <button onClick={() => { setSearchQuery(''); setSelectedTags([]); }} className="text-xs text-emerald-600 hover:underline mt-2">Clear all filters</button>
+                      </div>
+                  ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                          {filteredRecipes.map((recipe, idx) => (
+                              <div key={idx} className="border border-slate-200 rounded-lg p-4 hover:border-emerald-300 transition-all shadow-sm bg-white flex flex-col">
+                                  <div className="flex justify-between items-start mb-2">
+                                      <h3 className="font-bold text-slate-800 line-clamp-1" title={recipe.name}>{recipe.name}</h3>
+                                      <span className="text-[10px] font-mono bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200">{recipe.sku_id}</span>
+                                  </div>
+                                  
+                                  {/* Tags Preview */}
+                                  <div className="flex flex-wrap gap-1 mb-3 h-6 overflow-hidden">
+                                      {recipe.tags?.slice(0, 3).map((tag, tIdx) => (
+                                          <span key={tIdx} className="text-[10px] bg-slate-50 text-slate-500 px-1.5 py-0.5 rounded border border-slate-100">
+                                              {tag}
+                                          </span>
+                                      ))}
+                                      {(recipe.tags?.length || 0) > 3 && (
+                                          <span className="text-[10px] text-slate-400 px-1">+{ (recipe.tags?.length || 0) - 3}</span>
+                                      )}
+                                  </div>
+
+                                  {recipe.assignedRestaurantName && (
+                                      <div className="flex items-center gap-1 text-[10px] text-blue-600 bg-blue-50 px-2 py-1 rounded w-fit mb-2">
+                                          <Store size={10} /> {recipe.assignedRestaurantName}
+                                      </div>
+                                  )}
+                                  
+                                  <div className="mt-auto pt-4 border-t border-slate-100 flex justify-between items-center">
+                                      <div>
+                                          <p className="text-[10px] text-slate-400 uppercase font-bold">Cost</p>
+                                          <p className="text-emerald-700 font-bold">₹{recipe.food_cost_per_serving.toFixed(0)}</p>
+                                      </div>
+                                      <button 
+                                        onClick={() => {
+                                            handleTabChange('generator', true);
+                                            setGeneratedRecipe(recipe);
+                                            setSelectedSku(recipe.sku_id);
+                                        }}
+                                        className="px-3 py-1.5 text-xs font-bold text-slate-600 border border-slate-200 rounded hover:bg-slate-50 transition-colors"
+                                      >
+                                        View
+                                      </button>
+                                  </div>
+                              </div>
+                          ))}
+                      </div>
+                  )}
+              </div>
           </div>
       )} 
       
@@ -629,12 +849,26 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
             <div className="p-4 border-b border-slate-200 bg-slate-50 flex flex-col gap-3">
                 <div className="flex justify-between items-center">
                     <h3 className="font-bold text-slate-700">Menu Items</h3>
-                    <button 
-                        onClick={handleImportClick}
-                        className="text-xs flex items-center gap-1 text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-2 py-1 rounded border border-emerald-100 transition-colors"
-                    >
-                        <Upload size={12} /> Import
-                    </button>
+                    <div className="flex gap-2 items-center">
+                         <button 
+                            onClick={handleSurpriseMe}
+                            className="text-xs flex items-center gap-1 text-purple-600 hover:text-purple-700 bg-purple-50 px-2 py-1 rounded border border-purple-100 transition-colors"
+                            title="Auto-fill with a creative dish idea"
+                        >
+                            <Sparkles size={12} /> Surprise
+                        </button>
+                        <div className="group relative">
+                            <button 
+                                onClick={handleImportClick}
+                                className="text-xs flex items-center gap-1 text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-2 py-1 rounded border border-emerald-100 transition-colors"
+                            >
+                                <Upload size={12} /> Import
+                            </button>
+                            <div className="absolute right-0 top-full mt-2 w-48 p-2 bg-slate-800 text-white text-[10px] rounded shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                                Format: SKU, Name, Category, Price, PrepTime (CSV)
+                            </div>
+                        </div>
+                    </div>
                     <input 
                         type="file" 
                         ref={fileInputRef} 
@@ -647,20 +881,12 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                 <div className="relative">
                     <input 
                         type="text" 
-                        value={customItemName}
-                        onChange={(e) => setCustomItemName(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleGenerateCustomClick()}
-                        placeholder={isAdmin ? "Generate for: Butter Chicken" : "Request for: Butter Chicken"}
-                        className="w-full pl-8 pr-8 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search existing items..."
+                        className="w-full pl-8 pr-2 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
                     />
                     <Search className="absolute left-2.5 top-2.5 text-slate-400" size={14} />
-                    <button 
-                        onClick={handleGenerateCustomClick}
-                        disabled={!customItemName || loading}
-                        className="absolute right-1.5 top-1.5 p-1 bg-slate-100 hover:bg-emerald-500 hover:text-white rounded text-slate-400 transition-colors disabled:opacity-50 disabled:hover:bg-slate-100 disabled:hover:text-slate-400"
-                    >
-                        {loading && customItemName ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-                    </button>
                 </div>
 
                 {importStatus && (
@@ -668,6 +894,23 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                         <Check size={10} /> {importStatus}
                     </div>
                 )}
+                
+                {/* Popular Ideas Chips */}
+                <div className="pt-2 border-t border-slate-100 mt-1">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Quick Start Ideas</p>
+                    <div className="flex flex-wrap gap-2">
+                        {POPULAR_IDEAS.map((idea, idx) => (
+                            <button
+                                key={idx}
+                                onClick={() => handlePopularIdea(idea)}
+                                className="text-[10px] bg-white border border-slate-200 text-slate-600 hover:text-emerald-600 hover:border-emerald-200 px-2 py-1 rounded-full transition-colors flex items-center gap-1"
+                            >
+                                <Flame size={10} className="text-orange-400" />
+                                {idea.name}
+                            </button>
+                        ))}
+                    </div>
+                </div>
             </div>
             
             <div className="overflow-y-auto flex-1 p-2 space-y-2">
@@ -675,13 +918,15 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                 <div className="text-center p-8 text-slate-400">
                     <ChefHat className="mx-auto mb-2 opacity-50" size={32} />
                     <p className="text-sm">No items found.</p>
-                    <p className="text-xs mt-1">Add a custom item above or import your menu.</p>
+                    <p className="text-xs mt-1">Import your menu or create a new dish.</p>
                 </div>
             ) : (
-                menuItems.map((item) => (
+                menuItems
+                    .filter(m => m.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                    .map((item) => (
                     <div 
                     key={item.sku_id}
-                    onClick={() => handleGenerateClick(item)}
+                    onClick={() => loadItemIntoForm(item)}
                     className={`p-4 rounded-lg transition-all border ${
                         selectedSku === item.sku_id 
                         ? 'bg-yellow-50 border-yellow-200 ring-1 ring-yellow-300' 
@@ -689,8 +934,8 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                     }`}
                     >
                     <div className="flex justify-between items-start">
-                        <h4 className="font-semibold text-slate-800">{item.name}</h4>
-                        <span className="text-xs font-mono text-slate-400">{item.sku_id}</span>
+                        <h4 className="font-semibold text-slate-800 text-sm">{item.name}</h4>
+                        <span className="text-[10px] font-mono text-slate-400 bg-slate-50 px-1 rounded">{item.sku_id}</span>
                     </div>
                     </div>
                 ))
@@ -698,37 +943,10 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
             </div>
         </div>
 
-        {/* Detail View */}
+        {/* Detail / Generator View */}
         <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col animate-fade-in">
-            {!selectedSku ? (
-            <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
-                <ChefHat size={48} className="mb-4 opacity-50" />
-                <p className="text-sm">Select an item to view details</p>
-                <p className="text-xs mt-1">or create a new request</p>
-            </div>
-            ) : (
-                <>
-                {loading ? (
-                    <div className="flex-1 flex flex-col items-center justify-center gap-4">
-                        <Loader2 size={48} className="animate-spin text-emerald-500" />
-                        <p className="text-slate-600 font-bold animate-pulse">{loadingText}</p>
-                    </div>
-                ) : error ? (
-                    <div className="flex-1 flex flex-col items-center justify-center gap-4 p-8 text-center">
-                        <div className="bg-red-100 p-4 rounded-full text-red-500">
-                            <AlertCircle size={32} />
-                        </div>
-                        <h3 className="text-lg font-bold text-slate-800">Action Failed</h3>
-                        <p className="text-slate-500 max-w-sm">{error}</p>
-                        <button 
-                            onClick={() => handleDiscard()}
-                            className="text-sm text-slate-400 hover:text-slate-600 underline"
-                        >
-                            Close
-                        </button>
-                    </div>
-                ) : generatedRecipe ? (
-                    <div className="flex flex-col h-full animate-fade-in">
+            {generatedRecipe ? (
+                 <div className="flex flex-col h-full animate-fade-in">
                         {/* Header */}
                         <div className="p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-start">
                             <div>
@@ -749,7 +967,14 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                             
                             <div className="flex gap-2">
                                 <button 
-                                    onClick={handleDiscard}
+                                    onClick={handleDownloadPDF}
+                                    className="p-2 text-slate-500 hover:bg-slate-200 hover:text-blue-600 rounded-lg transition-colors"
+                                    title="Download PDF"
+                                >
+                                    <FileDown size={20} />
+                                </button>
+                                <button 
+                                    onClick={() => setGeneratedRecipe(null)}
                                     className="p-2 text-slate-400 hover:bg-slate-200 rounded-lg transition-colors"
                                     title="Close"
                                 >
@@ -767,14 +992,6 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                     <Sparkles className="text-blue-500 shrink-0 mt-0.5" size={18} />
                                     <div>
                                         <p className="text-sm text-blue-900 leading-relaxed">{generatedRecipe.human_summary}</p>
-                                        <div className="mt-2 flex items-center gap-2">
-                                            <span className="text-[10px] uppercase font-bold text-blue-400">AI Confidence:</span>
-                                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                                                generatedRecipe.confidence === 'High' ? 'bg-emerald-100 text-emerald-700' : 'bg-yellow-100 text-yellow-700'
-                                            }`}>
-                                                {generatedRecipe.confidence}
-                                            </span>
-                                        </div>
                                     </div>
                                 </div>
                             )}
@@ -865,6 +1082,13 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                 {isSaving ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
                                 {activeRequest && isAdmin ? `Send to ${activeRequest.userName}` : "Save Recipe"}
                             </button>
+
+                            <button 
+                                onClick={handleDownloadPDF}
+                                className="px-4 py-2 bg-white border border-slate-200 text-slate-600 font-bold rounded-lg hover:bg-slate-50 transition-colors text-xs flex items-center gap-2"
+                            >
+                                <FileDown size={14} /> Download PDF
+                            </button>
                             
                             <button 
                                 onClick={() => handleVariation('Vegan')}
@@ -892,9 +1116,141 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                 {posPushStatus || 'Push to POS'}
                             </button>
                         </div>
+                 </div>
+            ) : (
+                // AI Generator Form (DEDICATED SECTION)
+                loading ? (
+                    <div className="flex-1 flex flex-col items-center justify-center gap-4">
+                        <Loader2 size={48} className="animate-spin text-emerald-500" />
+                        <p className="text-slate-600 font-bold animate-pulse">{loadingText}</p>
                     </div>
-                ) : null}
-                </>
+                ) : (
+                    <div className="flex flex-col h-full">
+                        {/* Form Header */}
+                        <div className="p-6 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+                             <div>
+                                 <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                                     <Wand2 size={20} className="text-purple-600" /> AI Recipe Generator
+                                 </h2>
+                                 <p className="text-sm text-slate-500 mt-1">
+                                     {isAdmin && activeRequest 
+                                        ? `Fulfilling request for ${activeRequest.userName}` 
+                                        : `Create a cost-optimized recipe. Cost: ${CREDIT_COSTS.RECIPE} CR`}
+                                 </p>
+                             </div>
+                             <button 
+                                onClick={resetForm}
+                                className="text-xs flex items-center gap-1 text-slate-500 hover:text-red-500 transition-colors"
+                                title="Clear all fields"
+                             >
+                                 <Eraser size={12} /> Clear Form
+                             </button>
+                        </div>
+
+                        {/* Form Body */}
+                        <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+                            <div className="max-w-2xl mx-auto space-y-6">
+                                
+                                {/* Dish Name */}
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Dish Name</label>
+                                    <div className="relative">
+                                        <Type size={16} className="absolute left-3 top-3 text-slate-400" />
+                                        <input 
+                                            type="text" 
+                                            value={dishName}
+                                            onChange={(e) => setDishName(e.target.value)}
+                                            placeholder="e.g. Truffle Mushroom Risotto"
+                                            className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none font-medium"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Two Column Layout */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Cuisine Style</label>
+                                        <div className="relative">
+                                            <UtensilsCrossed size={16} className="absolute left-3 top-3 text-slate-400" />
+                                            <input 
+                                                type="text" 
+                                                value={cuisine}
+                                                onChange={(e) => setCuisine(e.target.value)}
+                                                placeholder="e.g. Modern Italian"
+                                                className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Key Ingredients</label>
+                                        <div className="relative">
+                                            <Carrot size={16} className="absolute left-3 top-3 text-slate-400" />
+                                            <input 
+                                                type="text" 
+                                                value={ingredients}
+                                                onChange={(e) => setIngredients(e.target.value)}
+                                                placeholder="e.g. Arborio Rice, Truffle Oil"
+                                                className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Dietary Chips */}
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Dietary Tags</label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {['Vegetarian', 'Vegan', 'Gluten-Free', 'Dairy-Free', 'Keto', 'Nut-Free', 'Halal', 'Paleo', 'Low-Sodium', 'Sugar-Free'].map(tag => (
+                                            <button
+                                                key={tag}
+                                                onClick={() => toggleDietary(tag)}
+                                                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                                                    dietary.includes(tag)
+                                                    ? 'bg-emerald-50 border-emerald-500 text-emerald-700'
+                                                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                                                }`}
+                                            >
+                                                {tag}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Notes */}
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Preparation Notes / Context</label>
+                                    <div className="relative">
+                                        <AlignLeft size={16} className="absolute left-3 top-3 text-slate-400" />
+                                        <textarea 
+                                            rows={4}
+                                            value={notes}
+                                            onChange={(e) => setNotes(e.target.value)}
+                                            placeholder="Describe presentation style, specific equipment, or any other requirements..."
+                                            className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none resize-none"
+                                        />
+                                    </div>
+                                </div>
+                                
+                                {error && (
+                                    <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg flex items-center gap-2">
+                                        <AlertCircle size={16} /> {error}
+                                    </div>
+                                )}
+
+                                <div className="pt-4">
+                                    <button 
+                                        onClick={(e) => handleFormSubmit(e)}
+                                        disabled={loading || !dishName}
+                                        className="w-full py-3.5 bg-slate-900 text-white font-bold rounded-xl hover:bg-emerald-600 transition-all shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
+                                    >
+                                        <Sparkles size={18} fill="currentColor" />
+                                        {isAdmin ? 'Generate Recipe Card' : `Request Generation (${CREDIT_COSTS.RECIPE} CR)`}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )
             )}
         </div>
       </div>

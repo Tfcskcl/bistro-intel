@@ -1,6 +1,6 @@
 
-import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
-import { SYSTEM_INSTRUCTION } from "../constants";
+import { GoogleGenAI, GenerateContentResponse, Type, Chat } from "@google/genai";
+import { SYSTEM_INSTRUCTION, MARKDOWN_INSTRUCTION, APP_CONTEXT } from "../constants";
 import { RecipeCard, SOP, StrategyReport, ImplementationGuide, MenuItem, MenuGenerationRequest } from "../types";
 import { ingredientService } from "./ingredientService";
 
@@ -75,6 +75,22 @@ const formatError = (error: any): string => {
     return error.message || "An unexpected error occurred. Please try again.";
 };
 
+// Helper for exponential backoff retry
+async function retryOperation<T>(operation: () => Promise<T>, retries = 3, delay = 1000): Promise<T> {
+    try {
+        return await operation();
+    } catch (error: any) {
+        const msg = (error.message || error.toString()).toLowerCase();
+        // Retry on server errors or overload
+        if (retries > 0 && (msg.includes('500') || msg.includes('503') || msg.includes('overloaded'))) {
+            console.log(`Retrying operation... Attempts left: ${retries}. Delay: ${delay}ms`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            return retryOperation(operation, retries - 1, delay * 2);
+        }
+        throw error;
+    }
+}
+
 export const verifyLocationWithMaps = async (locationQuery: string): Promise<string> => {
   const apiKey = getApiKey();
   if (!apiKey) return "API Key Required for Location Verification.";
@@ -96,6 +112,38 @@ export const verifyLocationWithMaps = async (locationQuery: string): Promise<str
     console.error("Maps verification failed:", error);
     return "Verification unavailable.";
   }
+};
+
+export const getChatResponse = async (history: { role: string, text: string }[], newMessage: string): Promise<string> => {
+    const apiKey = getApiKey();
+    if (!apiKey) throw new Error("API Key is missing.");
+  
+    const ai = new GoogleGenAI({ apiKey });
+    
+    // Convert simple history to Gemini format and filter empty messages
+    const chatHistory = history
+        .filter(msg => msg.text && msg.text.trim() !== '')
+        .map(msg => ({
+            role: msg.role === 'user' ? 'user' : 'model',
+            parts: [{ text: msg.text }]
+        }));
+  
+    // Use gemini-2.5-flash for better stability on general chat tasks
+    const chat: Chat = ai.chats.create({
+        model: 'gemini-2.5-flash',
+        config: {
+            systemInstruction: APP_CONTEXT,
+        },
+        history: chatHistory
+    });
+  
+    try {
+        // Wrap sendMessage in retry logic
+        const response = await retryOperation<GenerateContentResponse>(() => chat.sendMessage({ message: newMessage }));
+        return response.text || "I didn't catch that. Could you try again?";
+    } catch (error: any) {
+        throw new Error(formatError(error));
+    }
 };
 
 const recipeSchema = {
@@ -164,7 +212,7 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
   `;
 
   try {
-    const response: GenerateContentResponse = await ai.models.generateContent({
+    const response: GenerateContentResponse = await retryOperation(() => ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: [{ parts: [{ text: prompt }] }],
       config: {
@@ -172,7 +220,7 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
         responseMimeType: 'application/json',
         responseSchema: recipeSchema
       }
-    });
+    }));
 
     return parseJSON<RecipeCard>(response.text);
   } catch (error: any) {
@@ -206,7 +254,7 @@ export const generateRecipeVariation = async (userId: string, originalRecipe: Re
   `;
 
   try {
-    const response: GenerateContentResponse = await ai.models.generateContent({
+    const response: GenerateContentResponse = await retryOperation(() => ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: [{ parts: [{ text: prompt }] }],
       config: {
@@ -214,7 +262,7 @@ export const generateRecipeVariation = async (userId: string, originalRecipe: Re
         responseMimeType: 'application/json',
         responseSchema: recipeSchema
       }
-    });
+    }));
 
     return parseJSON<RecipeCard>(response.text);
   } catch (error: any) {
@@ -249,14 +297,14 @@ export const generateSOP = async (topic: string): Promise<SOP> => {
   `;
 
   try {
-    const response: GenerateContentResponse = await ai.models.generateContent({
+    const response: GenerateContentResponse = await retryOperation(() => ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: [{ parts: [{ text: prompt }] }],
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         responseMimeType: 'application/json'
       }
-    });
+    }));
 
     return parseJSON<SOP>(response.text);
   } catch (error: any) {
@@ -297,14 +345,14 @@ export const generateStrategy = async (role: string, context: string): Promise<S
   `;
 
   try {
-    const response: GenerateContentResponse = await ai.models.generateContent({
+    const response: GenerateContentResponse = await retryOperation(() => ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: [{ parts: [{ text: prompt }] }],
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         responseMimeType: 'application/json'
       }
-    });
+    }));
 
     return parseJSON<StrategyReport>(response.text);
   } catch (error: any) {
@@ -339,14 +387,14 @@ export const generateImplementationPlan = async (initiative: string): Promise<Im
     `;
 
     try {
-        const response: GenerateContentResponse = await ai.models.generateContent({
+        const response: GenerateContentResponse = await retryOperation(() => ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: [{ parts: [{ text: prompt }] }],
             config: {
                 systemInstruction: SYSTEM_INSTRUCTION,
                 responseMimeType: 'application/json'
             }
-        });
+        }));
 
         return parseJSON<ImplementationGuide>(response.text);
     } catch (error: any) {
@@ -360,23 +408,15 @@ export const generateMarketingVideo = async (images: string[], prompt: string, a
       throw new Error("API Key required for video generation");
   }
 
-  // NOTE: Users must select their own API key via window.aistudio.openSelectKey() in the UI before calling this.
   const ai = new GoogleGenAI({ apiKey });
-
-  // Veo models only support 16:9 or 9:16. Default 1:1 to 16:9 to prevent 500 error.
   const safeAspectRatio = (aspectRatio === '16:9' || aspectRatio === '9:16') ? aspectRatio : '16:9';
 
   try {
       let operation;
 
       if (images.length > 1) {
-          // Multiple images -> Use veo-3.1-generate-preview
-          // Using hardcoded strings instead of imported Enums to avoid browser issues
           const referenceImagesPayload: any[] = images.map(img => ({
-              image: {
-                  imageBytes: img,
-                  mimeType: 'image/png'
-              },
+              image: { imageBytes: img, mimeType: 'image/png' },
               referenceType: 'ASSET'
           }));
 
@@ -387,50 +427,32 @@ export const generateMarketingVideo = async (images: string[], prompt: string, a
                   numberOfVideos: 1,
                   referenceImages: referenceImagesPayload,
                   resolution: '720p',
-                  aspectRatio: '16:9' // Fixed for this model
+                  aspectRatio: '16:9' 
               }
           });
       } else if (images.length === 1) {
-          // Single image -> Use veo-3.1-fast-generate-preview
           operation = await ai.models.generateVideos({
               model: 'veo-3.1-fast-generate-preview',
               prompt: prompt || 'Cinematic food shot', 
-              image: {
-                  imageBytes: images[0],
-                  mimeType: 'image/png', 
-              },
-              config: {
-                  numberOfVideos: 1,
-                  resolution: '720p',
-                  aspectRatio: safeAspectRatio
-              }
+              image: { imageBytes: images[0], mimeType: 'image/png' },
+              config: { numberOfVideos: 1, resolution: '720p', aspectRatio: safeAspectRatio }
           });
       } else {
-          // Text only -> Use veo-3.1-fast-generate-preview
           operation = await ai.models.generateVideos({
               model: 'veo-3.1-fast-generate-preview',
               prompt: prompt,
-              config: {
-                  numberOfVideos: 1,
-                  resolution: '720p',
-                  aspectRatio: safeAspectRatio
-              }
+              config: { numberOfVideos: 1, resolution: '720p', aspectRatio: safeAspectRatio }
           });
       }
 
-      // Poll for completion
       while (!operation.done) {
           await new Promise(resolve => setTimeout(resolve, 5000));
           operation = await ai.operations.getVideosOperation({operation: operation});
       }
 
       const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
-      
-      if (!downloadLink) {
-          throw new Error("Video generation completed but no URI returned.");
-      }
+      if (!downloadLink) throw new Error("Video generation completed but no URI returned.");
 
-      // Note: Typically we return the blob URL for immediate viewing
       const response = await fetch(`${downloadLink}&key=${apiKey}`);
       const blob = await response.blob();
       return URL.createObjectURL(blob);
@@ -442,38 +464,28 @@ export const generateMarketingVideo = async (images: string[], prompt: string, a
 
 export const generateMarketingImage = async (prompt: string, aspectRatio: string): Promise<string> => {
     const apiKey = getApiKey();
-    if (!apiKey) {
-        throw new Error("API Key required for image generation");
-    }
+    if (!apiKey) throw new Error("API Key required for image generation");
 
     const ai = new GoogleGenAI({ apiKey });
 
     try {
-        const response = await ai.models.generateContent({
+        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
             model: 'gemini-3-pro-image-preview',
-            contents: {
-                parts: [{ text: prompt }]
-            },
-            config: {
-                imageConfig: {
-                    aspectRatio: aspectRatio,
-                    imageSize: "1K"
-                }
-            }
-        });
+            contents: { parts: [{ text: prompt }] },
+            config: { imageConfig: { aspectRatio: aspectRatio, imageSize: "1K" } }
+        }));
 
         let base64Image = '';
-        for (const part of response.candidates[0].content.parts) {
-            if (part.inlineData) {
-                base64Image = part.inlineData.data;
-                break;
+        if (response.candidates && response.candidates[0]?.content?.parts) {
+            for (const part of response.candidates[0].content.parts) {
+                if (part.inlineData) {
+                    base64Image = part.inlineData.data;
+                    break;
+                }
             }
         }
 
-        if (!base64Image) {
-            throw new Error("No image generated. Please try again.");
-        }
-
+        if (!base64Image) throw new Error("No image generated. Please try again.");
         return `data:image/png;base64,${base64Image}`;
 
     } catch (error: any) {
@@ -487,7 +499,6 @@ export const generateKitchenWorkflow = async (description: string): Promise<stri
 
     const ai = new GoogleGenAI({ apiKey });
     
-    // Provide a structure for the workflow in markdown
     const prompt = `
         Design an efficient kitchen workflow based on the following user requirements and context.
         The user has uploaded media (images/videos) which imply the layout described below.
@@ -504,13 +515,11 @@ export const generateKitchenWorkflow = async (description: string): Promise<stri
     `;
 
     try {
-        const response = await ai.models.generateContent({
+        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: [{ parts: [{ text: prompt }] }],
-            config: {
-                systemInstruction: SYSTEM_INSTRUCTION
-            }
-        });
+            config: { systemInstruction: MARKDOWN_INSTRUCTION }
+        }));
         
         return response.text || "Failed to generate workflow content.";
     } catch (error: any) {
@@ -533,6 +542,7 @@ export const generateMenu = async (req: MenuGenerationRequest): Promise<string> 
         Budget Range: ${req.budgetRange}
         Must Include: ${req.mustIncludeItems}
         Dietary Restrictions: ${req.dietaryRestrictions.join(', ')}
+        Number of Items to Generate: ${req.numberOfItems || 15}
         
         Output the menu in nicely formatted Markdown. Structure it by categories (Appetizers, Mains, Desserts, etc.).
         For each item, include:
@@ -545,13 +555,11 @@ export const generateMenu = async (req: MenuGenerationRequest): Promise<string> 
     `;
 
     try {
-        const response = await ai.models.generateContent({
+        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: [{ parts: [{ text: prompt }] }],
-            config: {
-                systemInstruction: SYSTEM_INSTRUCTION
-            }
-        });
+            config: { systemInstruction: MARKDOWN_INSTRUCTION }
+        }));
         
         return response.text || "Failed to generate menu.";
     } catch (error: any) {
