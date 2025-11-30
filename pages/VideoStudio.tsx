@@ -46,27 +46,45 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
 
   // Check for Veo API Key status
   useEffect(() => {
+    let interval: any;
+    
     const checkVeoKey = async () => {
         if (mediaType === 'video' && (window as any).aistudio) {
             try {
                 const has = await (window as any).aistudio.hasSelectedApiKey();
                 setHasVeoKey(has);
+                if (has) setError(null);
             } catch (e) {
                 console.error("Error checking Veo key:", e);
             }
         }
     };
+    
     checkVeoKey();
-  }, [mediaType]);
+    
+    // Poll frequently if key is missing to catch updates from other tabs or delayed initialization
+    if (!hasVeoKey && mediaType === 'video') {
+        interval = setInterval(checkVeoKey, 2000);
+    }
+
+    return () => {
+        if (interval) clearInterval(interval);
+    };
+  }, [mediaType, hasVeoKey]);
 
   const handleSelectVeoKey = async () => {
       if ((window as any).aistudio) {
           try {
             await (window as any).aistudio.openSelectKey();
+            // Optimistic update per guidelines
             setHasVeoKey(true);
+            setError(null);
           } catch (e) {
             console.error("Error selecting key:", e);
+            // Revert if explicitly failed, but usually openSelectKey doesn't throw on close
           }
+      } else {
+          alert("AI Studio environment not detected. Please ensure you are running in the correct environment.");
       }
   };
 
@@ -138,6 +156,10 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
 
     } catch (err: any) {
       setError(err.message || "Generation failed");
+      // If error suggests API key issue, reset state
+      if (err.message && (err.message.includes('API key') || err.message.includes('403') || err.message.includes('401'))) {
+          setHasVeoKey(false);
+      }
     } finally {
       setIsGenerating(false);
     }
@@ -154,52 +176,52 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
         <div className="flex gap-2">
            <button 
              onClick={() => setViewMode('create')}
-             className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${viewMode === 'create' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`}
+             className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${viewMode === 'create' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
            >
              Studio
            </button>
            <button 
              onClick={() => setViewMode('gallery')}
-             className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${viewMode === 'gallery' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`}
+             className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${viewMode === 'gallery' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
            >
              My Gallery
            </button>
            {isAdmin && (
              <button 
                onClick={() => setViewMode('requests')}
-               className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${viewMode === 'requests' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`}
+               className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${viewMode === 'requests' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
              >
                Queue
              </button>
            )}
         </div>
-        <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-800 rounded-full text-xs font-bold">
+        <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-400 rounded-full text-xs font-bold">
             <Wallet size={12} fill="currentColor" />
             Credits: {user.credits}
         </div>
       </div>
 
-      <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+      <div className="flex-1 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col transition-colors">
         {viewMode === 'create' && (
           <div className="flex h-full">
-            <div className="w-1/3 border-r border-slate-200 p-6 bg-slate-50 overflow-y-auto">
-              <h3 className="text-lg font-bold text-slate-800 mb-6 flex items-center gap-2">
-                 <Clapperboard className="text-pink-600" /> Content Creator
+            <div className="w-1/3 border-r border-slate-200 dark:border-slate-800 p-6 bg-slate-50 dark:bg-slate-800/50 overflow-y-auto">
+              <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
+                 <Clapperboard className="text-pink-600 dark:text-pink-400" /> Content Creator
               </h3>
               
               <div className="space-y-6">
                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Media Type</label>
-                    <div className="flex bg-white rounded-lg border border-slate-200 p-1">
+                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Media Type</label>
+                    <div className="flex bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-1">
                        <button 
                          onClick={() => setMediaType('video')}
-                         className={`flex-1 py-2 text-sm font-bold rounded-md transition-colors flex items-center justify-center gap-2 ${mediaType === 'video' ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
+                         className={`flex-1 py-2 text-sm font-bold rounded-md transition-colors flex items-center justify-center gap-2 ${mediaType === 'video' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
                        >
                          <PlayCircle size={16} /> Video ({CREDIT_COSTS.VIDEO} CR)
                        </button>
                        <button 
                          onClick={() => setMediaType('image')}
-                         className={`flex-1 py-2 text-sm font-bold rounded-md transition-colors flex items-center justify-center gap-2 ${mediaType === 'image' ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-50'}`}
+                         className={`flex-1 py-2 text-sm font-bold rounded-md transition-colors flex items-center justify-center gap-2 ${mediaType === 'image' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
                        >
                          <ImageIcon size={16} /> Image ({CREDIT_COSTS.IMAGE} CR)
                        </button>
@@ -207,24 +229,24 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
                  </div>
 
                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Prompt</label>
+                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Prompt</label>
                     <textarea 
                       value={prompt}
                       onChange={(e) => setPrompt(e.target.value)}
                       placeholder="Describe the scene (e.g. Cinematic slow motion shot of steam rising from a hot cup of coffee...)"
                       rows={4}
-                      className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-pink-500 outline-none resize-none"
+                      className="w-full px-4 py-3 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-pink-500 outline-none resize-none"
                     />
                  </div>
 
                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Aspect Ratio</label>
+                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Aspect Ratio</label>
                     <div className="flex gap-2">
                        {['16:9', '9:16', '1:1'].map(r => (
                           <button 
                             key={r}
                             onClick={() => setAspectRatio(r as any)}
-                            className={`px-3 py-2 rounded-lg border text-xs font-bold ${aspectRatio === r ? 'bg-pink-50 border-pink-500 text-pink-700' : 'bg-white border-slate-200 text-slate-600'}`}
+                            className={`px-3 py-2 rounded-lg border text-xs font-bold ${aspectRatio === r ? 'bg-pink-50 dark:bg-pink-900/30 border-pink-500 text-pink-700 dark:text-pink-400' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'}`}
                           >
                             {r}
                           </button>
@@ -234,21 +256,21 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
 
                  {mediaType === 'video' && (
                    <div>
-                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Reference Image (Optional)</label>
+                      <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Reference Image (Optional)</label>
                       <div 
                         onClick={() => fileInputRef.current?.click()}
-                        className="border-2 border-dashed border-slate-300 rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-white hover:border-pink-400 transition-colors"
+                        className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-white dark:hover:bg-slate-800 hover:border-pink-400 transition-colors"
                       >
                          {uploadedImages.length > 0 ? (
                            <div className="text-center">
                              <CheckCircle2 className="text-emerald-500 mx-auto mb-2" />
-                             <p className="text-xs font-bold text-slate-600">Image Uploaded</p>
+                             <p className="text-xs font-bold text-slate-600 dark:text-slate-300">Image Uploaded</p>
                              <button onClick={(e) => { e.stopPropagation(); setUploadedImages([]); }} className="text-[10px] text-red-500 underline mt-1">Remove</button>
                            </div>
                          ) : (
                            <>
                              <Upload className="text-slate-400 mb-2" />
-                             <p className="text-xs text-slate-500">Upload starting frame</p>
+                             <p className="text-xs text-slate-500 dark:text-slate-400">Upload starting frame</p>
                            </>
                          )}
                          <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
@@ -257,28 +279,29 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
                  )}
                  
                  {error && (
-                    <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg">
-                       {error}
+                    <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm rounded-lg flex items-center gap-2">
+                       <div className="shrink-0"><Key size={14}/></div>
+                       <div>{error}</div>
                     </div>
                  )}
 
                  {mediaType === 'video' && !hasVeoKey ? (
-                     <div className="space-y-3 mt-4 p-4 bg-slate-100 rounded-xl border border-slate-200">
+                     <div className="space-y-3 mt-4 p-4 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
                         <div className="flex items-start gap-2">
-                            <Key size={16} className="text-slate-500 mt-0.5" />
+                            <Key size={16} className="text-slate-500 dark:text-slate-400 mt-0.5" />
                             <div>
-                                <p className="text-xs font-bold text-slate-700">API Key Required</p>
-                                <p className="text-[10px] text-slate-500 leading-relaxed mt-1">
+                                <p className="text-xs font-bold text-slate-700 dark:text-slate-300">API Key Required</p>
+                                <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed mt-1">
                                     Video generation uses Veo models which require a paid Google Cloud API key.
                                 </p>
-                                <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noreferrer" className="text-[10px] text-blue-600 underline mt-1 block">
+                                <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noreferrer" className="text-[10px] text-blue-600 dark:text-blue-400 underline mt-1 block">
                                     View Billing Documentation
                                 </a>
                             </div>
                         </div>
                         <button 
                           onClick={handleSelectVeoKey}
-                          className="w-full py-2 bg-slate-800 text-white text-xs font-bold rounded-lg hover:bg-slate-700 transition-colors flex items-center justify-center gap-2"
+                          className="w-full py-2 bg-slate-800 dark:bg-slate-700 text-white text-xs font-bold rounded-lg hover:bg-slate-700 dark:hover:bg-slate-600 transition-colors flex items-center justify-center gap-2"
                         >
                           Select API Key
                         </button>
@@ -287,7 +310,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
                      <button 
                        onClick={handleGenerate}
                        disabled={isGenerating || !prompt}
-                       className="w-full py-3 bg-slate-900 text-white font-bold rounded-lg hover:bg-pink-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                       className="w-full py-3 bg-slate-900 dark:bg-pink-600 text-white font-bold rounded-lg hover:bg-pink-600 dark:hover:bg-pink-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                      >
                        {isGenerating ? <Loader2 className="animate-spin" size={20} /> : <Sparkles size={20} />}
                        Generate Asset
@@ -331,11 +354,11 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
         )}
 
         {viewMode === 'gallery' && (
-           <div className="p-6 h-full overflow-y-auto">
-              <h3 className="text-lg font-bold text-slate-800 mb-6">Your Creations</h3>
+           <div className="p-6 h-full overflow-y-auto bg-white dark:bg-slate-900">
+              <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-6">Your Creations</h3>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                  {gallery.map(item => (
-                    <div key={item.id} className="relative group rounded-lg overflow-hidden border border-slate-200 bg-slate-100 aspect-square">
+                    <div key={item.id} className="relative group rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 aspect-square">
                        {item.type === 'video' ? (
                           <video src={item.outputUrl} className="w-full h-full object-cover" />
                        ) : (
@@ -349,29 +372,29 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
                        </div>
                     </div>
                  ))}
-                 {gallery.length === 0 && <p className="text-slate-400 col-span-full text-center py-12">No assets generated yet.</p>}
+                 {gallery.length === 0 && <p className="text-slate-400 dark:text-slate-500 col-span-full text-center py-12">No assets generated yet.</p>}
               </div>
            </div>
         )}
 
         {viewMode === 'requests' && isAdmin && (
-           <div className="p-6">
-              <h3 className="text-lg font-bold text-slate-800 mb-6">Request Queue</h3>
+           <div className="p-6 bg-white dark:bg-slate-900">
+              <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-6">Request Queue</h3>
               {requests.map(req => (
-                  <div key={req.id} className="flex justify-between items-center p-4 border border-slate-200 rounded-lg mb-2">
+                  <div key={req.id} className="flex justify-between items-center p-4 border border-slate-200 dark:border-slate-700 rounded-lg mb-2">
                       <div>
-                          <p className="font-bold">{req.prompt}</p>
-                          <p className="text-xs text-slate-500">{req.userName} • {req.type}</p>
+                          <p className="font-bold text-slate-800 dark:text-white">{req.prompt}</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">{req.userName} • {req.type}</p>
                       </div>
                       <div>
                           {req.status === 'completed' ? (
-                              <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full text-xs font-bold flex items-center gap-1">
+                              <span className="px-3 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded-full text-xs font-bold flex items-center gap-1">
                                   <CheckCircle2 size={12} /> Completed
                               </span>
                           ) : (
                               <button 
                                 onClick={() => handleFulfillRequest(req)}
-                                className="px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded hover:bg-pink-600 transition-colors flex items-center gap-2"
+                                className="px-4 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold rounded hover:bg-pink-600 dark:hover:bg-pink-200 transition-colors flex items-center gap-2"
                               >
                                   <Sparkles size={14} /> Fulfill
                               </button>

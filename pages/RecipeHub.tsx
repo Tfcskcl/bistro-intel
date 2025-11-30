@@ -527,13 +527,20 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                   <h3>Ingredients</h3>
                   <table>
                     <thead>
-                       <tr><th>Item</th><th class="text-right">Qty</th></tr>
+                       <tr>
+                         <th>Item</th>
+                         <th class="text-right">Qty</th>
+                         <th class="text-right">Unit Cost</th>
+                         <th class="text-right">Total</th>
+                       </tr>
                     </thead>
                     <tbody>
                        ${generatedRecipe.ingredients.map(ing => `
                           <tr>
                              <td>${ing.name}</td>
                              <td class="text-right">${ing.qty_per_serving} ${ing.unit}</td>
+                             <td class="text-right">₹${ing.cost_per_unit?.toFixed(2)}</td>
+                             <td class="text-right font-bold">₹${ing.cost_per_serving?.toFixed(2)}</td>
                           </tr>
                        `).join('')}
                     </tbody>
@@ -571,36 +578,36 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       {/* Request Preview Modal (Admin Only) */}
       {previewRequest && (
           <div className="absolute inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
-              <div className="bg-white rounded-xl w-full max-w-md shadow-2xl border border-slate-200 animate-scale-in">
-                  <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-                      <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
+              <div className="bg-white dark:bg-slate-900 rounded-xl w-full max-w-md shadow-2xl border border-slate-200 dark:border-slate-800 animate-scale-in">
+                  <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
+                      <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2">
                           <Eye className="text-emerald-600" size={20} /> Request Preview
                       </h3>
-                      <button onClick={() => setPreviewRequest(null)} className="p-2 hover:bg-slate-100 rounded-full text-slate-500">
+                      <button onClick={() => setPreviewRequest(null)} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full text-slate-500 dark:text-slate-400">
                           <X size={20} />
                       </button>
                   </div>
                   <div className="p-6 space-y-4">
                       <div>
-                          <p className="text-xs font-bold text-slate-500 uppercase">Item Name</p>
-                          <p className="text-lg font-bold text-slate-900">{previewRequest.item.name}</p>
+                          <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Item Name</p>
+                          <p className="text-lg font-bold text-slate-900 dark:text-white">{previewRequest.item.name}</p>
                       </div>
                       <div>
-                          <p className="text-xs font-bold text-slate-500 uppercase">Requested By</p>
-                          <p className="text-sm text-slate-800">{previewRequest.userName}</p>
+                          <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Requested By</p>
+                          <p className="text-sm text-slate-800 dark:text-slate-200">{previewRequest.userName}</p>
                       </div>
-                      <div className="bg-slate-50 p-4 rounded-lg border border-slate-100">
-                          <p className="text-xs font-bold text-slate-500 uppercase mb-2">Specific Requirements</p>
-                          <p className="text-sm text-slate-600 leading-relaxed">{previewRequest.requirements}</p>
+                      <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg border border-slate-100 dark:border-slate-700">
+                          <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Specific Requirements</p>
+                          <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">{previewRequest.requirements}</p>
                       </div>
                       <div className="pt-4 flex justify-end gap-2">
-                          <button onClick={() => setPreviewRequest(null)} className="px-4 py-2 text-sm text-slate-600 font-medium hover:bg-slate-100 rounded-lg">Close</button>
+                          <button onClick={() => setPreviewRequest(null)} className="px-4 py-2 text-sm text-slate-600 dark:text-slate-400 font-medium hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">Close</button>
                           <button 
                               onClick={() => {
                                   setPreviewRequest(null);
                                   handleFulfillRequest(previewRequest);
                               }}
-                              className="px-4 py-2 bg-slate-900 text-white text-sm font-bold rounded-lg hover:bg-emerald-600 transition-colors flex items-center gap-2"
+                              className="px-4 py-2 bg-slate-900 dark:bg-emerald-600 text-white text-sm font-bold rounded-lg hover:bg-emerald-600 dark:hover:bg-emerald-700 transition-colors flex items-center gap-2"
                           >
                               <Sparkles size={14} fill="currentColor" /> Fulfill Now
                           </button>
@@ -615,20 +622,20 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
         <div className="flex gap-2">
             <button 
                 onClick={() => handleTabChange('generator')}
-                className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${viewMode === 'generator' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`}
+                className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${viewMode === 'generator' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
             >
                 {isAdmin ? (activeRequest ? 'Fulfilling Request' : 'AI Generator') : 'Request Recipe'}
             </button>
             <button 
                 onClick={() => handleTabChange('saved')}
-                className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${viewMode === 'saved' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`}
+                className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${viewMode === 'saved' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
             >
                 Saved Library ({savedRecipes.length})
             </button>
             
             <button 
                 onClick={() => handleTabChange('requests')}
-                className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-2 ${viewMode === 'requests' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 hover:bg-slate-100'}`}
+                className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-2 ${viewMode === 'requests' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
             >
                 {isAdmin ? (
                     <>
@@ -651,48 +658,48 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       </div>
 
       {viewMode === 'requests' && (
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 overflow-y-auto flex-1 animate-fade-in">
-              <h2 className="text-xl font-bold text-slate-800 mb-4">{isAdmin ? 'Customer Request Queue' : 'My Recipe Requests'}</h2>
+          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm p-6 overflow-y-auto flex-1 animate-fade-in transition-colors">
+              <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-4">{isAdmin ? 'Customer Request Queue' : 'My Recipe Requests'}</h2>
               
               <div className="space-y-3">
                   {(isAdmin ? adminQueue : myRequests).length === 0 ? (
-                      <p className="text-slate-500 text-center py-8">No pending requests found.</p>
+                      <p className="text-slate-500 dark:text-slate-400 text-center py-8">No pending requests found.</p>
                   ) : (
                       (isAdmin ? adminQueue : myRequests).map((req, i) => (
-                          <div key={i} className="flex justify-between items-center p-4 border border-slate-100 rounded-lg hover:border-slate-300 transition-colors bg-slate-50">
+                          <div key={i} className="flex justify-between items-center p-4 border border-slate-100 dark:border-slate-800 rounded-lg hover:border-slate-300 dark:hover:border-slate-700 transition-colors bg-slate-50 dark:bg-slate-800/50">
                               <div className="flex items-start gap-4">
-                                  <div className={`p-3 rounded-full ${req.status === 'completed' ? 'bg-emerald-100 text-emerald-600' : 'bg-yellow-100 text-yellow-600'}`}>
+                                  <div className={`p-3 rounded-full ${req.status === 'completed' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50 dark:text-emerald-400' : 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/50 dark:text-yellow-400'}`}>
                                       {req.status === 'completed' ? <CheckCircle2 size={20} /> : <Clock3 size={20} />}
                                   </div>
                                   <div>
-                                      <h4 className="font-bold text-slate-800">{req.item.name}</h4>
-                                      <p className="text-xs text-slate-500">Requested by: <span className="font-semibold">{req.userName}</span> • {new Date(req.requestDate).toLocaleString()}</p>
-                                      {isAdmin && <p className="text-xs text-slate-600 mt-1 italic max-w-lg bg-white p-1 rounded border border-slate-100 truncate">{req.requirements}</p>}
+                                      <h4 className="font-bold text-slate-800 dark:text-white">{req.item.name}</h4>
+                                      <p className="text-xs text-slate-500 dark:text-slate-400">Requested by: <span className="font-semibold">{req.userName}</span> • {new Date(req.requestDate).toLocaleString()}</p>
+                                      {isAdmin && <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 italic max-w-lg bg-white dark:bg-slate-800 p-1 rounded border border-slate-100 dark:border-slate-700 truncate">{req.requirements}</p>}
                                   </div>
                               </div>
                               
                               <div>
                                   {req.status === 'completed' ? (
-                                      <span className="px-3 py-1 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-full">Completed</span>
+                                      <span className="px-3 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs font-bold rounded-full">Completed</span>
                                   ) : (
                                       isAdmin ? (
                                           <div className="flex gap-2">
                                               <button 
                                                   onClick={() => setPreviewRequest(req)}
-                                                  className="p-2 bg-white border border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-300 rounded-lg transition-colors"
+                                                  className="p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-300 dark:hover:border-blue-700 rounded-lg transition-colors"
                                                   title="Quick Preview"
                                               >
                                                   <Eye size={16} />
                                               </button>
                                               <button 
                                                 onClick={() => handleFulfillRequest(req)}
-                                                className="px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded hover:bg-emerald-600 transition-colors flex items-center gap-2"
+                                                className="px-4 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold rounded hover:bg-emerald-600 dark:hover:bg-slate-200 transition-colors flex items-center gap-2"
                                               >
                                                   <Sparkles size={14} fill="currentColor" /> Fulfill
                                               </button>
                                           </div>
                                       ) : (
-                                          <span className="px-3 py-1 bg-yellow-100 text-yellow-700 text-xs font-bold rounded-full flex items-center gap-1">
+                                          <span className="px-3 py-1 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 text-xs font-bold rounded-full flex items-center gap-1">
                                               <Clock size={12} /> Pending Admin Review
                                           </span>
                                       )
@@ -706,9 +713,9 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       )}
 
       {viewMode === 'saved' && (
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col flex-1 animate-fade-in">
-              <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row justify-between items-center gap-4">
-                  <h2 className="text-xl font-bold text-slate-800">Your Saved Recipes</h2>
+          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col flex-1 animate-fade-in transition-colors">
+              <div className="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 flex flex-col sm:flex-row justify-between items-center gap-4">
+                  <h2 className="text-xl font-bold text-slate-800 dark:text-white">Your Saved Recipes</h2>
                   
                   {/* Search and Filter */}
                   <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -719,14 +726,14 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                               placeholder="Search recipes..." 
                               value={searchQuery}
                               onChange={(e) => setSearchQuery(e.target.value)}
-                              className="w-full pl-9 pr-4 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+                              className="w-full pl-9 pr-4 py-2 text-sm border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-colors"
                           />
                       </div>
                       
                       <div className="relative">
                           <button 
                               onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-                              className={`p-2 rounded-lg border transition-colors flex items-center gap-2 ${showFilterDropdown || selectedTags.length > 0 ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'}`}
+                              className={`p-2 rounded-lg border transition-colors flex items-center gap-2 ${showFilterDropdown || selectedTags.length > 0 ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700'}`}
                           >
                               <Filter size={16} />
                               <span className="text-xs font-bold hidden sm:inline">Filters</span>
@@ -736,9 +743,9 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                           </button>
 
                           {showFilterDropdown && (
-                              <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-slate-200 z-50 p-4 animate-scale-in">
+                              <div className="absolute right-0 mt-2 w-64 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 z-50 p-4 animate-scale-in">
                                   <div className="flex justify-between items-center mb-3">
-                                      <h4 className="text-xs font-bold text-slate-500 uppercase">Filter by Tags</h4>
+                                      <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Filter by Tags</h4>
                                       {selectedTags.length > 0 && (
                                           <button onClick={() => setSelectedTags([])} className="text-[10px] text-red-500 hover:underline">Clear</button>
                                       )}
@@ -748,14 +755,14 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                           <p className="text-xs text-slate-400 text-center py-2">No tags available</p>
                                       ) : (
                                           uniqueTags.map(tag => (
-                                              <label key={tag} className="flex items-center gap-2 p-2 hover:bg-slate-50 rounded cursor-pointer">
+                                              <label key={tag} className="flex items-center gap-2 p-2 hover:bg-slate-50 dark:hover:bg-slate-800 rounded cursor-pointer">
                                                   <input 
                                                       type="checkbox" 
                                                       checked={selectedTags.includes(tag)}
                                                       onChange={() => toggleTag(tag)}
                                                       className="rounded text-emerald-600 focus:ring-emerald-500 border-slate-300"
                                                   />
-                                                  <span className="text-sm text-slate-700">{tag}</span>
+                                                  <span className="text-sm text-slate-700 dark:text-slate-300">{tag}</span>
                                               </label>
                                           ))
                                       )}
@@ -768,9 +775,9 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
 
               {/* Active Filters Display */}
               {selectedTags.length > 0 && (
-                  <div className="px-6 py-2 bg-slate-50 border-b border-slate-100 flex flex-wrap gap-2">
+                  <div className="px-6 py-2 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800 flex flex-wrap gap-2">
                       {selectedTags.map(tag => (
-                          <div key={tag} className="bg-white border border-slate-200 text-slate-600 text-xs px-2 py-1 rounded-full flex items-center gap-1 shadow-sm">
+                          <div key={tag} className="bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 text-xs px-2 py-1 rounded-full flex items-center gap-1 shadow-sm">
                               {tag}
                               <button onClick={() => toggleTag(tag)} className="hover:text-red-500"><X size={12} /></button>
                           </div>
@@ -780,48 +787,48 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
 
               <div className="flex-1 overflow-y-auto p-6">
                   {savedRecipes.length === 0 ? (
-                      <div className="h-full flex flex-col items-center justify-center text-slate-400">
+                      <div className="h-full flex flex-col items-center justify-center text-slate-400 dark:text-slate-500">
                           <ChefHat size={48} className="mb-4 opacity-50" />
                           <p className="text-sm">No saved recipes yet.</p>
                           <p className="text-xs mt-1">{isAdmin ? 'Generate' : 'Request'} one to populate your library!</p>
                       </div>
                   ) : filteredRecipes.length === 0 ? (
-                      <div className="h-full flex flex-col items-center justify-center text-slate-400">
+                      <div className="h-full flex flex-col items-center justify-center text-slate-400 dark:text-slate-500">
                           <Search size={48} className="mb-4 opacity-50" />
                           <p className="text-sm">No recipes match your filters.</p>
-                          <button onClick={() => { setSearchQuery(''); setSelectedTags([]); }} className="text-xs text-emerald-600 hover:underline mt-2">Clear all filters</button>
+                          <button onClick={() => { setSearchQuery(''); setSelectedTags([]); }} className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline mt-2">Clear all filters</button>
                       </div>
                   ) : (
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                           {filteredRecipes.map((recipe, idx) => (
-                              <div key={idx} className="border border-slate-200 rounded-lg p-4 hover:border-emerald-300 transition-all shadow-sm bg-white flex flex-col">
+                              <div key={idx} className="border border-slate-200 dark:border-slate-700 rounded-lg p-4 hover:border-emerald-300 dark:hover:border-emerald-700 transition-all shadow-sm bg-white dark:bg-slate-900 flex flex-col">
                                   <div className="flex justify-between items-start mb-2">
-                                      <h3 className="font-bold text-slate-800 line-clamp-1" title={recipe.name}>{recipe.name}</h3>
-                                      <span className="text-[10px] font-mono bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded border border-slate-200">{recipe.sku_id}</span>
+                                      <h3 className="font-bold text-slate-800 dark:text-white line-clamp-1" title={recipe.name}>{recipe.name}</h3>
+                                      <span className="text-[10px] font-mono bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700">{recipe.sku_id}</span>
                                   </div>
                                   
                                   {/* Tags Preview */}
                                   <div className="flex flex-wrap gap-1 mb-3 h-6 overflow-hidden">
                                       {recipe.tags?.slice(0, 3).map((tag, tIdx) => (
-                                          <span key={tIdx} className="text-[10px] bg-slate-50 text-slate-500 px-1.5 py-0.5 rounded border border-slate-100">
+                                          <span key={tIdx} className="text-[10px] bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 px-1.5 py-0.5 rounded border border-slate-100 dark:border-slate-700">
                                               {tag}
                                           </span>
                                       ))}
                                       {(recipe.tags?.length || 0) > 3 && (
-                                          <span className="text-[10px] text-slate-400 px-1">+{ (recipe.tags?.length || 0) - 3}</span>
+                                          <span className="text-[10px] text-slate-400 dark:text-slate-500 px-1">+{ (recipe.tags?.length || 0) - 3}</span>
                                       )}
                                   </div>
 
                                   {recipe.assignedRestaurantName && (
-                                      <div className="flex items-center gap-1 text-[10px] text-blue-600 bg-blue-50 px-2 py-1 rounded w-fit mb-2">
+                                      <div className="flex items-center gap-1 text-[10px] text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2 py-1 rounded w-fit mb-2">
                                           <Store size={10} /> {recipe.assignedRestaurantName}
                                       </div>
                                   )}
                                   
-                                  <div className="mt-auto pt-4 border-t border-slate-100 flex justify-between items-center">
+                                  <div className="mt-auto pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center">
                                       <div>
-                                          <p className="text-[10px] text-slate-400 uppercase font-bold">Cost</p>
-                                          <p className="text-emerald-700 font-bold">₹{recipe.food_cost_per_serving.toFixed(0)}</p>
+                                          <p className="text-[10px] text-slate-400 dark:text-slate-500 uppercase font-bold">Cost</p>
+                                          <p className="text-emerald-700 dark:text-emerald-400 font-bold">₹{recipe.food_cost_per_serving.toFixed(0)}</p>
                                       </div>
                                       <button 
                                         onClick={() => {
@@ -829,7 +836,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                             setGeneratedRecipe(recipe);
                                             setSelectedSku(recipe.sku_id);
                                         }}
-                                        className="px-3 py-1.5 text-xs font-bold text-slate-600 border border-slate-200 rounded hover:bg-slate-50 transition-colors"
+                                        className="px-3 py-1.5 text-xs font-bold text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 rounded hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                                       >
                                         View
                                       </button>
@@ -845,14 +852,14 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       {viewMode === 'generator' && (
       <div className="flex gap-6 h-full overflow-hidden">
         {/* List */}
-        <div className="w-1/3 bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden animate-fade-in">
-            <div className="p-4 border-b border-slate-200 bg-slate-50 flex flex-col gap-3">
+        <div className="w-1/3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col overflow-hidden animate-fade-in transition-colors">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex flex-col gap-3">
                 <div className="flex justify-between items-center">
-                    <h3 className="font-bold text-slate-700">Menu Items</h3>
+                    <h3 className="font-bold text-slate-700 dark:text-white">Menu Items</h3>
                     <div className="flex gap-2 items-center">
                          <button 
                             onClick={handleSurpriseMe}
-                            className="text-xs flex items-center gap-1 text-purple-600 hover:text-purple-700 bg-purple-50 px-2 py-1 rounded border border-purple-100 transition-colors"
+                            className="text-xs flex items-center gap-1 text-purple-600 dark:text-purple-400 hover:text-purple-700 bg-purple-50 dark:bg-purple-900/30 px-2 py-1 rounded border border-purple-100 dark:border-purple-800 transition-colors"
                             title="Auto-fill with a creative dish idea"
                         >
                             <Sparkles size={12} /> Surprise
@@ -860,7 +867,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                         <div className="group relative">
                             <button 
                                 onClick={handleImportClick}
-                                className="text-xs flex items-center gap-1 text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-2 py-1 rounded border border-emerald-100 transition-colors"
+                                className="text-xs flex items-center gap-1 text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-1 rounded border border-emerald-100 dark:border-emerald-800 transition-colors"
                             >
                                 <Upload size={12} /> Import
                             </button>
@@ -884,26 +891,26 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         placeholder="Search existing items..."
-                        className="w-full pl-8 pr-2 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
+                        className="w-full pl-8 pr-2 py-2 text-sm border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
                     />
                     <Search className="absolute left-2.5 top-2.5 text-slate-400" size={14} />
                 </div>
 
                 {importStatus && (
-                    <div className="text-[10px] text-emerald-600 bg-emerald-50 p-1.5 rounded flex items-center gap-1 animate-fade-in">
+                    <div className="text-[10px] text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 p-1.5 rounded flex items-center gap-1 animate-fade-in">
                         <Check size={10} /> {importStatus}
                     </div>
                 )}
                 
                 {/* Popular Ideas Chips */}
-                <div className="pt-2 border-t border-slate-100 mt-1">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Quick Start Ideas</p>
+                <div className="pt-2 border-t border-slate-100 dark:border-slate-800 mt-1">
+                    <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase mb-2">Quick Start Ideas</p>
                     <div className="flex flex-wrap gap-2">
                         {POPULAR_IDEAS.map((idea, idx) => (
                             <button
                                 key={idx}
                                 onClick={() => handlePopularIdea(idea)}
-                                className="text-[10px] bg-white border border-slate-200 text-slate-600 hover:text-emerald-600 hover:border-emerald-200 px-2 py-1 rounded-full transition-colors flex items-center gap-1"
+                                className="text-[10px] bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:border-emerald-200 dark:hover:border-emerald-800 px-2 py-1 rounded-full transition-colors flex items-center gap-1"
                             >
                                 <Flame size={10} className="text-orange-400" />
                                 {idea.name}
@@ -915,7 +922,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
             
             <div className="overflow-y-auto flex-1 p-2 space-y-2">
             {menuItems.length === 0 ? (
-                <div className="text-center p-8 text-slate-400">
+                <div className="text-center p-8 text-slate-400 dark:text-slate-500">
                     <ChefHat className="mx-auto mb-2 opacity-50" size={32} />
                     <p className="text-sm">No items found.</p>
                     <p className="text-xs mt-1">Import your menu or create a new dish.</p>
@@ -929,13 +936,13 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                     onClick={() => loadItemIntoForm(item)}
                     className={`p-4 rounded-lg transition-all border ${
                         selectedSku === item.sku_id 
-                        ? 'bg-yellow-50 border-yellow-200 ring-1 ring-yellow-300' 
-                        : 'bg-white border-transparent hover:bg-slate-50 hover:border-slate-200 cursor-pointer'
+                        ? 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-900/50 ring-1 ring-yellow-300 dark:ring-yellow-700' 
+                        : 'bg-white dark:bg-slate-800 border-transparent hover:bg-slate-50 dark:hover:bg-slate-700 hover:border-slate-200 dark:hover:border-slate-600 cursor-pointer'
                     }`}
                     >
                     <div className="flex justify-between items-start">
-                        <h4 className="font-semibold text-slate-800 text-sm">{item.name}</h4>
-                        <span className="text-[10px] font-mono text-slate-400 bg-slate-50 px-1 rounded">{item.sku_id}</span>
+                        <h4 className="font-semibold text-slate-800 dark:text-slate-200 text-sm">{item.name}</h4>
+                        <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 bg-slate-50 dark:bg-slate-900 px-1 rounded">{item.sku_id}</span>
                     </div>
                     </div>
                 ))
@@ -944,20 +951,20 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
         </div>
 
         {/* Detail / Generator View */}
-        <div className="flex-1 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden flex flex-col animate-fade-in">
+        <div className="flex-1 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col animate-fade-in transition-colors">
             {generatedRecipe ? (
                  <div className="flex flex-col h-full animate-fade-in">
                         {/* Header */}
-                        <div className="p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-start">
+                        <div className="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex justify-between items-start">
                             <div>
                                 {activeRequest && isAdmin && (
-                                    <div className="mb-2 inline-flex items-center gap-1 text-[10px] font-bold text-yellow-700 bg-yellow-100 px-2 py-0.5 rounded">
+                                    <div className="mb-2 inline-flex items-center gap-1 text-[10px] font-bold text-yellow-700 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900/30 px-2 py-0.5 rounded">
                                         <UserCheck size={10} /> Fulfilling Request for: {activeRequest.userName}
                                     </div>
                                 )}
-                                <h2 className="text-2xl font-bold text-slate-800 leading-tight">{generatedRecipe.name}</h2>
-                                <p className="text-sm text-slate-500 mt-1 flex items-center gap-2">
-                                    <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-slate-200 text-xs">{generatedRecipe.sku_id}</span>
+                                <h2 className="text-2xl font-bold text-slate-800 dark:text-white leading-tight">{generatedRecipe.name}</h2>
+                                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-2">
+                                    <span className="font-mono bg-white dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700 text-xs">{generatedRecipe.sku_id}</span>
                                     <span>•</span>
                                     <span>Yield: {generatedRecipe.yield} servings</span>
                                     <span>•</span>
@@ -968,14 +975,14 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                             <div className="flex gap-2">
                                 <button 
                                     onClick={handleDownloadPDF}
-                                    className="p-2 text-slate-500 hover:bg-slate-200 hover:text-blue-600 rounded-lg transition-colors"
+                                    className="p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-blue-600 dark:hover:text-blue-400 rounded-lg transition-colors"
                                     title="Download PDF"
                                 >
                                     <FileDown size={20} />
                                 </button>
                                 <button 
                                     onClick={() => setGeneratedRecipe(null)}
-                                    className="p-2 text-slate-400 hover:bg-slate-200 rounded-lg transition-colors"
+                                    className="p-2 text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors"
                                     title="Close"
                                 >
                                     <X size={20} />
@@ -988,23 +995,23 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                             
                             {/* Summary & Confidence */}
                             {generatedRecipe.human_summary && (
-                                <div className="bg-blue-50 border border-blue-100 p-4 rounded-lg flex gap-3">
-                                    <Sparkles className="text-blue-500 shrink-0 mt-0.5" size={18} />
+                                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/50 p-4 rounded-lg flex gap-3">
+                                    <Sparkles className="text-blue-500 dark:text-blue-400 shrink-0 mt-0.5" size={18} />
                                     <div>
-                                        <p className="text-sm text-blue-900 leading-relaxed">{generatedRecipe.human_summary}</p>
+                                        <p className="text-sm text-blue-900 dark:text-blue-200 leading-relaxed">{generatedRecipe.human_summary}</p>
                                     </div>
                                 </div>
                             )}
 
                             {/* Costing Section */}
                             <div className="grid grid-cols-2 gap-4">
-                                <div className="bg-white border border-slate-200 p-4 rounded-xl shadow-sm">
+                                <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 rounded-xl shadow-sm">
                                     <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1">Food Cost (Per Serving)</p>
-                                    <p className="text-2xl font-bold text-slate-800">₹{generatedRecipe.food_cost_per_serving?.toFixed(2)}</p>
+                                    <p className="text-2xl font-bold text-slate-800 dark:text-white">₹{generatedRecipe.food_cost_per_serving?.toFixed(2)}</p>
                                 </div>
-                                <div className="bg-white border border-slate-200 p-4 rounded-xl shadow-sm">
+                                <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 rounded-xl shadow-sm">
                                     <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1">Suggested Price</p>
-                                    <p className="text-2xl font-bold text-emerald-600">₹{generatedRecipe.suggested_selling_price}</p>
+                                    <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">₹{generatedRecipe.suggested_selling_price}</p>
                                     <p className="text-[10px] text-slate-400 mt-1">
                                         ~{generatedRecipe.suggested_selling_price > 0 ? ((generatedRecipe.food_cost_per_serving / generatedRecipe.suggested_selling_price) * 100).toFixed(1) : 0}% Cost
                                     </p>
@@ -1013,24 +1020,28 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
 
                             {/* Ingredients Table */}
                             <div>
-                                <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
+                                <h3 className="font-bold text-slate-800 dark:text-white mb-3 flex items-center gap-2">
                                     <Scale size={18} className="text-slate-400"/> Ingredients
                                 </h3>
-                                <div className="border border-slate-200 rounded-lg overflow-hidden">
+                                <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
                                     <table className="w-full text-sm text-left">
-                                        <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
+                                        <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-700">
                                             <tr>
                                                 <th className="px-4 py-2">Item</th>
                                                 <th className="px-4 py-2 text-right">Qty</th>
-                                                <th className="px-4 py-2 text-right">Cost</th>
+                                                <th className="px-4 py-2 text-right">Unit Cost</th>
+                                                <th className="px-4 py-2 text-right">Total</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-slate-100">
+                                        <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                                             {generatedRecipe.ingredients?.map((ing, i) => (
-                                                <tr key={i} className="hover:bg-slate-50">
-                                                    <td className="px-4 py-2 font-medium text-slate-700">{ing.name}</td>
-                                                    <td className="px-4 py-2 text-right text-slate-500">{ing.qty_per_serving} {ing.unit}</td>
-                                                    <td className="px-4 py-2 text-right text-slate-600">₹{ing.cost_per_serving?.toFixed(2)}</td>
+                                                <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                                    <td className="px-4 py-2 font-medium text-slate-700 dark:text-slate-200">{ing.name}</td>
+                                                    <td className="px-4 py-2 text-right text-slate-500 dark:text-slate-400">{ing.qty_per_serving} {ing.unit}</td>
+                                                    <td className="px-4 py-2 text-right text-slate-500 dark:text-slate-400 text-xs">
+                                                        {ing.cost_per_unit ? `₹${ing.cost_per_unit}/${ing.unit}` : '-'}
+                                                    </td>
+                                                    <td className="px-4 py-2 text-right text-slate-600 dark:text-slate-300 font-bold">₹{ing.cost_per_serving?.toFixed(2)}</td>
                                                 </tr>
                                             ))}
                                         </tbody>
@@ -1040,13 +1051,13 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
 
                             {/* Preparation Steps */}
                             <div>
-                                <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
+                                <h3 className="font-bold text-slate-800 dark:text-white mb-3 flex items-center gap-2">
                                     <ChefHat size={18} className="text-slate-400"/> Preparation
                                 </h3>
                                 <div className="space-y-3">
                                     {generatedRecipe.preparation_steps?.map((step, i) => (
-                                        <div key={i} className="flex gap-3 text-sm text-slate-700">
-                                            <span className="font-bold text-slate-300 select-none">{i + 1}.</span>
+                                        <div key={i} className="flex gap-3 text-sm text-slate-700 dark:text-slate-300">
+                                            <span className="font-bold text-slate-300 dark:text-slate-600 select-none">{i + 1}.</span>
                                             <p>{step}</p>
                                         </div>
                                     ))}
@@ -1056,15 +1067,15 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                         </div>
 
                         {/* Footer Actions */}
-                        <div className="p-4 border-t border-slate-200 bg-slate-50 flex flex-wrap gap-3">
+                        <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex flex-wrap gap-3">
                             {/* Admin Context Selector for Outlets */}
                             {isAdmin && !activeRequest && (
-                                <div className="w-full mb-2 flex items-center gap-2 bg-white p-2 rounded border border-slate-200">
+                                <div className="w-full mb-2 flex items-center gap-2 bg-white dark:bg-slate-800 p-2 rounded border border-slate-200 dark:border-slate-700">
                                     <Building2 size={16} className="text-slate-400" />
                                     <select 
                                         value={selectedRestaurantId}
                                         onChange={(e) => setSelectedRestaurantId(e.target.value)}
-                                        className="text-xs w-full outline-none text-slate-700 font-medium bg-transparent"
+                                        className="text-xs w-full outline-none text-slate-700 dark:text-slate-200 font-medium bg-transparent"
                                     >
                                         <option value="">-- Assign to Restaurant (Optional) --</option>
                                         {restaurants.map(r => (
@@ -1085,20 +1096,20 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
 
                             <button 
                                 onClick={handleDownloadPDF}
-                                className="px-4 py-2 bg-white border border-slate-200 text-slate-600 font-bold rounded-lg hover:bg-slate-50 transition-colors text-xs flex items-center gap-2"
+                                className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-xs flex items-center gap-2"
                             >
                                 <FileDown size={14} /> Download PDF
                             </button>
                             
                             <button 
                                 onClick={() => handleVariation('Vegan')}
-                                className="px-4 py-2 bg-white border border-slate-200 text-slate-600 font-bold rounded-lg hover:bg-slate-50 transition-colors text-xs"
+                                className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-xs"
                             >
                                 Make Vegan
                             </button>
                             <button 
                                 onClick={() => handleVariation('Premium')}
-                                className="px-4 py-2 bg-white border border-slate-200 text-slate-600 font-bold rounded-lg hover:bg-slate-50 transition-colors text-xs"
+                                className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-xs"
                             >
                                 Premium Ver.
                             </button>
@@ -1108,8 +1119,8 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                 disabled={isPushing}
                                 className={`px-4 py-2 border font-bold rounded-lg transition-colors text-xs flex items-center gap-2 ${
                                     posPushStatus 
-                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                                    : 'bg-white text-blue-600 border-blue-200 hover:bg-blue-50'
+                                    ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800' 
+                                    : 'bg-white dark:bg-slate-800 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-900/30'
                                 }`}
                             >
                                 {isPushing ? <RefreshCw className="animate-spin" size={14} /> : <Store size={14} />}
@@ -1122,17 +1133,17 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                 loading ? (
                     <div className="flex-1 flex flex-col items-center justify-center gap-4">
                         <Loader2 size={48} className="animate-spin text-emerald-500" />
-                        <p className="text-slate-600 font-bold animate-pulse">{loadingText}</p>
+                        <p className="text-slate-600 dark:text-slate-400 font-bold animate-pulse">{loadingText}</p>
                     </div>
                 ) : (
                     <div className="flex flex-col h-full">
                         {/* Form Header */}
-                        <div className="p-6 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+                        <div className="p-6 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex justify-between items-center">
                              <div>
-                                 <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                                     <Wand2 size={20} className="text-purple-600" /> AI Recipe Generator
+                                 <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                                     <Wand2 size={20} className="text-purple-600 dark:text-purple-400" /> AI Recipe Generator
                                  </h2>
-                                 <p className="text-sm text-slate-500 mt-1">
+                                 <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
                                      {isAdmin && activeRequest 
                                         ? `Fulfilling request for ${activeRequest.userName}` 
                                         : `Create a cost-optimized recipe. Cost: ${CREDIT_COSTS.RECIPE} CR`}
@@ -1140,7 +1151,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                              </div>
                              <button 
                                 onClick={resetForm}
-                                className="text-xs flex items-center gap-1 text-slate-500 hover:text-red-500 transition-colors"
+                                className="text-xs flex items-center gap-1 text-slate-500 dark:text-slate-400 hover:text-red-500 transition-colors"
                                 title="Clear all fields"
                              >
                                  <Eraser size={12} /> Clear Form
@@ -1153,7 +1164,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                 
                                 {/* Dish Name */}
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Dish Name</label>
+                                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Dish Name</label>
                                     <div className="relative">
                                         <Type size={16} className="absolute left-3 top-3 text-slate-400" />
                                         <input 
@@ -1161,7 +1172,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                             value={dishName}
                                             onChange={(e) => setDishName(e.target.value)}
                                             placeholder="e.g. Truffle Mushroom Risotto"
-                                            className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none font-medium"
+                                            className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none font-medium"
                                         />
                                     </div>
                                 </div>
@@ -1169,7 +1180,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                 {/* Two Column Layout */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Cuisine Style</label>
+                                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Cuisine Style</label>
                                         <div className="relative">
                                             <UtensilsCrossed size={16} className="absolute left-3 top-3 text-slate-400" />
                                             <input 
@@ -1177,12 +1188,12 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                                 value={cuisine}
                                                 onChange={(e) => setCuisine(e.target.value)}
                                                 placeholder="e.g. Modern Italian"
-                                                className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none"
+                                                className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none"
                                             />
                                         </div>
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Key Ingredients</label>
+                                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Key Ingredients</label>
                                         <div className="relative">
                                             <Carrot size={16} className="absolute left-3 top-3 text-slate-400" />
                                             <input 
@@ -1190,7 +1201,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                                 value={ingredients}
                                                 onChange={(e) => setIngredients(e.target.value)}
                                                 placeholder="e.g. Arborio Rice, Truffle Oil"
-                                                className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none"
+                                                className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none"
                                             />
                                         </div>
                                     </div>
@@ -1198,7 +1209,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
 
                                 {/* Dietary Chips */}
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Dietary Tags</label>
+                                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Dietary Tags</label>
                                     <div className="flex flex-wrap gap-2">
                                         {['Vegetarian', 'Vegan', 'Gluten-Free', 'Dairy-Free', 'Keto', 'Nut-Free', 'Halal', 'Paleo', 'Low-Sodium', 'Sugar-Free'].map(tag => (
                                             <button
@@ -1206,8 +1217,8 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                                 onClick={() => toggleDietary(tag)}
                                                 className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
                                                     dietary.includes(tag)
-                                                    ? 'bg-emerald-50 border-emerald-500 text-emerald-700'
-                                                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                                                    ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-500 dark:border-emerald-600 text-emerald-700 dark:text-emerald-400'
+                                                    : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
                                                 }`}
                                             >
                                                 {tag}
@@ -1218,7 +1229,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
 
                                 {/* Notes */}
                                 <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1.5">Preparation Notes / Context</label>
+                                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Preparation Notes / Context</label>
                                     <div className="relative">
                                         <AlignLeft size={16} className="absolute left-3 top-3 text-slate-400" />
                                         <textarea 
@@ -1226,13 +1237,13 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                             value={notes}
                                             onChange={(e) => setNotes(e.target.value)}
                                             placeholder="Describe presentation style, specific equipment, or any other requirements..."
-                                            className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 focus:ring-2 focus:ring-emerald-500 outline-none resize-none"
+                                            className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none resize-none"
                                         />
                                     </div>
                                 </div>
                                 
                                 {error && (
-                                    <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg flex items-center gap-2">
+                                    <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm rounded-lg flex items-center gap-2">
                                         <AlertCircle size={16} /> {error}
                                     </div>
                                 )}
@@ -1241,7 +1252,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                     <button 
                                         onClick={(e) => handleFormSubmit(e)}
                                         disabled={loading || !dishName}
-                                        className="w-full py-3.5 bg-slate-900 text-white font-bold rounded-xl hover:bg-emerald-600 transition-all shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
+                                        className="w-full py-3.5 bg-slate-900 dark:bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-600 dark:hover:bg-emerald-700 transition-all shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
                                     >
                                         <Sparkles size={18} fill="currentColor" />
                                         {isAdmin ? 'Generate Recipe Card' : `Request Generation (${CREDIT_COSTS.RECIPE} CR)`}

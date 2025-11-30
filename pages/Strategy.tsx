@@ -263,33 +263,33 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
   };
 
   return (
-    <div className="h-[calc(100vh-6rem)] flex flex-col bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden relative">
+    <div className="h-[calc(100vh-6rem)] flex flex-col bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden relative transition-colors">
       
       {/* Assistance Modal */}
       {assistanceTarget && (
           <div className="absolute inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
-              <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 animate-fade-in-up">
-                  <div className="flex justify-between items-center mb-4 border-b border-slate-100 pb-2">
-                      <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                          <LifeBuoy className="text-blue-600" size={20}/> Need Assistance?
+              <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-md p-6 animate-fade-in-up border border-slate-200 dark:border-slate-700">
+                  <div className="flex justify-between items-center mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">
+                      <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                          <LifeBuoy className="text-blue-600 dark:text-blue-400" size={20}/> Need Assistance?
                       </h3>
-                      <button onClick={() => setAssistanceTarget(null)} className="text-slate-400 hover:text-slate-600">
+                      <button onClick={() => setAssistanceTarget(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
                           <X size={20} />
                       </button>
                   </div>
-                  <p className="text-sm text-slate-600 mb-4">
-                      Our experts will review your request regarding <span className="font-bold text-slate-800">"{assistanceTarget.title}"</span> and contact you shortly.
+                  <p className="text-sm text-slate-600 dark:text-slate-300 mb-4">
+                      Our experts will review your request regarding <span className="font-bold text-slate-800 dark:text-white">"{assistanceTarget.title}"</span> and contact you shortly.
                   </p>
                   <textarea 
                       value={assistanceMsg}
                       onChange={(e) => setAssistanceMsg(e.target.value)}
-                      className="w-full p-3 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none mb-4 h-32 resize-none"
+                      className="w-full p-3 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none mb-4 h-32 resize-none"
                       placeholder="Describe what you need help with..."
                   />
                   <div className="flex justify-end gap-3">
                       <button 
                           onClick={() => setAssistanceTarget(null)}
-                          className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg font-medium"
+                          className="px-4 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg font-medium"
                       >
                           Cancel
                       </button>
@@ -309,41 +309,41 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
       {/* Choice Modal (Self vs Expert) */}
       {choiceModalOpen && (
         <div className="absolute inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 animate-scale-in">
+            <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-lg p-6 animate-scale-in border border-slate-200 dark:border-slate-700">
                 <div className="text-center mb-6">
-                    <h3 className="text-xl font-bold text-slate-900">Choose Implementation Mode</h3>
-                    <p className="text-slate-500 text-sm mt-1">For: "{choiceModalOpen.title}"</p>
+                    <h3 className="text-xl font-bold text-slate-900 dark:text-white">Choose Implementation Mode</h3>
+                    <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">For: "{choiceModalOpen.title}"</p>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <button 
                         onClick={handleSelfGuided}
-                        className="p-4 border-2 border-slate-100 rounded-xl hover:border-emerald-500 hover:bg-emerald-50 transition-all text-left group"
+                        className="p-4 border-2 border-slate-100 dark:border-slate-700 rounded-xl hover:border-emerald-500 dark:hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all text-left group"
                     >
-                        <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                        <div className="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                             <BookOpen size={20} />
                         </div>
-                        <h4 className="font-bold text-slate-800 mb-1">Self-Guided AI Roadmap</h4>
-                        <p className="text-xs text-slate-500">Generate a step-by-step guide and execute it yourself.</p>
+                        <h4 className="font-bold text-slate-800 dark:text-white mb-1">Self-Guided AI Roadmap</h4>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">Generate a step-by-step guide and execute it yourself.</p>
                     </button>
 
                     <button 
                         onClick={handleExpertGuided}
-                        className="p-4 border-2 border-slate-100 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all text-left group"
+                        className="p-4 border-2 border-slate-100 dark:border-slate-700 rounded-xl hover:border-blue-500 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-all text-left group"
                     >
-                        <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                        <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                             <UserCheck size={20} />
                         </div>
-                        <h4 className="font-bold text-slate-800 mb-1">Expert Implementation</h4>
-                        <p className="text-xs text-slate-500">Assign a Bistro expert to handle this for you.</p>
-                        <span className="inline-block mt-2 text-[10px] font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded border border-blue-200">
+                        <h4 className="font-bold text-slate-800 dark:text-white mb-1">Expert Implementation</h4>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">Assign a Bistro expert to handle this for you.</p>
+                        <span className="inline-block mt-2 text-[10px] font-bold bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-800">
                             {CREDIT_COSTS.EXPERT_CONNECT} CREDITS
                         </span>
                     </button>
                 </div>
 
                 <div className="mt-6 text-center">
-                    <button onClick={() => setChoiceModalOpen(null)} className="text-sm text-slate-400 hover:text-slate-600">Cancel</button>
+                    <button onClick={() => setChoiceModalOpen(null)} className="text-sm text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">Cancel</button>
                 </div>
             </div>
         </div>
@@ -351,46 +351,46 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
 
       {/* Roadmap Modal */}
       {roadmapModalOpen && (
-          <div className="absolute inset-0 z-[60] bg-white flex flex-col animate-fade-in">
-              <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-                  <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                      <BookOpen className="text-emerald-600" size={20} /> Implementation Roadmap
+          <div className="absolute inset-0 z-[60] bg-white dark:bg-slate-900 flex flex-col animate-fade-in">
+              <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+                  <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                      <BookOpen className="text-emerald-600 dark:text-emerald-400" size={20} /> Implementation Roadmap
                   </h3>
-                  <button onClick={() => setRoadmapModalOpen(false)} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
-                      <X size={20} className="text-slate-500" />
+                  <button onClick={() => setRoadmapModalOpen(false)} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors">
+                      <X size={20} className="text-slate-500 dark:text-slate-400" />
                   </button>
               </div>
               
-              <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+              <div className="flex-1 overflow-y-auto p-8 custom-scrollbar bg-white dark:bg-slate-900">
                   {loadingPlan ? (
                       <div className="h-full flex flex-col items-center justify-center gap-4">
-                          <Loader2 className="animate-spin text-emerald-600" size={48} />
-                          <p className="text-slate-500 font-medium animate-pulse">Generating step-by-step guide...</p>
+                          <Loader2 className="animate-spin text-emerald-600 dark:text-emerald-400" size={48} />
+                          <p className="text-slate-500 dark:text-slate-400 font-medium animate-pulse">Generating step-by-step guide...</p>
                       </div>
                   ) : generatedPlan ? (
                       <div className="max-w-3xl mx-auto space-y-8">
-                          <div className="bg-emerald-50 p-6 rounded-xl border border-emerald-100">
-                              <h2 className="text-2xl font-bold text-emerald-900 mb-2">Objective</h2>
-                              <p className="text-emerald-800 text-lg leading-relaxed">{generatedPlan.objective}</p>
-                              <div className="mt-4 flex items-center gap-2 text-sm font-bold text-emerald-700">
+                          <div className="bg-emerald-50 dark:bg-emerald-900/20 p-6 rounded-xl border border-emerald-100 dark:border-emerald-800">
+                              <h2 className="text-2xl font-bold text-emerald-900 dark:text-emerald-100 mb-2">Objective</h2>
+                              <p className="text-emerald-800 dark:text-emerald-200 text-lg leading-relaxed">{generatedPlan.objective}</p>
+                              <div className="mt-4 flex items-center gap-2 text-sm font-bold text-emerald-700 dark:text-emerald-300">
                                   <Calendar size={16} /> Estimated Timeline: {generatedPlan.estimated_timeline}
                               </div>
                           </div>
 
                           <div className="space-y-6">
                               {generatedPlan.phases.map((phase, idx) => (
-                                  <div key={idx} className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative">
-                                      <div className="absolute -left-3 top-6 w-6 h-6 bg-slate-900 text-white rounded-full flex items-center justify-center text-xs font-bold border-2 border-white shadow-sm">
+                                  <div key={idx} className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm relative">
+                                      <div className="absolute -left-3 top-6 w-6 h-6 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-full flex items-center justify-center text-xs font-bold border-2 border-white dark:border-slate-900 shadow-sm">
                                           {idx + 1}
                                       </div>
-                                      <h3 className="text-xl font-bold text-slate-800 mb-4 pl-4">{phase.phase_name}</h3>
+                                      <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-4 pl-4">{phase.phase_name}</h3>
                                       
                                       <div className="pl-4 space-y-4">
                                           <div>
-                                              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-2">Action Steps</h4>
+                                              <h4 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-2">Action Steps</h4>
                                               <ul className="space-y-2">
                                                   {phase.steps.map((step, sIdx) => (
-                                                      <li key={sIdx} className="flex items-start gap-2 text-slate-700">
+                                                      <li key={sIdx} className="flex items-start gap-2 text-slate-700 dark:text-slate-300">
                                                           <div className="mt-1.5 w-1.5 h-1.5 bg-emerald-500 rounded-full shrink-0"></div>
                                                           {step}
                                                       </li>
@@ -398,18 +398,18 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                                               </ul>
                                           </div>
                                           
-                                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-slate-100">
+                                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-slate-100 dark:border-slate-700">
                                               <div>
-                                                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1">Resources Needed</h4>
+                                                  <h4 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-1">Resources Needed</h4>
                                                   <div className="flex flex-wrap gap-2">
                                                       {phase.resources_needed.map((res, rIdx) => (
-                                                          <span key={rIdx} className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded border border-slate-200">{res}</span>
+                                                          <span key={rIdx} className="text-xs bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-1 rounded border border-slate-200 dark:border-slate-600">{res}</span>
                                                       ))}
                                                   </div>
                                               </div>
                                               <div>
-                                                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1">Success Metric (KPI)</h4>
-                                                  <p className="text-sm font-medium text-blue-600">{phase.kpi_to_track}</p>
+                                                  <h4 className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wide mb-1">Success Metric (KPI)</h4>
+                                                  <p className="text-sm font-medium text-blue-600 dark:text-blue-400">{phase.kpi_to_track}</p>
                                               </div>
                                           </div>
                                       </div>
@@ -420,7 +420,7 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                           <div className="flex justify-center pt-8">
                               <button 
                                 onClick={() => setRoadmapModalOpen(false)}
-                                className="px-8 py-3 bg-slate-900 text-white font-bold rounded-lg hover:bg-slate-800 shadow-lg"
+                                className="px-8 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold rounded-lg hover:bg-slate-800 dark:hover:bg-slate-200 shadow-lg"
                               >
                                   Got it, I'll start working!
                               </button>
@@ -434,10 +434,10 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
       )}
 
       {/* Header / Role Selector */}
-      <div className="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between z-20">
+      <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex items-center justify-between z-20">
         <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-            <div className="p-2 bg-emerald-100 text-emerald-700 rounded-lg">
+            <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded-lg">
                 <UserIcon size={20} />
             </div>
             
@@ -445,20 +445,20 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                 <select 
                     value={role}
                     onChange={(e) => setRole(e.target.value as UserRole)}
-                    className="bg-white border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block p-2.5 outline-none"
+                    className="bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 text-sm rounded-lg focus:ring-emerald-500 focus:border-emerald-500 block p-2.5 outline-none"
                 >
                     <option value={UserRole.OWNER}>Owner Context</option>
                     <option value={UserRole.ADMIN}>Admin / Ops Context</option>
                     <option value={UserRole.SUPER_ADMIN}>Super Admin Context</option>
                 </select>
             ) : (
-                <div className="text-sm font-semibold text-slate-700 px-3 py-2 bg-white border border-slate-200 rounded-lg">
+                <div className="text-sm font-semibold text-slate-700 dark:text-slate-200 px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
                     Viewing as: {user.role === UserRole.OWNER ? 'Owner' : 'Admin'}
                 </div>
             )}
             </div>
-            <div className="h-6 w-px bg-slate-300 mx-2 hidden sm:block"></div>
-            <p className="text-sm text-slate-500 italic hidden sm:block">"Ask me about sales, costs, or long-term strategy..."</p>
+            <div className="h-6 w-px bg-slate-300 dark:bg-slate-700 mx-2 hidden sm:block"></div>
+            <p className="text-sm text-slate-500 dark:text-slate-400 italic hidden sm:block">"Ask me about sales, costs, or long-term strategy..."</p>
         </div>
         
         <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-400 rounded-full text-xs font-bold">
@@ -468,9 +468,9 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
       </div>
 
       {/* Chat Area */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-8 bg-slate-50 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-8 bg-slate-50 dark:bg-slate-900 custom-scrollbar">
         {error && (
-            <div className="max-w-4xl mx-auto mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3 text-red-700 animate-fade-in shadow-sm">
+            <div className="max-w-4xl mx-auto mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/50 rounded-lg flex items-center gap-3 text-red-700 dark:text-red-400 animate-fade-in shadow-sm">
                 <AlertTriangle size={20} className="shrink-0" />
                 <p className="flex-1 font-medium text-sm">{error}</p>
                 <button 
@@ -484,34 +484,34 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
 
         {!report && !loading && (
           <div className="h-full flex flex-col items-center justify-center p-4">
-            <div className="text-slate-400 opacity-60 mb-8 flex flex-col items-center animate-fade-in-up">
-                <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mb-6">
-                    <TrendingUp size={40} className="text-slate-400" />
+            <div className="text-slate-400 dark:text-slate-500 opacity-60 mb-8 flex flex-col items-center animate-fade-in-up">
+                <div className="w-20 h-20 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-6">
+                    <TrendingUp size={40} className="text-slate-400 dark:text-slate-500" />
                 </div>
-                <p className="text-lg font-medium text-slate-500">Strategic Business Intelligence</p>
-                <p className="text-sm text-slate-400 mt-2 max-w-sm text-center">BistroIntel processes your sales, menu, and inventory to suggest profitable strategies.</p>
-                <p className="text-xs font-bold text-emerald-600 mt-2 bg-emerald-50 px-2 py-1 rounded">Cost: {CREDIT_COSTS.STRATEGY} Credits per Query</p>
+                <p className="text-lg font-medium text-slate-500 dark:text-slate-400">Strategic Business Intelligence</p>
+                <p className="text-sm text-slate-400 dark:text-slate-500 mt-2 max-w-sm text-center">BistroIntel processes your sales, menu, and inventory to suggest profitable strategies.</p>
+                <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 mt-2 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded">Cost: {CREDIT_COSTS.STRATEGY} Credits per Query</p>
             </div>
             
             <div className="w-full max-w-4xl animate-fade-in-up" style={{ animationDelay: '100ms' }}>
                 <div className="flex items-center gap-2 mb-4 justify-center">
                     <HelpCircle size={16} className="text-emerald-500" />
-                    <p className="text-sm font-bold text-slate-500 uppercase tracking-wide">Common Strategy Queries</p>
+                    <p className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Common Strategy Queries</p>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {faqs.map((faq, idx) => (
                         <button 
                             key={idx}
                             onClick={() => handleSend(faq.prompt)}
-                            className="text-left p-6 bg-white border border-slate-200 rounded-xl hover:border-emerald-400 hover:shadow-lg transition-all group relative overflow-hidden"
+                            className="text-left p-6 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:border-emerald-400 dark:hover:border-emerald-500 hover:shadow-lg transition-all group relative overflow-hidden"
                         >
                             <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity bg-emerald-500 rounded-bl-2xl">
                                 <Sparkles size={24} className="text-white" />
                             </div>
-                            <h4 className="font-bold text-slate-700 group-hover:text-emerald-700 mb-2 flex items-center justify-between pr-8">
+                            <h4 className="font-bold text-slate-700 dark:text-slate-200 group-hover:text-emerald-700 dark:group-hover:text-emerald-400 mb-2 flex items-center justify-between pr-8">
                                 {faq.question}
                             </h4>
-                            <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">{faq.prompt}</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">{faq.prompt}</p>
                         </button>
                     ))}
                 </div>
@@ -521,11 +521,11 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
 
         {loading && (
            <div className="flex justify-center items-center h-full">
-             <div className="flex flex-col items-center gap-4 bg-white p-8 rounded-2xl shadow-xl border border-slate-100 animate-scale-in">
-               <Loader2 className="animate-spin text-emerald-600" size={40} />
+             <div className="flex flex-col items-center gap-4 bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 animate-scale-in">
+               <Loader2 className="animate-spin text-emerald-600 dark:text-emerald-400" size={40} />
                <div>
-                   <p className="text-slate-800 font-bold text-lg text-center">Analyzing Data Points...</p>
-                   <p className="text-slate-500 text-sm mt-1 animate-pulse text-center">Reviewing sales, purchases, and employee logs</p>
+                   <p className="text-slate-800 dark:text-white font-bold text-lg text-center">Analyzing Data Points...</p>
+                   <p className="text-slate-500 dark:text-slate-400 text-sm mt-1 animate-pulse text-center">Reviewing sales, purchases, and employee logs</p>
                </div>
              </div>
            </div>
@@ -540,8 +540,8 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                     <Target size={24} />
                 </div>
                 <div>
-                    <h2 className="text-2xl font-bold text-slate-900">Strategic Analysis Report</h2>
-                    <p className="text-sm text-slate-500">Generated for: {role.replace('_', ' ')} • {new Date().toLocaleDateString()}</p>
+                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Strategic Analysis Report</h2>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Generated for: {role.replace('_', ' ')} • {new Date().toLocaleDateString()}</p>
                 </div>
             </div>
 
@@ -549,22 +549,22 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 
                 {/* Executive Summary */}
-                <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden flex flex-col">
+                <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm relative overflow-hidden flex flex-col">
                    <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3"></div>
                    
-                   <div className="p-6 border-b border-slate-100 flex items-center gap-2">
+                   <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex items-center gap-2">
                        <Sparkles className="text-emerald-500" size={20} />
-                       <h3 className="text-lg font-bold text-slate-800">Executive Summary</h3>
+                       <h3 className="text-lg font-bold text-slate-800 dark:text-white">Executive Summary</h3>
                    </div>
                    
                    <div className="p-6 flex-1">
                        <ul className="space-y-4">
                            {(report.summary || []).map((item, i) => (
                                <li key={i} className="flex gap-4">
-                                   <div className="mt-1 w-6 h-6 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center text-xs font-bold shrink-0 border border-slate-200">
+                                   <div className="mt-1 w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 flex items-center justify-center text-xs font-bold shrink-0 border border-slate-200 dark:border-slate-600">
                                        {i+1}
                                    </div>
-                                   <p className="text-slate-700 leading-relaxed font-medium">{item}</p>
+                                   <p className="text-slate-700 dark:text-slate-300 leading-relaxed font-medium">{item}</p>
                                </li>
                            ))}
                        </ul>
@@ -572,24 +572,24 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                 </div>
 
                 {/* Priority & Impact Breakdown Charts */}
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm flex flex-col">
-                    <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-                        <h4 className="text-sm font-bold text-slate-500 uppercase tracking-wide">
+                <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col">
+                    <div className="p-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                        <h4 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
                             {vizMode === 'priority' ? 'Initiative Priority' : 'Impact vs Effort'}
                         </h4>
                         
                         {/* Viz Toolbar */}
-                        <div className="flex bg-slate-100 rounded-lg p-1 gap-1">
+                        <div className="flex bg-slate-100 dark:bg-slate-700 rounded-lg p-1 gap-1">
                              <button 
                                 onClick={() => setVizMode('priority')}
-                                className={`p-1.5 rounded transition-colors ${vizMode === 'priority' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                className={`p-1.5 rounded transition-colors ${vizMode === 'priority' ? 'bg-white dark:bg-slate-600 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
                                 title="Priority Breakdown"
                              >
                                 <PieChartIcon size={14} />
                              </button>
                              <button 
                                 onClick={() => setVizMode('impact')}
-                                className={`p-1.5 rounded transition-colors ${vizMode === 'impact' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                                className={`p-1.5 rounded transition-colors ${vizMode === 'impact' ? 'bg-white dark:bg-slate-600 text-emerald-600 dark:text-emerald-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
                                 title="Impact Matrix"
                              >
                                 <ScatterChartIcon size={14} />
@@ -603,13 +603,13 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                                 <div className="absolute top-2 right-4 z-10 flex gap-2">
                                      <button 
                                         onClick={() => setChartType('pie')}
-                                        className={`text-[10px] font-bold px-2 py-0.5 rounded border ${chartType === 'pie' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-white text-slate-500 border-slate-200'}`}
+                                        className={`text-[10px] font-bold px-2 py-0.5 rounded border ${chartType === 'pie' ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800' : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-600'}`}
                                      >
                                          Pie
                                      </button>
                                      <button 
                                         onClick={() => setChartType('bar')}
-                                        className={`text-[10px] font-bold px-2 py-0.5 rounded border ${chartType === 'bar' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-white text-slate-500 border-slate-200'}`}
+                                        className={`text-[10px] font-bold px-2 py-0.5 rounded border ${chartType === 'bar' ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800' : 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-600'}`}
                                      >
                                          Bar
                                      </button>
@@ -653,8 +653,8 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                                 {chartType === 'pie' && (
                                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none pb-8">
                                         <div className="text-center">
-                                            <span className="text-3xl font-bold text-slate-800">{(report.action_plan || []).length}</span>
-                                            <p className="text-xs text-slate-400 font-bold uppercase">Actions</p>
+                                            <span className="text-3xl font-bold text-slate-800 dark:text-white">{(report.action_plan || []).length}</span>
+                                            <p className="text-xs text-slate-400 dark:text-slate-500 font-bold uppercase">Actions</p>
                                         </div>
                                     </div>
                                 )}
@@ -674,9 +674,9 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                                                 if (active && payload && payload.length) {
                                                     const data = payload[0].payload;
                                                     return (
-                                                        <div className="bg-white p-2 border border-slate-200 shadow-lg rounded text-xs">
-                                                            <p className="font-bold text-slate-800">{data.name}</p>
-                                                            <p className="text-slate-500">Priority: {data.priority}</p>
+                                                        <div className="bg-white dark:bg-slate-800 p-2 border border-slate-200 dark:border-slate-700 shadow-lg rounded text-xs">
+                                                            <p className="font-bold text-slate-800 dark:text-white">{data.name}</p>
+                                                            <p className="text-slate-500 dark:text-slate-400">Priority: {data.priority}</p>
                                                         </div>
                                                     );
                                                 }
@@ -690,7 +690,7 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                                         </Scatter>
                                     </ScatterChart>
                                 </ResponsiveContainer>
-                                <div className="text-center text-[10px] text-slate-400 mt-[-10px]">
+                                <div className="text-center text-[10px] text-slate-400 dark:text-slate-500 mt-[-10px]">
                                     Top-Right: High Impact, High Cost • Top-Left: High Impact, Low Cost (Quick Wins)
                                 </div>
                             </div>
@@ -701,19 +701,19 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
 
             {/* Diagnosis: Root Causes */}
             {report.causes && report.causes.length > 0 && (
-                <div className="bg-amber-50 rounded-2xl border border-amber-100 p-6 relative overflow-hidden">
+                <div className="bg-amber-50 dark:bg-amber-900/20 rounded-2xl border border-amber-100 dark:border-amber-800 p-6 relative overflow-hidden">
                     <div className="absolute top-0 right-0 p-4 opacity-10">
                         <Activity size={120} className="text-amber-500" />
                     </div>
                     <div className="relative z-10">
-                        <h3 className="text-lg font-bold text-amber-900 mb-4 flex items-center gap-2">
+                        <h3 className="text-lg font-bold text-amber-900 dark:text-amber-400 mb-4 flex items-center gap-2">
                            <Activity size={20} /> Diagnostic: Root Causes
                         </h3>
                         <div className="grid md:grid-cols-2 gap-4">
                             {report.causes.map((cause, i) => (
-                                <div key={i} className="bg-white/80 p-4 rounded-xl border border-amber-200/50 flex gap-3 items-start">
-                                    <AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" />
-                                    <p className="text-sm text-amber-900 font-medium">{cause}</p>
+                                <div key={i} className="bg-white/80 dark:bg-slate-800/80 p-4 rounded-xl border border-amber-200/50 dark:border-amber-800/50 flex gap-3 items-start">
+                                    <AlertTriangle size={18} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
+                                    <p className="text-sm text-amber-900 dark:text-amber-200 font-medium">{cause}</p>
                                 </div>
                             ))}
                         </div>
@@ -723,38 +723,38 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
 
             {/* Strategic Roadmap (12-Month) */}
             {report.roadmap && report.roadmap.length > 0 && (
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                    <div className="p-6 border-b border-slate-100 flex items-center gap-2 bg-gradient-to-r from-slate-50 to-white">
-                        <Map size={20} className="text-indigo-600" />
-                        <h3 className="text-lg font-bold text-slate-900">12-Month Strategic Roadmap</h3>
+                <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+                    <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex items-center gap-2 bg-gradient-to-r from-slate-50 to-white dark:from-slate-800 dark:to-slate-700/50">
+                        <Map size={20} className="text-indigo-600 dark:text-indigo-400" />
+                        <h3 className="text-lg font-bold text-slate-900 dark:text-white">12-Month Strategic Roadmap</h3>
                     </div>
                     <div className="p-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 relative">
                             {/* Connector Line (Desktop) */}
-                            <div className="hidden lg:block absolute top-6 left-0 right-0 h-0.5 bg-indigo-100 z-0 mx-12"></div>
+                            <div className="hidden lg:block absolute top-6 left-0 right-0 h-0.5 bg-indigo-100 dark:bg-indigo-900 z-0 mx-12"></div>
                             
                             {report.roadmap.map((phase, idx) => (
-                                <div key={idx} className="relative z-10 bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col h-full hover:border-indigo-300 transition-colors">
-                                    <div className="w-12 h-12 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center font-bold text-indigo-600 mb-4 mx-auto lg:mx-0">
+                                <div key={idx} className="relative z-10 bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col h-full hover:border-indigo-300 dark:hover:border-indigo-600 transition-colors">
+                                    <div className="w-12 h-12 rounded-full bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-800 flex items-center justify-center font-bold text-indigo-600 dark:text-indigo-400 mb-4 mx-auto lg:mx-0">
                                         {idx + 1}
                                     </div>
                                     <div className="text-center lg:text-left mb-4">
-                                        <h4 className="text-lg font-bold text-slate-900">{phase.phase_name}</h4>
-                                        <p className="text-sm font-semibold text-indigo-600">{phase.duration}</p>
+                                        <h4 className="text-lg font-bold text-slate-900 dark:text-white">{phase.phase_name}</h4>
+                                        <p className="text-sm font-semibold text-indigo-600 dark:text-indigo-400">{phase.duration}</p>
                                     </div>
                                     
                                     <div className="flex-1 space-y-2 mb-4">
                                         {phase.steps.slice(0, 3).map((step, sIdx) => (
-                                            <div key={sIdx} className="flex gap-2 items-start text-xs text-slate-600">
+                                            <div key={sIdx} className="flex gap-2 items-start text-xs text-slate-600 dark:text-slate-300">
                                                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-1 shrink-0"></span>
                                                 {step}
                                             </div>
                                         ))}
                                     </div>
                                     
-                                    <div className="pt-3 border-t border-slate-100 text-xs">
-                                        <span className="font-bold text-slate-500 uppercase">Milestone:</span>
-                                        <p className="text-slate-800 font-medium mt-1">{phase.milestone}</p>
+                                    <div className="pt-3 border-t border-slate-100 dark:border-slate-700 text-xs">
+                                        <span className="font-bold text-slate-500 dark:text-slate-400 uppercase">Milestone:</span>
+                                        <p className="text-slate-800 dark:text-slate-200 font-medium mt-1">{phase.milestone}</p>
                                     </div>
                                 </div>
                             ))}
@@ -766,28 +766,28 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
             {/* Action Plan */}
             <div>
               <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                    <Briefcase size={22} className="text-blue-600"/> Actionable Initiatives
+                  <h3 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <Briefcase size={22} className="text-blue-600 dark:text-blue-400"/> Actionable Initiatives
                   </h3>
-                  <span className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-full">
+                  <span className="text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full">
                       {(report.action_plan || []).length} Initiatives Identified
                   </span>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                 {(report.action_plan || []).map((action, i) => (
-                  <div key={i} className={`flex flex-col rounded-xl border shadow-sm transition-all hover:shadow-md bg-white ${
+                  <div key={i} className={`flex flex-col rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transition-all hover:shadow-md bg-white dark:bg-slate-800 ${
                         actionStates[i] === 'completed' ? 'opacity-60 grayscale' : ''
                   }`}>
                     {/* Card Header */}
-                    <div className="p-5 border-b border-slate-100 flex justify-between items-start gap-3">
-                        <h4 className={`font-bold text-slate-800 leading-snug ${actionStates[i] === 'completed' ? 'line-through' : ''}`}>
+                    <div className="p-5 border-b border-slate-100 dark:border-slate-700 flex justify-between items-start gap-3">
+                        <h4 className={`font-bold text-slate-800 dark:text-white leading-snug ${actionStates[i] === 'completed' ? 'line-through' : ''}`}>
                             {action.initiative}
                         </h4>
                         <span className={`shrink-0 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider border ${
-                            action.priority === 'High' ? 'bg-red-50 text-red-700 border-red-200' :
-                            action.priority === 'Medium' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                            'bg-blue-50 text-blue-700 border-blue-200'
+                            action.priority === 'High' ? 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800' :
+                            action.priority === 'Medium' ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800' :
+                            'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800'
                         }`}>
                             {action.priority}
                         </span>
@@ -796,47 +796,47 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                     {/* Card Metrics */}
                     <div className="p-5 flex-1 space-y-4">
                         <div className="grid grid-cols-2 gap-2">
-                            <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
-                                <p className="text-[10px] text-slate-400 uppercase font-bold mb-1">Impact</p>
-                                <p className="text-xs font-bold text-emerald-600 leading-tight">{action.impact_estimate}</p>
+                            <div className="bg-slate-50 dark:bg-slate-700 p-2 rounded-lg border border-slate-100 dark:border-slate-600">
+                                <p className="text-[10px] text-slate-400 dark:text-slate-400 uppercase font-bold mb-1">Impact</p>
+                                <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 leading-tight">{action.impact_estimate}</p>
                             </div>
-                            <div className="bg-slate-50 p-2 rounded-lg border border-slate-100">
-                                <p className="text-[10px] text-slate-400 uppercase font-bold mb-1">Cost</p>
-                                <p className="text-xs font-bold text-slate-700 leading-tight">{action.cost_estimate}</p>
+                            <div className="bg-slate-50 dark:bg-slate-700 p-2 rounded-lg border border-slate-100 dark:border-slate-600">
+                                <p className="text-[10px] text-slate-400 dark:text-slate-400 uppercase font-bold mb-1">Cost</p>
+                                <p className="text-xs font-bold text-slate-700 dark:text-slate-300 leading-tight">{action.cost_estimate}</p>
                             </div>
                         </div>
                     </div>
                     
                     {/* Card Actions */}
-                    <div className="p-4 border-t border-slate-100 bg-slate-50/50 rounded-b-xl">
+                    <div className="p-4 border-t border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 rounded-b-xl">
                         <div className="flex flex-col gap-3">
                             {/* Implementation Button */}
                             {actionStates[i] === 'in_progress' ? (
                                 <button 
                                     onClick={() => handleStartImplementationClick(i, action.initiative)}
-                                    className="w-full py-2 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-lg flex items-center justify-center gap-2 border border-emerald-200"
+                                    className="w-full py-2 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs font-bold rounded-lg flex items-center justify-center gap-2 border border-emerald-200 dark:border-emerald-800"
                                 >
                                     <Clock size={14} /> View Roadmap
                                 </button>
                             ) : actionStates[i] === 'help_requested' ? (
-                                <div className="w-full py-2 bg-blue-100 text-blue-700 text-xs font-bold rounded-lg flex items-center justify-center gap-2 border border-blue-200">
+                                <div className="w-full py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs font-bold rounded-lg flex items-center justify-center gap-2 border border-blue-200 dark:border-blue-800">
                                     <CheckCircle2 size={14} /> Expert Assigned
                                 </div>
                             ) : actionStates[i] === 'completed' ? (
-                                <div className="w-full py-2 bg-slate-200 text-slate-600 text-xs font-bold rounded-lg flex items-center justify-center gap-2">
+                                <div className="w-full py-2 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold rounded-lg flex items-center justify-center gap-2">
                                     <CheckCircle2 size={14} /> Done
                                 </div>
                             ) : (
                                 <div className="flex gap-2">
                                     <button 
                                         onClick={() => handleStartImplementationClick(i, action.initiative)}
-                                        className="flex-1 py-2 bg-slate-900 text-white text-xs font-bold rounded-lg hover:bg-emerald-600 transition-colors flex items-center justify-center gap-1 shadow-sm"
+                                        className="flex-1 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold rounded-lg hover:bg-emerald-600 dark:hover:bg-slate-200 transition-colors flex items-center justify-center gap-1 shadow-sm"
                                     >
                                         <Play size={12} fill="currentColor" /> Start
                                     </button>
                                     <button 
                                         onClick={() => openAssistanceModal(i, action.initiative)}
-                                        className="py-2 px-3 bg-white border border-slate-200 text-slate-600 hover:text-blue-600 hover:border-blue-200 rounded-lg transition-colors"
+                                        className="py-2 px-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-200 dark:hover:border-blue-800 rounded-lg transition-colors"
                                         title="Ask Expert"
                                     >
                                         <LifeBuoy size={16} />
@@ -845,14 +845,14 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                             )}
 
                             {/* Status Toggle */}
-                            <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium pt-1">
+                            <div className="flex items-center justify-between text-[10px] text-slate-400 dark:text-slate-500 font-medium pt-1">
                                 <span>Status:</span>
                                 <div className="flex gap-1">
                                     {['idle', 'in_progress', 'completed'].map((s) => (
                                         <button 
                                             key={s}
                                             onClick={() => updateActionStatus(i, s as any)}
-                                            className={`w-2 h-2 rounded-full transition-all ${actionStates[i] === s ? (s === 'completed' ? 'bg-slate-400 scale-125' : s === 'in_progress' ? 'bg-emerald-500 scale-125' : 'bg-slate-300 scale-125') : 'bg-slate-200 hover:bg-slate-300'}`}
+                                            className={`w-2 h-2 rounded-full transition-all ${actionStates[i] === s ? (s === 'completed' ? 'bg-slate-400 dark:bg-slate-500 scale-125' : s === 'in_progress' ? 'bg-emerald-500 scale-125' : 'bg-slate-300 dark:bg-slate-600 scale-125') : 'bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600'}`}
                                             title={s.replace('_', ' ')}
                                         />
                                     ))}
@@ -867,9 +867,9 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
             
             {/* Seasonal Menu Suggestions */}
             {(report.seasonal_menu_suggestions || []).length > 0 && (
-                <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-                    <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-                        <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+                    <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
+                        <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
                             <Lightbulb size={20} className="text-yellow-500" /> Seasonal Menu Strategy
                         </h3>
                         {/* Legend */}
@@ -879,10 +879,10 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                         </div>
                     </div>
                     
-                    <div className="grid md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-100">
+                    <div className="grid md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-100 dark:divide-slate-700">
                         {/* Additions */}
                         <div className="p-6">
-                            <h4 className="text-xs font-bold text-emerald-600 uppercase mb-4 flex items-center gap-2">
+                            <h4 className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase mb-4 flex items-center gap-2">
                                 <ArrowUpRight size={16} /> Recommended Additions
                             </h4>
                             <div className="space-y-4">
@@ -890,8 +890,8 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                                     <div key={i} className="flex gap-3 items-start">
                                         <div className="mt-1 w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></div>
                                         <div>
-                                            <p className="font-bold text-slate-800 text-sm">{item.item}</p>
-                                            <p className="text-xs text-slate-500 mt-1">{item.reason}</p>
+                                            <p className="font-bold text-slate-800 dark:text-white text-sm">{item.item}</p>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{item.reason}</p>
                                         </div>
                                     </div>
                                 ))}
@@ -900,7 +900,7 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
 
                         {/* Removals */}
                         <div className="p-6">
-                             <h4 className="text-xs font-bold text-red-600 uppercase mb-4 flex items-center gap-2">
+                             <h4 className="text-xs font-bold text-red-600 dark:text-red-400 uppercase mb-4 flex items-center gap-2">
                                 <ArrowDownRight size={16} /> Suggested Removals
                             </h4>
                             <div className="space-y-4">
@@ -908,8 +908,8 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                                     <div key={i} className="flex gap-3 items-start">
                                         <div className="mt-1 w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></div>
                                         <div>
-                                            <p className="font-bold text-slate-800 text-sm">{item.item}</p>
-                                            <p className="text-xs text-slate-500 mt-1">{item.reason}</p>
+                                            <p className="font-bold text-slate-800 dark:text-white text-sm">{item.item}</p>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{item.reason}</p>
                                         </div>
                                     </div>
                                 ))}
@@ -923,7 +923,7 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
       </div>
 
       {/* Input */}
-      <div className="p-4 bg-white border-t border-slate-200 z-30">
+      <div className="p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 z-30">
         <div className="max-w-4xl mx-auto space-y-3">
             {/* Quick Chips */}
             <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar mask-linear-fade">
@@ -931,7 +931,7 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                     <button
                         key={idx}
                         onClick={() => setQuery(prompt)}
-                        className="whitespace-nowrap px-3 py-1.5 bg-slate-100 hover:bg-emerald-50 text-slate-600 hover:text-emerald-700 border border-slate-200 hover:border-emerald-200 rounded-full text-xs font-medium transition-colors flex items-center gap-1.5 shrink-0"
+                        className="whitespace-nowrap px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 text-slate-600 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-400 border border-slate-200 dark:border-slate-700 hover:border-emerald-200 dark:hover:border-emerald-800 rounded-full text-xs font-medium transition-colors flex items-center gap-1.5 shrink-0"
                     >
                         <Sparkles size={12} className="text-yellow-500" />
                         {prompt}
@@ -946,20 +946,20 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                     onChange={(e) => setQuery(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleSend()}
                     placeholder="Enter your business goal or challenge (e.g. 'Increase delivery revenue by 20%')..."
-                    className="flex-1 px-4 py-3 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none shadow-sm"
+                    className="flex-1 px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none shadow-sm"
                     autoFocus
                 />
                 <button 
                     onClick={handleClear}
                     title="Clear Chat"
-                    className="px-3 py-3 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-100 flex items-center justify-center"
+                    className="px-3 py-3 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors border border-transparent hover:border-red-100 dark:hover:border-red-900/50 flex items-center justify-center"
                 >
                     <Trash2 size={20} />
                 </button>
                 <button 
                     onClick={() => handleSend()}
                     disabled={loading || !query}
-                    className="px-6 py-3 bg-slate-900 text-white rounded-lg hover:bg-emerald-600 disabled:opacity-50 transition-colors font-bold shadow-lg shadow-slate-900/20 flex items-center gap-2"
+                    className="px-6 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg hover:bg-emerald-600 dark:hover:bg-slate-200 disabled:opacity-50 transition-colors font-bold shadow-lg shadow-slate-900/20 flex items-center gap-2"
                 >
                     {loading ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />}
                     {loading ? '' : `Ask (${CREDIT_COSTS.STRATEGY} CR)`}

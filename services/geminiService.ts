@@ -201,14 +201,18 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
     
     Context Data:
     Menu Item: ${JSON.stringify(item)}
-    Ingredient Prices (Use these for costing if matches found, otherwise estimate): ${JSON.stringify(currentIngredients)}
+    Ingredient Database (Use strictly for pricing): ${JSON.stringify(currentIngredients)}
 
-    Important:
-    - If specific ingredient prices are not found in context, estimate reasonable market rates.
-    - Ensure 'food_cost_per_serving' is calculated based on ingredient quantities and costs.
-    - 'sku_id' should match the input or be generated if missing.
-    - 'category' should be one of: main, snack, beverage, dessert.
-    - 'current_price' should be the current selling price or estimated if unknown.
+    Tasks:
+    1. List all ingredients required.
+    2. For each ingredient, try to find a match in the 'Ingredient Database'.
+    3. If found, use the database 'cost_per_unit' and 'unit'.
+    4. If not found, estimate a realistic market 'cost_per_unit' and 'unit'.
+    5. Calculate 'cost_per_serving' = 'qty_per_serving' * 'cost_per_unit' (ensure unit conversion if needed, e.g. 100g = 0.1kg).
+    6. Sum all 'cost_per_serving' to get total 'food_cost_per_serving'.
+    
+    Output Format: JSON complying with the schema.
+    Ensure 'ingredients' array has: name, qty_per_serving, unit, cost_per_unit, cost_per_serving.
   `;
 
   try {
@@ -244,13 +248,14 @@ export const generateRecipeVariation = async (userId: string, originalRecipe: Re
     Original Recipe:
     ${JSON.stringify(originalRecipe)}
     
-    Ingredient Prices Context: ${JSON.stringify(currentIngredients)}
+    Ingredient Database: ${JSON.stringify(currentIngredients)}
 
     Tasks:
     1. Modify ingredients to suit the "${variationType}" requirement.
     2. Adjust preparation steps accordingly.
-    3. Recalculate estimated food cost and price.
-    4. Update the name to reflect the variation.
+    3. RE-CALCULATE costs based on the Ingredient Database for any new or changed ingredients.
+    4. Provide detailed costing per ingredient (cost_per_unit, cost_per_serving).
+    5. Update the name to reflect the variation.
   `;
 
   try {
