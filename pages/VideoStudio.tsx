@@ -4,7 +4,7 @@ import { User, UserRole, MarketingRequest } from '../types';
 import { generateMarketingVideo, generateMarketingImage } from '../services/geminiService';
 import { storageService } from '../services/storageService';
 import { CREDIT_COSTS } from '../constants';
-import { Clapperboard, Image as ImageIcon, Loader2, PlayCircle, Download, RefreshCw, Upload, CheckCircle2, Clock, Wallet, Sparkles } from 'lucide-react';
+import { Clapperboard, Image as ImageIcon, Loader2, PlayCircle, Download, RefreshCw, Upload, CheckCircle2, Clock, Wallet, Sparkles, Key } from 'lucide-react';
 
 interface VideoStudioProps {
   user: User;
@@ -23,6 +23,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [hasVeoKey, setHasVeoKey] = useState(false);
 
   // Gallery
   const [gallery, setGallery] = useState<MarketingRequest[]>([]);
@@ -42,6 +43,32 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
       setRequests(allRequests.filter(r => r.status === 'pending'));
     }
   }, [user.id, isAdmin, viewMode]);
+
+  // Check for Veo API Key status
+  useEffect(() => {
+    const checkVeoKey = async () => {
+        if (mediaType === 'video' && (window as any).aistudio) {
+            try {
+                const has = await (window as any).aistudio.hasSelectedApiKey();
+                setHasVeoKey(has);
+            } catch (e) {
+                console.error("Error checking Veo key:", e);
+            }
+        }
+    };
+    checkVeoKey();
+  }, [mediaType]);
+
+  const handleSelectVeoKey = async () => {
+      if ((window as any).aistudio) {
+          try {
+            await (window as any).aistudio.openSelectKey();
+            setHasVeoKey(true);
+          } catch (e) {
+            console.error("Error selecting key:", e);
+          }
+      }
+  };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -71,11 +98,9 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
     }
 
     // Check API Key for Veo
-    if (mediaType === 'video') {
-       // We rely on the service to handle the "user selection" via window.aistudio if needed, 
-       // but strictly speaking, the guideline says we must prompt user to select key for Veo.
-       // However, we are in a pure React context without the `window.aistudio` typings injected globally yet in this file scope.
-       // Let's assume the service handles the logic or throws if key is missing.
+    if (mediaType === 'video' && !hasVeoKey) {
+       setError("Video generation requires a paid Google Cloud API Key. Please select one to proceed.");
+       return;
     }
 
     setIsGenerating(true);
@@ -237,14 +262,37 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
                     </div>
                  )}
 
-                 <button 
-                   onClick={handleGenerate}
-                   disabled={isGenerating || !prompt}
-                   className="w-full py-3 bg-slate-900 text-white font-bold rounded-lg hover:bg-pink-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                 >
-                   {isGenerating ? <Loader2 className="animate-spin" size={20} /> : <Sparkles size={20} />}
-                   Generate Asset
-                 </button>
+                 {mediaType === 'video' && !hasVeoKey ? (
+                     <div className="space-y-3 mt-4 p-4 bg-slate-100 rounded-xl border border-slate-200">
+                        <div className="flex items-start gap-2">
+                            <Key size={16} className="text-slate-500 mt-0.5" />
+                            <div>
+                                <p className="text-xs font-bold text-slate-700">API Key Required</p>
+                                <p className="text-[10px] text-slate-500 leading-relaxed mt-1">
+                                    Video generation uses Veo models which require a paid Google Cloud API key.
+                                </p>
+                                <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noreferrer" className="text-[10px] text-blue-600 underline mt-1 block">
+                                    View Billing Documentation
+                                </a>
+                            </div>
+                        </div>
+                        <button 
+                          onClick={handleSelectVeoKey}
+                          className="w-full py-2 bg-slate-800 text-white text-xs font-bold rounded-lg hover:bg-slate-700 transition-colors flex items-center justify-center gap-2"
+                        >
+                          Select API Key
+                        </button>
+                     </div>
+                 ) : (
+                     <button 
+                       onClick={handleGenerate}
+                       disabled={isGenerating || !prompt}
+                       className="w-full py-3 bg-slate-900 text-white font-bold rounded-lg hover:bg-pink-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                     >
+                       {isGenerating ? <Loader2 className="animate-spin" size={20} /> : <Sparkles size={20} />}
+                       Generate Asset
+                     </button>
+                 )}
               </div>
             </div>
 
