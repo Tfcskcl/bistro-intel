@@ -377,7 +377,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       try {
           // Use target user ID to fetch correct ingredients
           const contextUserId = targetUserId || (activeRequest ? activeRequest.userId : user.id);
-          const card = await generateRecipeCard(contextUserId, item, requirements);
+          const card = await generateRecipeCard(contextUserId, item, requirements, user.location);
           setGeneratedRecipe(card);
       } catch (e: any) {
           console.error(e);
@@ -415,7 +415,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
 
     try {
         if (deductCredits()) {
-            const variant = await generateRecipeVariation(user.id, generatedRecipe, type);
+            const variant = await generateRecipeVariation(user.id, generatedRecipe, type, user.location);
             setGeneratedRecipe(variant);
         }
     } catch (e) {

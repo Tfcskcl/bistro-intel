@@ -53,7 +53,7 @@ const parseJSON = <T>(text: string | undefined): T => {
 
 export const verifyLocationWithMaps = async (locationQuery: string): Promise<string> => {
   const apiKey = getApiKey();
-  if (!apiKey) return "API Key Required for Location Verification.";
+  if (!apiKey) return "API Key Required for location verification.";
 
   const ai = new GoogleGenAI({ apiKey });
   
@@ -74,7 +74,7 @@ export const verifyLocationWithMaps = async (locationQuery: string): Promise<str
   }
 };
 
-export const generateRecipeCard = async (userId: string, item: MenuItem, requirements: string): Promise<RecipeCard> => {
+export const generateRecipeCard = async (userId: string, item: MenuItem, requirements: string, location?: string): Promise<RecipeCard> => {
     const apiKey = getApiKey();
     if (!apiKey) throw new Error("API Key Required");
     const ai = new GoogleGenAI({ apiKey });
@@ -114,6 +114,9 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
 
     const prompt = `Generate a detailed recipe card for "${item.name}". 
     Context/Requirements: ${requirements}
+    ${location ? `Location for Costing: ${location}. 
+    - Estimate ingredient prices (cost_per_unit) reflective of local wholesale market rates in ${location}.
+    - Use local currency (e.g. INR for India) for all costs.` : 'Estimate costs based on average wholesale rates.'}
     ${SYSTEM_INSTRUCTION}`;
 
     const response = await ai.models.generateContent({
@@ -129,13 +132,14 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
     return parseJSON<RecipeCard>(response.text);
 };
 
-export const generateRecipeVariation = async (userId: string, original: RecipeCard, variationType: string): Promise<RecipeCard> => {
+export const generateRecipeVariation = async (userId: string, original: RecipeCard, variationType: string, location?: string): Promise<RecipeCard> => {
     const apiKey = getApiKey();
     if (!apiKey) throw new Error("API Key Required");
     const ai = new GoogleGenAI({ apiKey });
 
     const prompt = `Create a "${variationType}" variation of the following recipe: ${JSON.stringify(original)}.
-    Maintain the same JSON structure. Adjust ingredients, steps, and costs accordingly.`;
+    Maintain the same JSON structure. Adjust ingredients, steps, and costs accordingly.
+    ${location ? `Ensure revised costs reflect local market rates in ${location}.` : ''}`;
 
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
