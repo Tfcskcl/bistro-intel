@@ -4,7 +4,7 @@ import { PLANS, CREDIT_COSTS } from '../constants';
 import { generateRecipeCard, generateRecipeVariation, substituteIngredient, estimateMarketRates } from '../services/geminiService';
 import { ingredientService } from '../services/ingredientService';
 import { RecipeCard, MenuItem, User, UserRole, POSChangeRequest, RecipeRequest, Ingredient } from '../types';
-import { Loader2, ChefHat, Scale, Clock, AlertCircle, Upload, Lock, Sparkles, Check, Save, RefreshCw, Search, Plus, Store, Zap, Trash2, Building2, FileSignature, X, AlignLeft, UtensilsCrossed, Inbox, UserCheck, CheckCircle2, Clock3, Carrot, Type, Wallet, Filter, Tag, Eye, Flame, Wand2, Eraser, FileDown, TrendingDown, ArrowRight, Key, Coins, Leaf, TestTube, ArrowLeftRight, PenTool, Lightbulb, Calculator, DollarSign } from 'lucide-react';
+import { Loader2, ChefHat, Scale, Clock, AlertCircle, Upload, Lock, Sparkles, Check, Save, RefreshCw, Search, Plus, Store, Zap, Trash2, Building2, FileSignature, X, AlignLeft, UtensilsCrossed, Inbox, UserCheck, CheckCircle2, Clock3, Carrot, Type, Wallet, Filter, Tag, Eye, Flame, Wand2, Eraser, FileDown, TrendingDown, ArrowRight, Key, Coins, Leaf, TestTube, ArrowLeftRight, PenTool, Lightbulb, Calculator, DollarSign, Edit2 } from 'lucide-react';
 import { storageService } from '../services/storageService';
 import { authService } from '../services/authService';
 
@@ -114,7 +114,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
 
   useEffect(() => {
       setAltPrices({});
-  }, [generatedRecipe]);
+  }, [generatedRecipe?.sku_id]); // Reset alt prices only on new recipe
 
   const refreshRequests = () => {
     const allRequests = storageService.getAllRecipeRequests();
@@ -165,14 +165,10 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
               hasChanges = true;
           }
 
-          // Calculate new cost per serving based on rate change ratio
-          // If original rate is 0, we can't ratio it. Assume 0 cost unless user provides rate, then we need qty.
           if (originalRate > 0) {
               totalNewCost += (userRate / originalRate) * originalCostServing;
           } else {
-              // Fallback if original rate missing but we have user rate and qty
-              // This is tricky without standardized units, but usually AI gives cost/serving.
-              totalNewCost += originalCostServing; // No change if we can't calc
+              totalNewCost += originalCostServing; 
           }
       });
 
@@ -235,6 +231,72 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       setManualForm({ name: '', cuisine: '', yield: '1', prepTime: '20', description: '', steps: '' });
       setManualIngredients([{ id: 1, name: '', qty: '', unit: 'g', costPerUnit: '' }]);
       setTargetFoodCost(30);
+  };
+
+  // --- RECALCULATION HANDLERS ---
+
+  const handleYieldUpdate = (newYieldStr: string) => {
+      if (!generatedRecipe) return;
+      const newYield = parseFloat(newYieldStr);
+      if (isNaN(newYield) || newYield <= 0) return;
+
+      const oldYield = generatedRecipe.yield || 1;
+      const factor = oldYield / newYield; // If yield doubles (2), cost per serving halves (0.5)
+
+      // Recalculate costs
+      const newFoodCost = generatedRecipe.food_cost_per_serving * factor;
+      const newSellingPrice = generatedRecipe.suggested_selling_price * factor;
+
+      // Update Ingredients Qty Display (Qty Per Serving)
+      // Note: In typical recipe cards, "Yield" changes often imply re-portioning the total batch.
+      // So qty_per_serving should change.
+      const updatedIngredients = generatedRecipe.ingredients.map(ing => ({
+          ...ing,
+          qty_per_serving: (ing.qty_per_serving || 0) * factor,
+          cost_per_serving: (ing.cost_per_serving || 0) * factor
+      }));
+
+      setGeneratedRecipe({
+          ...generatedRecipe,
+          yield: newYield,
+          food_cost_per_serving: newFoodCost,
+          suggested_selling_price: newSellingPrice,
+          ingredients: updatedIngredients
+      });
+  };
+
+  const handleManualCostUpdate = (newCostStr: string) => {
+      if (!generatedRecipe) return;
+      const newCost = parseFloat(newCostStr);
+      if (isNaN(newCost)) return;
+
+      setGeneratedRecipe({
+          ...generatedRecipe,
+          food_cost_per_serving: newCost
+          // We don't auto-update selling price here to let user see margin impact, 
+          // unless they use the "Auto Calc" button which we can add later.
+      });
+  };
+
+  const handleManualPriceUpdate = (newPriceStr: string) => {
+      if (!generatedRecipe) return;
+      const newPrice = parseFloat(newPriceStr);
+      if (isNaN(newPrice)) return;
+
+      setGeneratedRecipe({
+          ...generatedRecipe,
+          suggested_selling_price: newPrice
+      });
+  };
+
+  const resetSellingPrice = () => {
+      if (!generatedRecipe) return;
+      // Reset to standard 30% food cost
+      const recommended = generatedRecipe.food_cost_per_serving / 0.30;
+      setGeneratedRecipe({
+          ...generatedRecipe,
+          suggested_selling_price: recommended
+      });
   };
 
   const handleSurpriseMe = () => {
@@ -667,13 +729,40 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                       <div className="flex-1 mr-4">
                                           <h1 className="text-3xl font-bold">{generatedRecipe.name}</h1>
                                           <p className="text-slate-300 text-sm mt-2">{generatedRecipe.human_summary}</p>
+                                          
+                                          {/* Editable Yield */}
+                                          <div className="flex items-center gap-2 mt-4 bg-white/10 w-fit px-3 py-1.5 rounded-lg border border-white/10">
+                                              <Scale size={16} className="text-emerald-400" />
+                                              <span className="text-xs font-bold uppercase tracking-wide text-slate-300">Yield:</span>
+                                              <input 
+                                                  type="number"
+                                                  value={generatedRecipe.yield || 1}
+                                                  onChange={(e) => handleYieldUpdate(e.target.value)}
+                                                  className="w-12 bg-transparent text-white font-bold text-sm text-center border-b border-white/30 focus:border-emerald-400 outline-none"
+                                              />
+                                              <span className="text-xs text-slate-400">Servings</span>
+                                          </div>
                                       </div>
                                       <div className="text-right flex flex-col items-end gap-2 shrink-0">
-                                          <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Selling Price</p>
-                                          <p className="text-3xl font-black">₹{generatedRecipe.suggested_selling_price.toFixed(0)}</p>
+                                          <p className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
+                                              Selling Price <Edit2 size={10} />
+                                          </p>
+                                          <div className="flex items-center justify-end gap-1">
+                                              <span className="text-2xl font-black text-white/50">₹</span>
+                                              <input 
+                                                  type="number"
+                                                  value={generatedRecipe.suggested_selling_price.toFixed(2)}
+                                                  onChange={(e) => handleManualPriceUpdate(e.target.value)}
+                                                  className="w-28 bg-transparent text-3xl font-black text-right text-white border-b-2 border-white/20 focus:border-emerald-500 outline-none"
+                                              />
+                                              <button onClick={resetSellingPrice} title="Reset to 30% Cost" className="ml-2 p-1 hover:bg-white/10 rounded-full text-slate-400 hover:text-white transition-colors">
+                                                  <RefreshCw size={14} />
+                                              </button>
+                                          </div>
+                                          
                                           <button 
                                             onClick={handleSaveRecipe}
-                                            className={`text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg transition-colors border ${isRecipeSaved ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50' : 'bg-white/10 hover:bg-white/20 text-white border-white/10'}`}
+                                            className={`mt-2 text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg transition-colors border ${isRecipeSaved ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50' : 'bg-white/10 hover:bg-white/20 text-white border-white/10'}`}
                                           >
                                             {isRecipeSaved ? <Check size={14} /> : <Save size={14} />}
                                             {isRecipeSaved ? 'Saved' : 'Save'}
@@ -684,19 +773,27 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                               
                               {/* Detailed Costing Breakdown */}
                               <div className="grid grid-cols-3 border-b border-slate-100 dark:border-slate-700 text-center bg-slate-50/50 dark:bg-slate-800/50">
-                                  <div className="p-4 border-r border-slate-100 dark:border-slate-700">
-                                      <p className="text-xs text-slate-500 dark:text-slate-400 uppercase font-bold">Food Cost</p>
-                                      <p className="text-xl font-bold text-slate-800 dark:text-white">₹{generatedRecipe.food_cost_per_serving.toFixed(2)}</p>
+                                  <div className="p-4 border-r border-slate-100 dark:border-slate-700 flex flex-col items-center">
+                                      <p className="text-xs text-slate-500 dark:text-slate-400 uppercase font-bold mb-1 flex items-center gap-1">Food Cost <Edit2 size={10}/></p>
+                                      <div className="flex items-center justify-center">
+                                          <span className="text-lg font-bold text-slate-500 mr-0.5">₹</span>
+                                          <input 
+                                              type="number"
+                                              value={generatedRecipe.food_cost_per_serving.toFixed(2)}
+                                              onChange={(e) => handleManualCostUpdate(e.target.value)}
+                                              className="w-20 bg-transparent text-xl font-bold text-slate-800 dark:text-white text-center border-b border-dashed border-slate-300 focus:border-emerald-500 outline-none"
+                                          />
+                                      </div>
                                   </div>
                                   <div className="p-4 border-r border-slate-100 dark:border-slate-700">
                                       <p className="text-xs text-slate-500 dark:text-slate-400 uppercase font-bold">Food Cost %</p>
-                                      <p className="text-xl font-bold text-slate-800 dark:text-white">
+                                      <p className="text-xl font-bold text-slate-800 dark:text-white mt-1">
                                           {((generatedRecipe.food_cost_per_serving / generatedRecipe.suggested_selling_price) * 100).toFixed(1)}%
                                       </p>
                                   </div>
                                   <div className="p-4">
                                       <p className="text-xs text-slate-500 dark:text-slate-400 uppercase font-bold">Gross Margin</p>
-                                      <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">
+                                      <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">
                                           ₹{(generatedRecipe.suggested_selling_price - generatedRecipe.food_cost_per_serving).toFixed(2)}
                                       </p>
                                   </div>
@@ -754,7 +851,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                               <div key={i} className="grid grid-cols-12 items-center text-sm py-3 px-2 border-b border-slate-50 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg group transition-colors">
                                                   <div className="col-span-5 pr-2">
                                                       <p className="font-medium text-slate-700 dark:text-slate-200 truncate">{ing.name}</p>
-                                                      <p className="text-xs text-slate-400">{ing.qty_per_serving?.toFixed(1) || ing.qty} {ing.unit}</p>
+                                                      <p className="text-xs text-slate-400">{ing.qty_per_serving?.toFixed(3) || ing.qty} {ing.unit}</p>
                                                   </div>
                                                   <div className="col-span-2 text-right text-slate-500 dark:text-slate-400 font-mono text-xs">
                                                       ₹{originalRate.toFixed(0)}
