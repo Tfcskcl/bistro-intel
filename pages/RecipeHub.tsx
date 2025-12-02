@@ -1242,7 +1242,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                   </button>
                                   <button onClick={handleSaveRecipe} disabled={isSaving} className="px-4 py-1.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold rounded-lg hover:bg-black dark:hover:bg-slate-200 flex items-center gap-2">
                                       {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} 
-                                      {isStaff && activeRequest ? 'Save & Send' : 'Save'}
+                                      {isStaff && activeRequest ? 'Save & Send' : 'Save Recipe'}
                                   </button>
                               </div>
                           </div>
@@ -1395,6 +1395,18 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                               </div>
                                           </div>
                                       </div>
+                                  </div>
+                                  
+                                  {/* Bottom Save Action */}
+                                  <div className="p-8 border-t border-slate-100 dark:border-slate-800 flex justify-center bg-slate-50 dark:bg-slate-800/20">
+                                      <button 
+                                          onClick={handleSaveRecipe} 
+                                          disabled={isSaving} 
+                                          className="px-8 py-3 bg-slate-900 dark:bg-emerald-600 text-white font-bold rounded-xl hover:scale-105 active:scale-95 transition-all shadow-lg shadow-slate-900/10 dark:shadow-emerald-900/20 flex items-center gap-2"
+                                      >
+                                          {isSaving ? <Loader2 size={20} className="animate-spin" /> : <Save size={20} />}
+                                          Save Recipe to Library
+                                      </button>
                                   </div>
                               </div>
 

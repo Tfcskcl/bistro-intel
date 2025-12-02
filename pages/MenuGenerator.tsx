@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, MenuGenerationRequest, UserRole } from '../types';
 import { storageService } from '../services/storageService';
-import { generateMenu } from '../services/geminiService';
+import { generateMenu, hasValidApiKey } from '../services/geminiService';
 import { CREDIT_COSTS } from '../constants';
 import { Sparkles, Loader2, Wallet, ArrowRight, History, ChefHat, DollarSign, Users, UtensilsCrossed, AlertCircle, BookOpen, Key } from 'lucide-react';
 
@@ -29,28 +29,22 @@ export const MenuGenerator: React.FC<MenuGeneratorProps> = ({ user, onUserUpdate
     const [generatedResult, setGeneratedResult] = useState<MenuGenerationRequest | null>(null);
     const [history, setHistory] = useState<MenuGenerationRequest[]>([]);
     const [selectedRequest, setSelectedRequest] = useState<MenuGenerationRequest | null>(null);
-    const [hasApiKey, setHasApiKey] = useState(() => (window as any).hasValidApiKey ? (window as any).hasValidApiKey() : true); // Fallback to true if helper missing
+    const [hasApiKey, setHasApiKey] = useState(() => hasValidApiKey());
 
     useEffect(() => {
         refreshHistory();
-        // Check actual helper
-        import('../services/geminiService').then(module => {
-            if (module.hasValidApiKey()) {
-                setHasApiKey(true);
-            }
-        });
     }, [user.id, isAdmin]);
 
     // Poll for API Key Status
     useEffect(() => {
         const checkKey = async () => {
-            // Check local fallback
-            import('../services/geminiService').then(module => {
-                if (module.hasValidApiKey()) {
-                    setHasApiKey(true);
-                    if (error && error.includes('API Key')) setError(null);
-                }
-            });
+            if (hasValidApiKey()) {
+                setHasApiKey(true);
+                if (error && error.includes('API Key')) setError(null);
+                return;
+            } else {
+                setHasApiKey(false);
+            }
 
             if ((window as any).aistudio) {
                 try {
@@ -73,9 +67,19 @@ export const MenuGenerator: React.FC<MenuGeneratorProps> = ({ user, onUserUpdate
                 await (window as any).aistudio.openSelectKey();
                 setHasApiKey(true);
                 setError(null);
+                return;
             } catch (e) {
                 console.error(e);
             }
+        }
+        
+        // Fallback to manual entry
+        const key = prompt("Please enter your Google Gemini API Key:", "");
+        if (key) {
+            // Use the service helper if available globally or duplicate logic for now
+            // Ideally we import setStoredApiKey but for minimal diff we use LS directly which service reads
+            localStorage.setItem('gemini_api_key', key);
+            window.location.reload(); 
         }
     };
 
@@ -203,7 +207,7 @@ export const MenuGenerator: React.FC<MenuGeneratorProps> = ({ user, onUserUpdate
                         <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-6">Menu Configuration</h2>
                         
                         {!hasApiKey && (
-                            <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg flex flex-col gap-2">
+                            <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg flex flex-col gap-2 animate-fade-in">
                                 <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 font-bold text-sm">
                                     <AlertCircle size={16} /> API Key Required
                                 </div>
