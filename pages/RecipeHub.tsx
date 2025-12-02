@@ -4,7 +4,7 @@ import { PLANS, CREDIT_COSTS } from '../constants';
 import { generateRecipeCard, generateRecipeVariation, substituteIngredient, estimateMarketRates } from '../services/geminiService';
 import { ingredientService } from '../services/ingredientService';
 import { RecipeCard, MenuItem, User, UserRole, POSChangeRequest, RecipeRequest, Ingredient } from '../types';
-import { Loader2, ChefHat, Scale, Clock, AlertCircle, Upload, Lock, Sparkles, Check, Save, RefreshCw, Search, Plus, Store, Zap, Trash2, Building2, FileSignature, X, AlignLeft, UtensilsCrossed, Inbox, UserCheck, CheckCircle2, Clock3, Carrot, Type, Wallet, Filter, Tag, Eye, Flame, Wand2, Eraser, FileDown, TrendingDown, ArrowRight, Key, Coins, Leaf, TestTube, ArrowLeftRight, PenTool, Lightbulb, Calculator, DollarSign, Edit2 } from 'lucide-react';
+import { Loader2, ChefHat, Scale, Clock, AlertCircle, Upload, Lock, Sparkles, Check, Save, RefreshCw, Search, Plus, Store, Zap, Trash2, Building2, FileSignature, X, AlignLeft, UtensilsCrossed, Inbox, UserCheck, CheckCircle2, Clock3, Carrot, Type, Wallet, Filter, Tag, Eye, Flame, Wand2, Eraser, FileDown, TrendingDown, ArrowRight, Key, Coins, Leaf, TestTube, ArrowLeftRight, PenTool, Lightbulb, Calculator, DollarSign, Edit2, Globe } from 'lucide-react';
 import { storageService } from '../services/storageService';
 import { authService } from '../services/authService';
 
@@ -72,6 +72,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
   ]);
   const [targetFoodCost, setTargetFoodCost] = useState(30);
   const [isUpdatingRates, setIsUpdatingRates] = useState(false);
+  const [isFetchingRates, setIsFetchingRates] = useState(false);
 
   // Supplier Costing State
   const [altPrices, setAltPrices] = useState<Record<number, string>>({});
@@ -499,6 +500,34 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       setAltPrices(newAltPrices);
   };
 
+  const handleFetchMarketRates = async () => {
+      if (!generatedRecipe) return;
+      setIsFetchingRates(true);
+      try {
+          const names = generatedRecipe.ingredients.map(i => i.name);
+          const location = user.location || "General Market";
+          const rates = await estimateMarketRates(names, location);
+          
+          const newAltPrices: Record<number, string> = { ...altPrices };
+          
+          generatedRecipe.ingredients.forEach((ing, idx) => {
+              const rate = rates[ing.name];
+              if (rate) {
+                  newAltPrices[idx] = rate.toString();
+              }
+          });
+          
+          setAltPrices(newAltPrices);
+          setImportStatus(`Market rates for ${location} fetched!`);
+          setTimeout(() => setImportStatus(null), 3000);
+      } catch (e) {
+          console.error(e);
+          setError("Failed to fetch market rates.");
+      } finally {
+          setIsFetchingRates(false);
+      }
+  };
+
   const handleIngredientSwap = async (index: number) => {
       if (!generatedRecipe) return;
       const ingredient = generatedRecipe.ingredients[index];
@@ -827,105 +856,179 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                               <div className="p-8 border-b border-slate-100 dark:border-slate-700">
                                   <div className="flex justify-between items-center mb-4">
                                       <h3 className="font-bold text-slate-800 dark:text-white">Ingredients & Costing</h3>
-                                      <button onClick={handleSuggestSupplierPrices} className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1">
-                                          <Sparkles size={12} /> Suggest Cheaper Prices
-                                      </button>
+                                      <div className="flex gap-3">
+                                          <button onClick={handleFetchMarketRates} disabled={isFetchingRates} className="text-xs font-bold text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 hover:underline flex items-center gap-1 transition-colors">
+                                              {isFetchingRates ? <Loader2 size={12} className="animate-spin" /> : <Globe size={12} />} 
+                                              Fetch Live Rates
+                                          </button>
+                                          <button onClick={handleSuggestSupplierPrices} className="text-xs font-bold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 hover:underline flex items-center gap-1">
+                                              <Zap size={12} /> Suggest Cheaper Prices
+                                          </button>
+                                      </div>
                                   </div>
-                                  
-                                  {/* Table Header */}
-                                  <div className="grid grid-cols-12 text-xs font-bold text-slate-400 uppercase mb-2 px-2">
-                                      <div className="col-span-5">Item</div>
-                                      <div className="col-span-2 text-right">Mkt Rate</div>
-                                      <div className="col-span-3 text-right">Your Rate</div>
-                                      <div className="col-span-2 text-right">Variance</div>
-                                  </div>
+                                  <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
+                                      <table className="w-full text-sm text-left">
+                                          <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold uppercase text-xs">
+                                              <tr>
+                                                  <th className="px-4 py-3">Ingredient</th>
+                                                  <th className="px-4 py-3">Qty / Portion</th>
+                                                  <th className="px-4 py-3">Market Rate</th>
+                                                  <th className="px-4 py-3 bg-emerald-50/50 dark:bg-emerald-900/10">Your Rate</th>
+                                                  <th className="px-4 py-3 text-right">Cost</th>
+                                              </tr>
+                                          </thead>
+                                          <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-900">
+                                              {generatedRecipe.ingredients.map((ing, idx) => {
+                                                  const marketRate = ing.cost_per_unit || 0;
+                                                  const userRateStr = altPrices[idx];
+                                                  const userRate = userRateStr ? parseFloat(userRateStr) : marketRate;
+                                                  const isVariance = userRate !== marketRate;
+                                                  const variancePct = marketRate > 0 ? ((userRate - marketRate) / marketRate) * 100 : 0;
+                                                  
+                                                  // Calculate cost based on user rate or market rate
+                                                  const displayCost = marketRate > 0 ? (ing.cost_per_serving || 0) * (userRate / marketRate) : (ing.cost_per_serving || 0);
 
-                                  <div className="space-y-1">
-                                      {generatedRecipe.ingredients.map((ing, i) => {
-                                          const originalRate = ing.cost_per_unit || 0;
-                                          const userRate = altPrices[i] ? parseFloat(altPrices[i]) : originalRate;
-                                          const variance = originalRate > 0 ? ((originalRate - userRate) / originalRate) * 100 : 0;
-                                          const isCheaper = userRate < originalRate;
-                                          
-                                          return (
-                                              <div key={i} className="grid grid-cols-12 items-center text-sm py-3 px-2 border-b border-slate-50 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg group transition-colors">
-                                                  <div className="col-span-5 pr-2">
-                                                      <p className="font-medium text-slate-700 dark:text-slate-200 truncate">{ing.name}</p>
-                                                      <p className="text-xs text-slate-400">{ing.qty_per_serving?.toFixed(3) || ing.qty} {ing.unit}</p>
-                                                  </div>
-                                                  <div className="col-span-2 text-right text-slate-500 dark:text-slate-400 font-mono text-xs">
-                                                      ₹{originalRate.toFixed(0)}
-                                                  </div>
-                                                  <div className="col-span-3 flex justify-end">
-                                                      <div className="relative">
-                                                          <span className="absolute left-2 top-1.5 text-xs text-slate-400">₹</span>
-                                                          <input 
-                                                              type="number" 
-                                                              className={`w-20 pl-4 pr-1 py-1 text-right text-xs border rounded focus:ring-1 focus:ring-emerald-500 outline-none transition-all ${
-                                                                  altPrices[i] ? 'border-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300' : 'border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 dark:text-white'
-                                                              }`}
-                                                              placeholder={originalRate.toFixed(0)}
-                                                              value={altPrices[i] || ''} 
-                                                              onChange={(e) => setAltPrices({...altPrices, [i]: e.target.value})} 
-                                                          />
-                                                      </div>
-                                                  </div>
-                                                  <div className="col-span-2 flex justify-end items-center gap-2">
-                                                      {altPrices[i] && (
-                                                          <span className={`text-xs font-bold ${isCheaper ? 'text-emerald-500' : 'text-red-500'}`}>
-                                                              {isCheaper ? '▼' : '▲'} {Math.abs(variance).toFixed(0)}%
-                                                          </span>
-                                                      )}
-                                                      <button 
-                                                          onClick={() => handleIngredientSwap(i)}
-                                                          className={`p-1.5 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-emerald-600 transition-all opacity-0 group-hover:opacity-100 ${swappingIndex === i ? 'opacity-100' : ''}`}
-                                                          title="Find Substitute"
-                                                      >
-                                                          {swappingIndex === i ? <Loader2 size={14} className="animate-spin"/> : <ArrowLeftRight size={14} />}
-                                                      </button>
-                                                  </div>
-                                              </div>
-                                          );
-                                      })}
+                                                  return (
+                                                      <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 group">
+                                                          <td className="px-4 py-3 font-medium text-slate-700 dark:text-slate-200 flex items-center gap-2">
+                                                              {ing.name}
+                                                              <button 
+                                                                onClick={() => handleIngredientSwap(idx)} 
+                                                                className="text-slate-400 hover:text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                title="Find Substitute"
+                                                              >
+                                                                  {swappingIndex === idx ? <Loader2 size={14} className="animate-spin"/> : <ArrowLeftRight size={14} />}
+                                                              </button>
+                                                          </td>
+                                                          <td className="px-4 py-3 text-slate-500 dark:text-slate-400">
+                                                              {ing.qty_per_serving ? `${ing.qty_per_serving.toFixed(2)} ${ing.unit}` : ing.qty}
+                                                          </td>
+                                                          <td className="px-4 py-3 text-slate-500 dark:text-slate-400">
+                                                              ₹{marketRate.toFixed(2)} / {ing.unit}
+                                                          </td>
+                                                          <td className="px-4 py-3 bg-emerald-50/30 dark:bg-emerald-900/5">
+                                                              <div className="flex items-center gap-2">
+                                                                  <input 
+                                                                      type="number" 
+                                                                      placeholder={marketRate.toFixed(2)}
+                                                                      value={altPrices[idx] || ''}
+                                                                      onChange={(e) => setAltPrices({...altPrices, [idx]: e.target.value})}
+                                                                      className="w-20 px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-emerald-500 outline-none bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-white"
+                                                                  />
+                                                                  {isVariance && (
+                                                                      <span className={`text-[10px] font-bold ${variancePct > 0 ? 'text-red-500' : 'text-emerald-500'}`}>
+                                                                          {variancePct > 0 ? '+' : ''}{variancePct.toFixed(0)}%
+                                                                      </span>
+                                                                  )}
+                                                              </div>
+                                                          </td>
+                                                          <td className="px-4 py-3 text-right font-bold text-slate-700 dark:text-slate-300">
+                                                              ₹{displayCost.toFixed(2)}
+                                                          </td>
+                                                      </tr>
+                                                  );
+                                              })}
+                                          </tbody>
+                                      </table>
                                   </div>
                               </div>
 
-                              <div className="p-8 bg-slate-50 dark:bg-slate-800/30">
-                                  <h3 className="font-bold text-slate-800 dark:text-white mb-4">Method</h3>
-                                  <ol className="list-decimal pl-5 space-y-2 text-sm text-slate-600 dark:text-slate-300">
-                                      {generatedRecipe.preparation_steps.map((step, i) => <li key={i}>{step}</li>)}
-                                  </ol>
+                              <div className="p-8 bg-slate-50 dark:bg-slate-950/50">
+                                  <h3 className="font-bold text-slate-800 dark:text-white mb-4">Preparation Steps</h3>
+                                  <div className="space-y-4">
+                                      {generatedRecipe.preparation_steps.map((step, i) => (
+                                          <div key={i} className="flex gap-4">
+                                              <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-slate-600 dark:text-slate-400 shrink-0 text-sm">
+                                                  {i + 1}
+                                              </div>
+                                              <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed mt-1.5">{step}</p>
+                                          </div>
+                                      ))}
+                                  </div>
                               </div>
 
                               {generatedRecipe.reasoning && (
-                                  <div className="p-8 border-t border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-900/50">
-                                      <h3 className="font-bold text-slate-800 dark:text-white mb-2 flex items-center gap-2 text-sm uppercase tracking-wide">
-                                          <Lightbulb size={16} className="text-yellow-500" /> Chef's Insight
+                                  <div className="p-8 border-t border-slate-100 dark:border-slate-800 bg-amber-50/50 dark:bg-amber-900/10">
+                                      <h3 className="font-bold text-amber-800 dark:text-amber-400 mb-2 flex items-center gap-2">
+                                          <Lightbulb size={18} /> Chef's Insight
                                       </h3>
-                                      <p className="text-sm text-slate-600 dark:text-slate-400 italic leading-relaxed">
+                                      <p className="text-sm text-amber-900/80 dark:text-amber-200/80 italic">
                                           "{generatedRecipe.reasoning}"
                                       </p>
                                   </div>
                               )}
-
-                              <div className="p-6 flex flex-col sm:flex-row justify-center gap-4 border-t border-slate-100 dark:border-slate-800">
-                                  <button onClick={handleSaveRecipe} disabled={isSaving} className={`px-8 py-3 font-bold rounded-xl shadow-lg flex items-center gap-2 transition-all ${isRecipeSaved ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-400' : 'bg-emerald-600 text-white hover:bg-emerald-700'}`}>
-                                      {isSaving ? <Loader2 className="animate-spin" /> : isRecipeSaved ? <Check /> : <Save />} 
-                                      {isRecipeSaved ? 'Saved to Library' : 'Save Recipe'}
-                                  </button>
-                                  <button onClick={handleDownloadPDF} className="px-6 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-bold rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2">
-                                      <FileDown size={18} /> Export PDF
-                                  </button>
-                              </div>
                           </div>
                       </div>
                   ) : (
-                      <div className="h-full flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 opacity-60">
-                          <ChefHat size={48} className="mb-4" />
-                          <p>Ready to Generate</p>
+                      <div className="h-full flex flex-col items-center justify-center text-slate-400 opacity-60 p-8 text-center">
+                          <ChefHat size={64} className="mb-6" />
+                          <h3 className="text-xl font-bold mb-2">BistroChef is Ready</h3>
+                          <p className="max-w-md">Select an AI persona or switch to manual mode to create your professional recipe card.</p>
+                      </div>
+                  )}
+                  
+                  {generatedRecipe && (
+                      <div className="p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center shrink-0">
+                          <div className="flex gap-2">
+                              <button onClick={() => handleVariation('Vegan')} className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-300">Make Vegan</button>
+                              <button onClick={() => handleVariation('Gluten-Free')} className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-300">Make Gluten-Free</button>
+                              <button onClick={() => handleVariation('Budget')} className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-300">Optimize Cost</button>
+                          </div>
+                          <div className="flex gap-2">
+                              <button onClick={handleDownloadPDF} className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
+                                  <FileDown size={20} />
+                              </button>
+                              {isStaff && adminQueue.length > 0 && activeRequest && (
+                                  <button onClick={handleSaveRecipe} className="px-6 py-2 bg-emerald-600 text-white font-bold rounded-lg hover:bg-emerald-700 transition-colors flex items-center gap-2">
+                                      <CheckCircle2 size={18} /> Complete Request
+                                  </button>
+                              )}
+                          </div>
                       </div>
                   )}
               </div>
+          </div>
+      )}
+
+      {viewMode === 'requests' && isStaff && (
+          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col flex-1 animate-fade-in transition-colors">
+              <div className="p-6 border-b border-slate-100 dark:border-slate-800">
+                  <h2 className="text-xl font-bold text-slate-800 dark:text-white">Recipe Requests Queue</h2>
+              </div>
+              <div className="flex-1 overflow-y-auto p-6">
+                  {adminQueue.length === 0 ? (
+                      <p className="text-slate-500 text-center py-12">No pending requests.</p>
+                  ) : (
+                      <div className="space-y-4">
+                          {adminQueue.map(req => (
+                              <div key={req.id} className="border border-slate-200 dark:border-slate-700 rounded-xl p-6 bg-slate-50 dark:bg-slate-800">
+                                  <div className="flex justify-between items-start mb-4">
+                                      <div>
+                                          <h3 className="font-bold text-lg text-slate-800 dark:text-white">{req.item.name}</h3>
+                                          <p className="text-sm text-slate-500 dark:text-slate-400">Requested by <span className="font-bold">{req.userName}</span></p>
+                                      </div>
+                                      <span className="text-xs font-bold bg-yellow-100 text-yellow-700 px-2 py-1 rounded">PENDING</span>
+                                  </div>
+                                  <div className="bg-white dark:bg-slate-900 p-4 rounded-lg border border-slate-200 dark:border-slate-700 text-sm text-slate-600 dark:text-slate-300 mb-4">
+                                      {req.requirements}
+                                  </div>
+                                  <div className="flex justify-end">
+                                      <button onClick={() => handleFulfillRequest(req)} className="px-6 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold rounded-lg hover:opacity-90">
+                                          Process Request
+                                      </button>
+                                  </div>
+                              </div>
+                          ))}
+                      </div>
+                  )}
+              </div>
+          </div>
+      )}
+
+      {importStatus && (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-6 py-3 rounded-full shadow-lg flex items-center gap-2 animate-fade-in-up">
+              <CheckCircle2 size={18} className="text-emerald-400" />
+              <span className="font-bold text-sm">{importStatus}</span>
           </div>
       )}
     </div>
