@@ -61,7 +61,7 @@ const generateMockRecipe = (item: MenuItem, requirements: string): RecipeCard =>
         allergens: ["Check Ingredients"],
         shelf_life_hours: 24,
         food_cost_per_serving: totalCost,
-        suggested_selling_price: Math.ceil(totalCost * 3.5),
+        suggested_selling_price: Math.ceil(totalCost / 0.30), // 30% Food Cost Model
         tags: ["Auto-Generated", "Draft"],
         human_summary: `A generated recipe card for ${baseName}. Ingredients and costs are estimated based on standard kitchen data.`,
         reasoning: "Generated using BistroIntelligence Engine (Dev Mode). Key ingredients selected for flavor balance and cost efficiency.",
@@ -233,6 +233,36 @@ export const verifyLocationWithMaps = async (locationQuery: string): Promise<str
   }
 };
 
+export const estimateMarketRates = async (ingredients: string[], location: string): Promise<Record<string, number>> => {
+    const ai = createAIClient();
+    // Mock if no AI
+    if (!ai) {
+        await new Promise(r => setTimeout(r, 1000));
+        const mockRates: Record<string, number> = {};
+        ingredients.forEach(i => mockRates[i] = Math.floor(Math.random() * 200) + 50);
+        return mockRates;
+    }
+
+    try {
+        const prompt = `
+        Task: Estimate current market rates for the following ingredients in ${location}.
+        Ingredients: ${ingredients.join(', ')}.
+        Return a JSON object where key is the ingredient name and value is price per KG/Liter in local currency number only.
+        Example: {"Onion": 40, "Milk": 60}
+        `;
+        
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+            config: { responseMimeType: 'application/json' }
+        });
+        return cleanAndParseJSON<Record<string, number>>(response.text);
+    } catch (e) {
+        console.error("Rate Estimation Failed", e);
+        return {};
+    }
+};
+
 export const generateRecipeCard = async (userId: string, item: MenuItem, requirements: string, location?: string, chefPersona: string = 'Executive Chef'): Promise<RecipeCard> => {
     const ai = createAIClient();
     
@@ -269,13 +299,13 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
     Role: ${chefPersona}
     Task: Generate a HIGHLY DETAILED and professional recipe card for "${item.name}". 
     Context: ${requirements}
-    Location: ${location || 'Global'}
+    Location: ${location || 'India'}
     
     REQUIREMENTS:
     1. INGREDIENTS: List EVERY single ingredient including oils, spices, and garnishes. Use precise metric units (g, ml). 
     2. STEPS: Break down preparation into clear, detailed, actionable steps. Include cooking techniques, temperatures, and visual cues (e.g., "golden brown").
-    3. COSTING: Estimate realistic ingredient costs for ${location || 'India'} in INR.
-    4. SUMMARY: Write a compelling menu description.
+    3. COSTING: Estimate realistic ingredient costs for ${location || 'India'} in local currency.
+    4. PRICING: Suggested Selling Price should be calculated based on a 30% Food Cost model (Cost * 3.3).
     5. REASONING: Explain the culinary logic behind key ingredient choices or techniques used (e.g. "Acid added to balance richness").
     
     IMPORTANT: Return ONLY valid JSON matching this structure:
@@ -309,7 +339,7 @@ export const generateRecipeVariation = async (userId: string, original: RecipeCa
     }
 
     try {
-        const prompt = `Task: Create a "${variationType}" variation of the following recipe. Include reasoning for changes. Maintain JSON structure. Original JSON: ${JSON.stringify(original)}.`;
+        const prompt = `Task: Create a "${variationType}" variation of the following recipe. Include reasoning for changes. Maintain JSON structure. Update Costing and Selling Price accurately. Original JSON: ${JSON.stringify(original)}.`;
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
@@ -331,7 +361,7 @@ export const substituteIngredient = async (recipe: RecipeCard, ingredientName: s
     }
 
     try {
-        const prompt = `Task: Find a culinary substitute for "${ingredientName}" in this recipe. Update quantities, costs, and explain reasoning. Return full JSON. Recipe: ${JSON.stringify(recipe)}`;
+        const prompt = `Task: Find a culinary substitute for "${ingredientName}" in this recipe. Update quantities, costs, total food cost and suggested selling price. Explain reasoning. Return full JSON. Recipe: ${JSON.stringify(recipe)}`;
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
