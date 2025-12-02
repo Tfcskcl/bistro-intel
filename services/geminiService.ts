@@ -358,7 +358,10 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
     
     DETAILED COSTING RULES:
     1. LIST EVERY INGREDIENT: You must include "Hidden Costs" like Oil, Salt, Water, Spices, Garnishes. 
-    2. MICRO-COSTING: Do not set cost to 0. Even 5g of salt has a cost (e.g., 0.10). Estimate market rates for ${location || 'India'}.
+    2. ACT AS A COST CONTROLLER: Estimate realistic market rates for ${location || 'India'}.
+       - Do not leave cost_per_unit as 0. 
+       - Even a "pinch of salt" has a cost. Estimate it (e.g., 5g salt @ 20/kg = 0.10).
+       - Assume water cost is negligible unless bottled.
     3. ACCURACY: The 'food_cost_per_serving' MUST be the strict mathematical sum of all 'cost_per_serving' values of ingredients.
     
     REQUIREMENTS:
@@ -367,6 +370,7 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
     3. COSTING: Estimate realistic ingredient costs based on search data.
     4. PRICING: Suggested Selling Price based on 30% Food Cost.
     5. TIME: Estimate Prep vs Cook time.
+    6. EQUIPMENT & ALLERGENS: Explicitly list required equipment (e.g., Blender, Sous-vide) and allergens.
     
     OUTPUT FORMAT:
     Return a single valid JSON object matching the structure below. Do not include markdown blocks like \`\`\`json.
@@ -381,7 +385,9 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
       "suggested_selling_price": number,
       "prep_time_minutes": number,
       "cook_time_minutes": number,
+      "total_time_minutes": number,
       "equipment_needed": ["string"],
+      "allergens": ["string"],
       "human_summary": "string",
       "reasoning": "string"
     }
@@ -423,19 +429,28 @@ export const generateRecipeVariation = async (userId: string, original: RecipeCa
 
     try {
         const prompt = `
-        Role: Expert Chef.
+        Role: Expert Chef & Menu Engineer.
         Task: Create a "${variationType}" variation of the existing recipe below.
         
-        Guidelines:
-        1. Maintain the core identity of the dish, but adapt for ${variationType}.
-        2. INGREDIENTS: Swap or remove ingredients as needed. 
-        3. STRICT RE-COSTING: You MUST recalculate 'cost_per_serving', 'food_cost_per_serving', and 'suggested_selling_price' based on the NEW ingredients. Do not just copy the old prices.
-           Example: If replacing expensive meat with vegetables, the cost SHOULD go down.
-        4. Reasoning: Explain what changed in the 'reasoning' field.
-        
         Original Recipe JSON: ${JSON.stringify(original)}
+
+        VARIATION STRATEGIES:
+        - If "Vegan": Replace all animal products (meat, dairy, eggs, honey) with plant-based alternatives. Ensure protein balance.
+        - If "Low-Calorie": Reduce fats, oils, and sugars. Use steaming/grilling instead of frying. Increase vegetable content.
+        - If "Spicy": Introduce hot peppers, chili oils, or spices appropriate to the cuisine. Adjust balance.
+        - If "Budget-Friendly": Replace premium ingredients (e.g., truffles, prime cuts, imported cheeses) with cost-effective local alternatives. Maximize yield.
+        - If "Gluten-Free": Ensure no wheat-based ingredients (soy sauce -> tamari, flour -> almond/rice flour).
+
+        REQUIREMENTS:
+        1. Maintain the core identity of the dish (e.g. a Burger should still be a Burger).
+        2. STRICT RE-COSTING AUDIT: 
+           - You MUST recalculate 'cost_per_serving' for every new ingredient.
+           - You MUST SUM these new costs to get the new 'food_cost_per_serving'. 
+           - Do NOT simply copy the old price. "Budget" variations MUST be cheaper.
+        3. Reasoning: Clearly explain the substitutions made in the 'reasoning' field.
+        4. Name: Update the name to reflect the variation (e.g., "Spicy Chicken Burger").
         
-        Return valid JSON.
+        Return valid JSON matching the schema.
         `;
         const response = await ai.models.generateContent({
             model: 'gemini-3-pro-preview', // Upgraded

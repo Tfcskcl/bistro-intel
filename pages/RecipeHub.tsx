@@ -4,7 +4,7 @@ import { PLANS, CREDIT_COSTS } from '../constants';
 import { generateRecipeCard, generateRecipeVariation, substituteIngredient, estimateMarketRates } from '../services/geminiService';
 import { ingredientService } from '../services/ingredientService';
 import { RecipeCard, MenuItem, User, UserRole, POSChangeRequest, RecipeRequest, Ingredient } from '../types';
-import { Loader2, ChefHat, Scale, Clock, AlertCircle, Upload, Lock, Sparkles, Check, Save, RefreshCw, Search, Plus, Store, Zap, Trash2, Building2, FileSignature, X, AlignLeft, UtensilsCrossed, Inbox, UserCheck, CheckCircle2, Clock3, Carrot, Type, Wallet, Filter, Tag, Eye, Flame, Wand2, Eraser, FileDown, TrendingDown, ArrowRight, Key, Coins, Leaf, TestTube, ArrowLeftRight, PenTool, Lightbulb, Calculator, DollarSign, Edit2, Globe } from 'lucide-react';
+import { Loader2, ChefHat, Scale, Clock, AlertCircle, Upload, Lock, Sparkles, Check, Save, RefreshCw, Search, Plus, Store, Zap, Trash2, Building2, FileSignature, X, AlignLeft, UtensilsCrossed, Inbox, UserCheck, CheckCircle2, Clock3, Carrot, Type, Wallet, Filter, Tag, Eye, Flame, Wand2, Eraser, FileDown, TrendingDown, ArrowRight, Key, Coins, Leaf, TestTube, ArrowLeftRight, PenTool, Lightbulb, Calculator, DollarSign, Edit2, Globe, Droplets, Wheat } from 'lucide-react';
 import { storageService } from '../services/storageService';
 import { authService } from '../services/authService';
 
@@ -398,14 +398,32 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
           return;
       }
       setIsUpdatingRates(true);
-      const names = manualIngredients.map(i => i.name);
-      const rates = await estimateMarketRates(names, user.location || 'India');
       
-      setManualIngredients(prev => prev.map(ing => {
-          const rate = rates[ing.name];
-          if (rate) return { ...ing, costPerUnit: rate.toString() };
-          return ing;
-      }));
+      const namesToFetch: string[] = [];
+      const updatedIngredients = [...manualIngredients];
+
+      // 1. Check local knowledge base first
+      updatedIngredients.forEach((ing) => {
+          const learnedPrice = ingredientService.getLearnedPrice(ing.name);
+          if (learnedPrice) {
+              ing.costPerUnit = learnedPrice.toString();
+          } else {
+              namesToFetch.push(ing.name);
+          }
+      });
+
+      // 2. Fetch missing from AI
+      if (namesToFetch.length > 0) {
+          const rates = await estimateMarketRates(namesToFetch, user.location || 'India');
+          updatedIngredients.forEach(ing => {
+              if (namesToFetch.includes(ing.name)) {
+                  const rate = rates[ing.name];
+                  if (rate) ing.costPerUnit = rate.toString();
+              }
+          });
+      }
+      
+      setManualIngredients(updatedIngredients);
       setIsUpdatingRates(false);
   };
 
@@ -537,16 +555,30 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       try {
           const names = generatedRecipe.ingredients.map(i => i.name);
           const location = user.location || "General Market";
-          const rates = await estimateMarketRates(names, location);
           
           const newAltPrices: Record<number, string> = { ...altPrices };
-          
+          const namesToFetch: string[] = [];
+
+          // 1. Check knowledge base
           generatedRecipe.ingredients.forEach((ing, idx) => {
-              const rate = rates[ing.name];
-              if (rate) {
-                  newAltPrices[idx] = rate.toString();
+              const learnedPrice = ingredientService.getLearnedPrice(ing.name);
+              if (learnedPrice) {
+                  newAltPrices[idx] = learnedPrice.toString();
+              } else {
+                  namesToFetch.push(ing.name);
               }
           });
+
+          // 2. Fetch rest from AI
+          if (namesToFetch.length > 0) {
+              const rates = await estimateMarketRates(namesToFetch, location);
+              generatedRecipe.ingredients.forEach((ing, idx) => {
+                  if (namesToFetch.includes(ing.name)) {
+                      const rate = rates[ing.name];
+                      if (rate) newAltPrices[idx] = rate.toString();
+                  }
+              });
+          }
           
           setAltPrices(newAltPrices);
           setImportStatus(`Market rates for ${location} fetched!`);
@@ -802,17 +834,25 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                             <h1 className="text-3xl font-bold">{generatedRecipe.name}</h1>
                                             <p className="text-slate-300 text-sm mt-2">{generatedRecipe.human_summary}</p>
                                             
-                                            {/* Editable Yield */}
-                                            <div className="flex items-center gap-2 mt-4 bg-white/10 w-fit px-3 py-1.5 rounded-lg border border-white/10">
-                                                <Scale size={16} className="text-emerald-400" />
-                                                <span className="text-xs font-bold uppercase tracking-wide text-slate-300">Yield:</span>
-                                                <input 
-                                                    type="number"
-                                                    value={generatedRecipe.yield || 1}
-                                                    onChange={(e) => handleYieldUpdate(e.target.value)}
-                                                    className="w-12 bg-transparent text-white font-bold text-sm text-center border-b border-white/30 focus:border-emerald-400 outline-none"
-                                                />
-                                                <span className="text-xs text-slate-400">Servings</span>
+                                            <div className="flex gap-4 mt-4">
+                                                {/* Editable Yield */}
+                                                <div className="flex items-center gap-2 bg-white/10 w-fit px-3 py-1.5 rounded-lg border border-white/10">
+                                                    <Scale size={16} className="text-emerald-400" />
+                                                    <span className="text-xs font-bold uppercase tracking-wide text-slate-300">Yield:</span>
+                                                    <input 
+                                                        type="number"
+                                                        value={generatedRecipe.yield || 1}
+                                                        onChange={(e) => handleYieldUpdate(e.target.value)}
+                                                        className="w-12 bg-transparent text-white font-bold text-sm text-center border-b border-white/30 focus:border-emerald-400 outline-none"
+                                                    />
+                                                    <span className="text-xs text-slate-400">Servings</span>
+                                                </div>
+
+                                                {/* Time Display */}
+                                                <div className="flex items-center gap-3 text-slate-300 text-xs font-medium">
+                                                    <div className="flex items-center gap-1"><Carrot size={14} className="text-orange-400"/> Prep: {generatedRecipe.prep_time_minutes || 20}m</div>
+                                                    <div className="flex items-center gap-1"><Flame size={14} className="text-red-400"/> Cook: {generatedRecipe.cook_time_minutes || 15}m</div>
+                                                </div>
                                             </div>
                                         </div>
                                         <div className="text-right flex flex-col items-end gap-2 shrink-0">
@@ -996,6 +1036,38 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                     </div>
                                 </div>
 
+                                {/* Equipment & Allergens */}
+                                <div className="grid grid-cols-2 border-t border-slate-100 dark:border-slate-800">
+                                    <div className="p-8 border-r border-slate-100 dark:border-slate-700 bg-white/30 dark:bg-slate-900/30 backdrop-blur-sm">
+                                        <h3 className="font-bold text-slate-800 dark:text-white mb-3 flex items-center gap-2">
+                                            <UtensilsCrossed size={16} className="text-blue-500" /> Equipment Needed
+                                        </h3>
+                                        {generatedRecipe.equipment_needed && generatedRecipe.equipment_needed.length > 0 ? (
+                                            <div className="flex flex-wrap gap-2">
+                                                {generatedRecipe.equipment_needed.map((item, i) => (
+                                                    <span key={i} className="px-3 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-lg text-xs font-medium border border-blue-100 dark:border-blue-800">
+                                                        {item}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        ) : <p className="text-xs text-slate-400 italic">No equipment listed.</p>}
+                                    </div>
+                                    <div className="p-8 bg-white/30 dark:bg-slate-900/30 backdrop-blur-sm">
+                                        <h3 className="font-bold text-slate-800 dark:text-white mb-3 flex items-center gap-2">
+                                            <AlertCircle size={16} className="text-red-500" /> Allergens
+                                        </h3>
+                                        {generatedRecipe.allergens && generatedRecipe.allergens.length > 0 ? (
+                                            <div className="flex flex-wrap gap-2">
+                                                {generatedRecipe.allergens.map((item, i) => (
+                                                    <span key={i} className="px-3 py-1 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 rounded-lg text-xs font-medium border border-red-100 dark:border-red-800">
+                                                        {item}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        ) : <p className="text-xs text-slate-400 italic">No allergens detected.</p>}
+                                    </div>
+                                </div>
+
                                 {generatedRecipe.reasoning && (
                                     <div className="p-8 border-t border-slate-100 dark:border-slate-800 bg-amber-50/50 dark:bg-amber-900/10 backdrop-blur-sm">
                                         <h3 className="font-bold text-amber-800 dark:text-amber-400 mb-2 flex items-center gap-2">
@@ -1020,11 +1092,21 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                   {generatedRecipe && (
                       <div className="p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center shrink-0">
                           <div className="flex gap-2 overflow-x-auto pb-1 max-w-[60%] custom-scrollbar">
-                              <button onClick={() => handleVariation('Vegan')} className="whitespace-nowrap px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-300">Vegan</button>
-                              <button onClick={() => handleVariation('Low-Calorie')} className="whitespace-nowrap px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-300">Low-Cal</button>
-                              <button onClick={() => handleVariation('Spicy')} className="whitespace-nowrap px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-300">Spicy</button>
-                              <button onClick={() => handleVariation('Budget-Friendly')} className="whitespace-nowrap px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-300">Budget</button>
-                              <button onClick={() => handleVariation('Gluten-Free')} className="whitespace-nowrap px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-300">GF</button>
+                              <button onClick={() => handleVariation('Vegan')} className="whitespace-nowrap px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-300 flex items-center gap-1">
+                                  <Leaf size={12} className="text-green-500" /> Vegan
+                              </button>
+                              <button onClick={() => handleVariation('Low-Calorie')} className="whitespace-nowrap px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-300 flex items-center gap-1">
+                                  <Droplets size={12} className="text-blue-400" /> Low-Cal
+                              </button>
+                              <button onClick={() => handleVariation('Spicy')} className="whitespace-nowrap px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-300 flex items-center gap-1">
+                                  <Flame size={12} className="text-red-500" /> Spicy
+                              </button>
+                              <button onClick={() => handleVariation('Budget-Friendly')} className="whitespace-nowrap px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-300 flex items-center gap-1">
+                                  <Wallet size={12} className="text-emerald-500" /> Budget
+                              </button>
+                              <button onClick={() => handleVariation('Gluten-Free')} className="whitespace-nowrap px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-300 flex items-center gap-1">
+                                  <Wheat size={12} className="text-amber-500" /> GF
+                              </button>
                           </div>
                           <div className="flex gap-2">
                               <button onClick={handleDownloadPDF} className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
