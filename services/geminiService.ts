@@ -75,7 +75,17 @@ const generateMockRecipe = (item: MenuItem, requirements: string): RecipeCard =>
     if (!mockIngredients.some(i => i.name.includes("Oil"))) {
         mockIngredients.push({ name: "Cooking Oil/Butter", qty: "20ml", qty_per_serving: 0.02, cost_per_unit: 160, unit: "l", cost_per_serving: 3.2 });
     }
-    mockIngredients.push({ name: "Seasoning (Salt/Pepper)", qty: "5g", qty_per_serving: 0.005, cost_per_unit: 50, unit: "kg", cost_per_serving: 0.25 });
+    if (!mockIngredients.some(i => i.name.includes("Salt"))) {
+        mockIngredients.push({ name: "Salt", qty: "5g", qty_per_serving: 0.005, cost_per_unit: 20, unit: "kg", cost_per_serving: 0.1 });
+    }
+    if (!mockIngredients.some(i => i.name.includes("Water")) && !isDrink) {
+        mockIngredients.push({ name: "Water (Prep)", qty: "100ml", qty_per_serving: 0.1, cost_per_unit: 0, unit: "l", cost_per_serving: 0 });
+    }
+    
+    // Add generic aromatics for savory dishes
+    if (!isDrink && !mockIngredients.some(i => i.name.includes("Onion"))) {
+         mockIngredients.push({ name: "Onion", qty: "50g", qty_per_serving: 0.05, cost_per_unit: 40, unit: "kg", cost_per_serving: 2 });
+    }
 
     const totalCost = mockIngredients.reduce((acc, curr) => acc + (curr.cost_per_serving || 0), 0);
 
@@ -217,6 +227,7 @@ export const cleanAndParseJSON = <T>(text: string | undefined): T => {
     if (!text) throw new Error("Empty response from AI");
     try {
         let clean = text.replace(/```json\n?|```/g, '').trim();
+        // If markdown is still there or there's intro text, try to find the first { and last }
         const firstOpen = clean.indexOf('{');
         const lastClose = clean.lastIndexOf('}');
         if (firstOpen !== -1 && lastClose !== -1) {
@@ -335,43 +346,63 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
         return generateMockRecipe(item, requirements);
     }
 
+    // 1. Text Prompt demanding Search Grounding
     const prompt = `
     Role: ${chefPersona}
     Task: Generate a HIGHLY DETAILED and professional recipe card for "${item.name}". 
     Context: ${requirements}
     Location: ${location || 'India'}
     
-    REQUIREMENTS:
-    1. INGREDIENTS: List EVERY single ingredient including oils, spices, and garnishes. Use precise metric units (g, ml). Ensure costs are realistic for the location.
-    2. PREPARATION STEPS (CRITICAL): 
-       - Break down instructions into granular, actionable steps.
-       - MANDATORY: Use professional culinary terminology for techniques (e.g., 'brunoise', 'sweat', 'emulsify', 'blanch').
-       - Include precise temperatures (e.g., "Bake at 180°C/350°F").
-       - Include specific timings (e.g., "Sear for 2 mins per side").
-       - Include sensory cues for doneness (e.g., "until golden brown and fragrant").
-    3. COSTING: Estimate realistic ingredient costs for ${location || 'India'} in local currency.
-    4. PRICING: Suggested Selling Price should be calculated based on a 30% Food Cost model.
-    5. REASONING: Explain the culinary logic behind key ingredient choices or techniques used.
-    6. TIME BREAKDOWN: Estimate Prep Time and Cook Time separately.
-    7. EQUIPMENT: List all specific kitchen tools required.
+    CRITICAL INSTRUCTION:
+    You have access to Google Search. USE IT to research the authentic and complete ingredient list for this dish. 
+    Ensure NO ingredients are missing (e.g. water, oil, salt, base spices, garnishes).
     
-    IMPORTANT: Provide a complete JSON response matching the schema. Do not truncate.
+    REQUIREMENTS:
+    1. INGREDIENTS: List EVERY single ingredient found in your research. Use precise metric units (g, ml).
+    2. PREPARATION STEPS: Granular steps using professional culinary terms (brunoise, sweat, deglaze). Include temps and times.
+    3. COSTING: Estimate realistic ingredient costs for ${location || 'India'} in local currency based on search data.
+    4. PRICING: Suggested Selling Price based on 30% Food Cost.
+    5. TIME: Estimate Prep vs Cook time.
+    
+    OUTPUT FORMAT:
+    Return a single valid JSON object matching the structure below. Do not include markdown blocks like \`\`\`json.
+    
+    Structure Example:
+    {
+      "sku_id": "string",
+      "name": "string",
+      "ingredients": [{"name": "string", "qty": "string", "cost_per_unit": number, "unit": "string", "cost_per_serving": number, "qty_per_serving": number}],
+      "preparation_steps": ["string"],
+      "food_cost_per_serving": number,
+      "suggested_selling_price": number,
+      "prep_time_minutes": number,
+      "cook_time_minutes": number,
+      "equipment_needed": ["string"],
+      "human_summary": "string",
+      "reasoning": "string"
+    }
     `;
 
     try {
+        // Use Google Search Tool. 
+        // Note: When tools are used, responseSchema is NOT supported by the SDK/API rules.
+        // We must rely on the prompt to enforce JSON structure and parse it manually.
         const response = await ai.models.generateContent({
-            model: 'gemini-3-pro-preview', // Upgraded for better reasoning and strict schema adherence
+            model: 'gemini-3-pro-preview', 
             contents: prompt,
             config: { 
-                responseMimeType: 'application/json',
-                responseSchema: RECIPE_SCHEMA,
+                tools: [{ googleSearch: {} }],
+                // responseMimeType: 'application/json', // CANNOT USE WITH TOOLS
+                // responseSchema: RECIPE_SCHEMA,        // CANNOT USE WITH TOOLS
                 maxOutputTokens: 8192
             }
         });
         
-        const parsed = JSON.parse(response.text || '{}');
+        // Manual Parsing because we used Tools
+        const parsed = cleanAndParseJSON<RecipeCard>(response.text);
+        
         if (!parsed.sku_id) parsed.sku_id = `AI-${Date.now().toString().slice(-6)}`;
-        return parsed as RecipeCard;
+        return parsed;
 
     } catch (e) {
         console.error("AI Generation Failed, falling back to mock:", e);
@@ -396,14 +427,13 @@ export const generateRecipeVariation = async (userId: string, original: RecipeCa
         Task: Create a "${variationType}" variation of the existing recipe below.
         
         Guidelines:
-        1. Maintain the core identity of the dish (e.g. if it's a burger, keep it a burger but modify ingredients).
-        2. Reasoning: Explain specifically what was changed to meet the "${variationType}" requirement in the 'reasoning' field.
-        3. Costing: Recalculate 'food_cost_per_serving' and 'suggested_selling_price' based on new ingredients.
-        4. Steps: Adjust preparation steps to reflect ingredient changes. Ensure steps use professional culinary terms, specific temperatures, and sensory cues just like the original.
+        1. Maintain the core identity of the dish.
+        2. Reasoning: Explain what changed in the 'reasoning' field.
+        3. Costing: Recalculate costs.
         
         Original Recipe JSON: ${JSON.stringify(original)}
         
-        Return valid JSON matching the schema.
+        Return valid JSON.
         `;
         const response = await ai.models.generateContent({
             model: 'gemini-3-pro-preview', // Upgraded
