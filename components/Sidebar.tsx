@@ -33,6 +33,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
     { id: AppView.BILLING, label: 'Plans & Billing', icon: CreditCard, allowedRoles: [UserRole.OWNER] },
   ];
 
+  const lowCredits = user.credits < 50;
+
   return (
     <div className="w-64 bg-white dark:bg-slate-900 text-slate-800 dark:text-white flex flex-col h-screen fixed left-0 top-0 z-20 shadow-xl border-r border-slate-200 dark:border-slate-800 transition-colors duration-200">
       <div className="p-6 border-b border-slate-200 dark:border-slate-800">
@@ -71,15 +73,27 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
       </nav>
 
       <div className="p-4 border-t border-slate-200 dark:border-slate-800 space-y-2 bg-slate-50 dark:bg-slate-900 transition-colors duration-200">
-        <div className="px-4 py-2 bg-white dark:bg-slate-800 rounded-lg mb-2 border border-slate-200 dark:border-slate-700">
+        <div className={`px-4 py-3 rounded-lg mb-2 border ${lowCredits ? 'bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
             <div className="flex justify-between items-center mb-1">
                 <p className="text-xs text-slate-500 dark:text-slate-400">Role</p>
                 <span className="text-[10px] font-bold uppercase bg-slate-200 dark:bg-slate-700 px-1.5 rounded text-slate-600 dark:text-slate-300">{user.role.replace('_', ' ')}</span>
             </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Credits</p>
-            <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                {user.credits} CR
-            </p>
+            <div className="flex justify-between items-center mt-2">
+                <div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Credits</p>
+                    <p className={`text-sm font-bold ${lowCredits ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                        {user.credits} CR
+                    </p>
+                </div>
+                {lowCredits && (
+                    <button 
+                        onClick={() => onChangeView(AppView.BILLING)}
+                        className="text-[10px] font-bold bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 px-2 py-1 rounded hover:bg-red-200 transition-colors"
+                    >
+                        Top Up
+                    </button>
+                )}
+            </div>
         </div>
         
         <button 

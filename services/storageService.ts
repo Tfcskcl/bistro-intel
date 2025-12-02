@@ -112,6 +112,30 @@ export const storageService = {
             type: 'debit',
             description
         });
+
+        // Automated Low Balance Warning
+        const THRESHOLD = 50;
+        if (newBalance < THRESHOLD && current >= THRESHOLD) {
+             const notif: AppNotification = {
+                id: `n_low_bal_${Date.now()}`,
+                title: 'Low Credit Balance',
+                message: `Your wallet is running low (${newBalance} CR remaining). Top up to continue using AI tools without interruption.`,
+                type: 'warning',
+                read: false,
+                date: new Date().toISOString()
+             };
+             
+             // Push to user's personal notifications
+             const key = getKey(userId, 'notifications');
+             const stored = localStorage.getItem(key);
+             let notifications: AppNotification[] = stored ? JSON.parse(stored) : [];
+             // Avoid duplicate unread warnings
+             if (!notifications.some(n => n.title === 'Low Credit Balance' && !n.read)) {
+                 notifications.push(notif);
+                 localStorage.setItem(key, JSON.stringify(notifications));
+             }
+        }
+
         return true;
     },
 
