@@ -3,30 +3,18 @@ import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { SYSTEM_INSTRUCTION, MARKDOWN_INSTRUCTION, APP_CONTEXT } from "../constants";
 import { RecipeCard, SOP, StrategyReport, ImplementationGuide, MenuItem, MenuGenerationRequest } from "../types";
 
-// Known leaked key to blacklist
-const LEAKED_KEY = 'AIzaSyB8BoSUqHHnmpkSIwpp2jI2xM2TW3IlIgA';
-
 const getApiKey = (): string => {
-  // 1. Check Local Storage (User Override)
+  // 1. Check Local Storage (User Override / Manual Entry)
   const localKey = localStorage.getItem('gemini_api_key');
-  if (localKey && localKey !== LEAKED_KEY) return localKey;
+  if (localKey) return localKey;
 
-  // 2. Check Environment Variable (Cloud)
-  if (process.env.API_KEY && process.env.API_KEY !== LEAKED_KEY) return process.env.API_KEY;
-
-  // If local storage had the leaked key, clean it up
-  if (localKey === LEAKED_KEY) {
-      localStorage.removeItem('gemini_api_key');
-  }
+  // 2. Check Environment Variable (Cloud / Build time)
+  if (process.env.API_KEY) return process.env.API_KEY;
 
   return '';
 };
 
 export const setStoredApiKey = (key: string) => {
-    if (key === LEAKED_KEY) {
-        alert("This API Key has been flagged as compromised. Please use a different key.");
-        return;
-    }
     localStorage.setItem('gemini_api_key', key);
     window.location.reload(); // Reload to reset state with new key
 };
