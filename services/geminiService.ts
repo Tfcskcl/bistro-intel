@@ -127,37 +127,24 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
             break;
     }
 
-    const schema: Schema = {
-        type: Type.OBJECT,
-        properties: {
-            sku_id: { type: Type.STRING },
-            name: { type: Type.STRING },
-            category: { type: Type.STRING },
-            prep_time_min: { type: Type.NUMBER },
-            current_price: { type: Type.NUMBER },
-            ingredients: {
-                type: Type.ARRAY,
-                items: {
-                    type: Type.OBJECT,
-                    properties: {
-                        name: { type: Type.STRING },
-                        qty: { type: Type.STRING },
-                        qty_per_serving: { type: Type.NUMBER },
-                        cost_per_unit: { type: Type.NUMBER },
-                        unit: { type: Type.STRING },
-                        cost_per_serving: { type: Type.NUMBER }
-                    }
-                }
-            },
-            yield: { type: Type.NUMBER },
-            preparation_steps: { type: Type.ARRAY, items: { type: Type.STRING } },
-            food_cost_per_serving: { type: Type.NUMBER },
-            suggested_selling_price: { type: Type.NUMBER },
-            tags: { type: Type.ARRAY, items: { type: Type.STRING } },
-            human_summary: { type: Type.STRING },
-            reasoning: { type: Type.STRING },
-            confidence: { type: Type.STRING }
-        }
+    // Template to guide the model (More robust than strict Schema for complex creative tasks)
+    const jsonTemplate = {
+        sku_id: "string",
+        name: "string",
+        category: "main",
+        prep_time_min: 0,
+        current_price: 0,
+        ingredients: [
+            { name: "string", qty: "string", qty_per_serving: 0, cost_per_unit: 0, unit: "string", cost_per_serving: 0 }
+        ],
+        yield: 0,
+        preparation_steps: ["string"],
+        food_cost_per_serving: 0,
+        suggested_selling_price: 0,
+        tags: ["string"],
+        human_summary: "string",
+        reasoning: "string",
+        confidence: "High"
     };
 
     const prompt = `
@@ -170,6 +157,9 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
     - Estimate ingredient prices (cost_per_unit) reflective of local wholesale market rates in ${location}.
     - Use local currency (e.g. INR for India) for all costs.` : 'Estimate costs based on average wholesale rates.'}
     
+    Output STRICT JSON matching this structure:
+    ${JSON.stringify(jsonTemplate)}
+    
     ${SYSTEM_INSTRUCTION}`;
 
     const response = await ai.models.generateContent({
@@ -177,8 +167,7 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
         contents: prompt,
         config: {
             responseMimeType: 'application/json',
-            responseSchema: schema,
-            systemInstruction: SYSTEM_INSTRUCTION // Base instruction + specific prompt override
+            // Removed strict responseSchema to prevent validation errors on creative outputs
         }
     });
 
@@ -192,7 +181,8 @@ export const generateRecipeVariation = async (userId: string, original: RecipeCa
 
     const prompt = `Create a "${variationType}" variation of the following recipe: ${JSON.stringify(original)}.
     Maintain the same JSON structure. Adjust ingredients, steps, and costs accordingly.
-    ${location ? `Ensure revised costs reflect local market rates in ${location}.` : ''}`;
+    ${location ? `Ensure revised costs reflect local market rates in ${location}.` : ''}
+    Output STRICT JSON.`;
 
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
@@ -243,39 +233,27 @@ export const generateSOP = async (topic: string): Promise<SOP> => {
     if (!apiKey) throw new Error("API Key Required");
     const ai = new GoogleGenAI({ apiKey });
 
-    const schema: Schema = {
-        type: Type.OBJECT,
-        properties: {
-            sop_id: { type: Type.STRING },
-            title: { type: Type.STRING },
-            scope: { type: Type.STRING },
-            prerequisites: { type: Type.STRING },
-            materials_equipment: { type: Type.ARRAY, items: { type: Type.STRING } },
-            stepwise_procedure: { 
-                type: Type.ARRAY,
-                items: {
-                    type: Type.OBJECT,
-                    properties: {
-                        step_no: { type: Type.NUMBER },
-                        action: { type: Type.STRING },
-                        responsible_role: { type: Type.STRING },
-                        time_limit: { type: Type.STRING }
-                    }
-                }
-            },
-            critical_control_points: { type: Type.ARRAY, items: { type: Type.STRING } },
-            monitoring_checklist: { type: Type.ARRAY, items: { type: Type.STRING } },
-            kpis: { type: Type.ARRAY, items: { type: Type.STRING } },
-            quick_troubleshooting: { type: Type.STRING }
-        }
+    const jsonTemplate = {
+        sop_id: "string",
+        title: "string",
+        scope: "string",
+        prerequisites: "string",
+        materials_equipment: ["string"],
+        stepwise_procedure: [
+            { step_no: 1, action: "string", responsible_role: "string", time_limit: "string" }
+        ],
+        critical_control_points: ["string"],
+        monitoring_checklist: ["string"],
+        kpis: ["string"],
+        quick_troubleshooting: "string"
     };
 
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: `Create a Standard Operating Procedure (SOP) for: ${topic}.`,
+        contents: `Create a Standard Operating Procedure (SOP) for: ${topic}. 
+        Output STRICT JSON matching this structure: ${JSON.stringify(jsonTemplate)}`,
         config: {
             responseMimeType: 'application/json',
-            responseSchema: schema,
             systemInstruction: SYSTEM_INSTRUCTION
         }
     });
@@ -288,55 +266,26 @@ export const generateStrategy = async (role: string, query: string): Promise<Str
     if (!apiKey) throw new Error("API Key Required");
     const ai = new GoogleGenAI({ apiKey });
 
-    const schema: Schema = {
-        type: Type.OBJECT,
-        properties: {
-            summary: { type: Type.ARRAY, items: { type: Type.STRING } },
-            causes: { type: Type.ARRAY, items: { type: Type.STRING } },
-            action_plan: {
-                type: Type.ARRAY,
-                items: {
-                    type: Type.OBJECT,
-                    properties: {
-                        initiative: { type: Type.STRING },
-                        impact_estimate: { type: Type.STRING },
-                        cost_estimate: { type: Type.STRING },
-                        priority: { type: Type.STRING } // High/Medium/Low
-                    }
-                }
-            },
-            seasonal_menu_suggestions: {
-                type: Type.ARRAY,
-                items: {
-                    type: Type.OBJECT,
-                    properties: {
-                        type: { type: Type.STRING }, // add/remove
-                        item: { type: Type.STRING },
-                        reason: { type: Type.STRING }
-                    }
-                }
-            },
-            roadmap: {
-                type: Type.ARRAY,
-                items: {
-                    type: Type.OBJECT,
-                    properties: {
-                        phase_name: { type: Type.STRING },
-                        duration: { type: Type.STRING },
-                        steps: { type: Type.ARRAY, items: { type: Type.STRING } },
-                        milestone: { type: Type.STRING }
-                    }
-                }
-            }
-        }
+    const jsonTemplate = {
+        summary: ["string"],
+        causes: ["string"],
+        action_plan: [
+            { initiative: "string", impact_estimate: "string", cost_estimate: "string", priority: "High" }
+        ],
+        seasonal_menu_suggestions: [
+            { type: "add", item: "string", reason: "string" }
+        ],
+        roadmap: [
+            { phase_name: "string", duration: "string", steps: ["string"], milestone: "string" }
+        ]
     };
 
     const response = await ai.models.generateContent({
         model: 'gemini-3-pro-preview',
-        contents: `Role: ${role}. Query: ${query}. Provide a strategic analysis.`,
+        contents: `Role: ${role}. Query: ${query}. Provide a strategic analysis.
+        Output STRICT JSON matching this structure: ${JSON.stringify(jsonTemplate)}`,
         config: {
             responseMimeType: 'application/json',
-            responseSchema: schema,
             systemInstruction: APP_CONTEXT
         }
     });
@@ -349,32 +298,20 @@ export const generateImplementationPlan = async (title: string): Promise<Impleme
     if (!apiKey) throw new Error("API Key Required");
     const ai = new GoogleGenAI({ apiKey });
 
-    const schema: Schema = {
-        type: Type.OBJECT,
-        properties: {
-            objective: { type: Type.STRING },
-            estimated_timeline: { type: Type.STRING },
-            phases: {
-                type: Type.ARRAY,
-                items: {
-                    type: Type.OBJECT,
-                    properties: {
-                        phase_name: { type: Type.STRING },
-                        steps: { type: Type.ARRAY, items: { type: Type.STRING } },
-                        resources_needed: { type: Type.ARRAY, items: { type: Type.STRING } },
-                        kpi_to_track: { type: Type.STRING }
-                    }
-                }
-            }
-        }
+    const jsonTemplate = {
+        objective: "string",
+        estimated_timeline: "string",
+        phases: [
+            { phase_name: "string", steps: ["string"], resources_needed: ["string"], kpi_to_track: "string" }
+        ]
     };
 
     const response = await ai.models.generateContent({
         model: 'gemini-3-pro-preview',
-        contents: `Create a detailed implementation guide for: ${title}`,
+        contents: `Create a detailed implementation guide for: ${title}.
+        Output STRICT JSON matching this structure: ${JSON.stringify(jsonTemplate)}`,
         config: {
             responseMimeType: 'application/json',
-            responseSchema: schema,
             systemInstruction: "You are an operations manager. Provide clear, step-by-step instructions."
         }
     });
