@@ -104,6 +104,24 @@ export interface KitchenWorkflowRequest {
     completedDate?: string;
 }
 
+export interface MenuStructure {
+    title: string;
+    tagline?: string;
+    currency: string;
+    sections: {
+        title: string;
+        description?: string;
+        items: {
+            name: string;
+            description: string;
+            price: string;
+            tags: string[]; // e.g., 'Spicy', 'Vegan'
+            pairing?: string;
+        }[];
+    }[];
+    footer_note?: string;
+}
+
 export interface MenuGenerationRequest {
     id: string;
     userId: string;
@@ -114,9 +132,12 @@ export interface MenuGenerationRequest {
     budgetRange: string;
     mustIncludeItems: string;
     dietaryRestrictions: string[];
+    season?: string; // New
+    pricingStrategy?: string; // New
+    themeStyle?: string; // New
     numberOfItems?: number;
     requestDate: string;
-    generatedMenu?: string;
+    generatedMenu?: string; // JSON string of MenuStructure
 }
 
 export interface RoadmapPhase {

@@ -1,7 +1,7 @@
 
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { SYSTEM_INSTRUCTION, MARKDOWN_INSTRUCTION, APP_CONTEXT } from "../constants";
-import { RecipeCard, SOP, StrategyReport, ImplementationGuide, MenuItem, MenuGenerationRequest, User, PurchaseOrder, InventoryItem } from "../types";
+import { RecipeCard, SOP, StrategyReport, ImplementationGuide, MenuItem, MenuGenerationRequest, User, PurchaseOrder, InventoryItem, MenuStructure } from "../types";
 
 // Development Key for Live Preview 
 // SECURITY NOTE: We have removed the hardcoded key to prevent exposure.
@@ -720,17 +720,79 @@ export const generateKitchenWorkflow = async (description: string): Promise<stri
 
 export const generateMenu = async (request: MenuGenerationRequest): Promise<string> => {
     const ai = createAIClient();
-    if (!ai) return `# ${request.restaurantName} Menu\n\n## Starters\n- **House Special**: Chef's choice.\n\n## Mains\n- **Signature Dish**: A classic favorite.`;
+    const fallbackJSON: MenuStructure = {
+        title: request.restaurantName,
+        currency: "₹",
+        sections: [
+            {
+                title: "Starters",
+                items: [{ name: "Crispy Calamari", description: "Golden fried with garlic aioli.", price: "350", tags: ["Crispy"] }]
+            },
+            {
+                title: "Mains",
+                items: [{ name: "Truffle Pasta", description: "House-made pasta with black truffle cream.", price: "550", tags: ["Vegetarian"] }]
+            }
+        ]
+    };
+
+    if (!ai) return JSON.stringify(fallbackJSON);
+
+    const prompt = `
+    Task: Design a professional menu structure for "${request.restaurantName}".
+    
+    Context:
+    - Cuisine: ${request.cuisineType}
+    - Target Audience: ${request.targetAudience}
+    - Budget Range: ${request.budgetRange}
+    - Must Include: ${request.mustIncludeItems}
+    - Dietary Restrictions: ${request.dietaryRestrictions.join(', ')}
+    - Season: ${request.season || 'General'}
+    - Pricing Strategy: ${request.pricingStrategy || 'Standard'} (Adjust prices accordingly)
+    
+    Requirements:
+    1. Organize into logical sections (Starters, Mains, Desserts, etc.).
+    2. Suggest creative dish names and mouth-watering descriptions.
+    3. Assign prices based on the budget range and strategy.
+    4. Include a 'tagline' that fits the brand voice.
+    5. Add 'pairing' suggestions for main courses where appropriate.
+    
+    Output strictly as JSON matching this structure:
+    {
+        "title": "string",
+        "tagline": "string",
+        "currency": "symbol",
+        "sections": [
+            {
+                "title": "Section Name",
+                "description": "Optional section blurb",
+                "items": [
+                    {
+                        "name": "Dish Name",
+                        "description": "Appetizing description",
+                        "price": "number",
+                        "tags": ["Spicy", "Vegan", "Bestseller"],
+                        "pairing": "Drink suggestion"
+                    }
+                ]
+            }
+        ],
+        "footer_note": "string"
+    }
+    `;
 
     try {
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: `Generate menu for ${request.restaurantName}. Style: ${request.cuisineType}. Target: ${request.targetAudience}. Budget: ${request.budgetRange}.`,
-            config: { systemInstruction: MARKDOWN_INSTRUCTION }
+            model: 'gemini-3-pro-preview', // Use pro model for better creative writing
+            contents: prompt,
+            config: { 
+                responseMimeType: 'application/json',
+                maxOutputTokens: 8192
+            }
         });
-        return response.text || "";
+        return response.text || JSON.stringify(fallbackJSON);
     } catch (e) {
-        return "# Menu Generation Failed\n\nPlease try again later.";
+        console.error(e);
+        return JSON.stringify(fallbackJSON);
     }
 };
 
