@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { User, KitchenWorkflowRequest, UserRole } from '../types';
 import { storageService } from '../services/storageService';
@@ -30,11 +29,10 @@ export const KitchenWorkflow: React.FC<KitchenWorkflowProps> = ({ user, onUserUp
     const [adminDraft, setAdminDraft] = useState('');
     const [isGenerating, setIsGenerating] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [hasApiKey, setHasApiKey] = useState(false);
+    const [hasApiKey, setHasApiKey] = useState(() => hasValidApiKey());
 
     useEffect(() => {
         refreshData();
-        if (hasValidApiKey()) setHasApiKey(true);
     }, [user.id, isAdmin]);
 
     // Poll for API Key Status
@@ -403,7 +401,7 @@ export const KitchenWorkflow: React.FC<KitchenWorkflowProps> = ({ user, onUserUp
                                     <div className="flex items-center gap-2">
                                         <AlertTriangle size={16} /> {error}
                                     </div>
-                                    {(error.includes('API Key') || error.includes('configure') || error.includes('unauthenticated')) && (
+                                    {(error.includes('API Key') || error.includes('configure') || error.includes('unauthenticated')) && !hasApiKey && (
                                         <button 
                                             onClick={handleConnectKey}
                                             className="px-3 py-1 bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-200 text-xs font-bold rounded hover:bg-red-200 dark:hover:bg-red-700 transition-colors"

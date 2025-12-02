@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { User, MenuGenerationRequest, UserRole } from '../types';
 import { storageService } from '../services/storageService';
@@ -30,15 +29,29 @@ export const MenuGenerator: React.FC<MenuGeneratorProps> = ({ user, onUserUpdate
     const [generatedResult, setGeneratedResult] = useState<MenuGenerationRequest | null>(null);
     const [history, setHistory] = useState<MenuGenerationRequest[]>([]);
     const [selectedRequest, setSelectedRequest] = useState<MenuGenerationRequest | null>(null);
-    const [hasApiKey, setHasApiKey] = useState(true);
+    const [hasApiKey, setHasApiKey] = useState(() => (window as any).hasValidApiKey ? (window as any).hasValidApiKey() : true); // Fallback to true if helper missing
 
     useEffect(() => {
         refreshHistory();
+        // Check actual helper
+        import('../services/geminiService').then(module => {
+            if (module.hasValidApiKey()) {
+                setHasApiKey(true);
+            }
+        });
     }, [user.id, isAdmin]);
 
     // Poll for API Key Status
     useEffect(() => {
         const checkKey = async () => {
+            // Check local fallback
+            import('../services/geminiService').then(module => {
+                if (module.hasValidApiKey()) {
+                    setHasApiKey(true);
+                    if (error && error.includes('API Key')) setError(null);
+                }
+            });
+
             if ((window as any).aistudio) {
                 try {
                     const has = await (window as any).aistudio.hasSelectedApiKey();
@@ -290,7 +303,7 @@ export const MenuGenerator: React.FC<MenuGeneratorProps> = ({ user, onUserUpdate
                                     <div className="flex items-center gap-2">
                                         <AlertCircle size={14} /> {error}
                                     </div>
-                                    {(error.includes('API Key') || error.includes('configure') || error.includes('unauthenticated')) && (
+                                    {(error.includes('API Key') || error.includes('configure') || error.includes('unauthenticated')) && !hasApiKey && (
                                         <button 
                                             type="button"
                                             onClick={handleConnectKey}

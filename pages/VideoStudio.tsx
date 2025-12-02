@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { User, UserRole, MarketingRequest } from '../types';
 import { generateMarketingVideo, generateMarketingImage, hasValidApiKey } from '../services/geminiService';
@@ -23,7 +22,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [hasVeoKey, setHasVeoKey] = useState(false);
+  const [hasVeoKey, setHasVeoKey] = useState(() => hasValidApiKey());
 
   // Gallery
   const [gallery, setGallery] = useState<MarketingRequest[]>([]);
@@ -42,9 +41,6 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
     if (isAdmin) {
       setRequests(allRequests.filter(r => r.status === 'pending'));
     }
-    
-    // Check initial key status
-    if (hasValidApiKey()) setHasVeoKey(true);
   }, [user.id, isAdmin, viewMode]);
 
   // Check for Veo API Key status

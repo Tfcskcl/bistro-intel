@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { generateStrategy, generateImplementationPlan, hasValidApiKey } from '../services/geminiService';
 import { StrategyReport, UserRole, User, PlanType, ImplementationGuide } from '../types';
@@ -56,7 +55,7 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
   const [report, setReport] = useState<StrategyReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [hasApiKey, setHasApiKey] = useState(false);
+  const [hasApiKey, setHasApiKey] = useState(() => hasValidApiKey());
   
   // Track status of individual action items
   const [actionStates, setActionStates] = useState<ActionState>({});
@@ -102,7 +101,6 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
         setQuery('');
         setError(null);
     }
-    if (hasValidApiKey()) setHasApiKey(true);
   }, [role, user.role]);
 
   // Poll for API Key Status
@@ -519,7 +517,7 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                     <p className="font-medium text-sm">{error}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                    {(error.includes('API Key') || error.includes('configure') || error.includes('unauthenticated')) && (
+                    {(error.includes('API Key') || error.includes('configure') || error.includes('unauthenticated')) && !hasApiKey && (
                         <button 
                             onClick={handleConnectKey}
                             className="px-3 py-1 bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-200 text-xs font-bold rounded hover:bg-red-200 dark:hover:bg-red-700 transition-colors"

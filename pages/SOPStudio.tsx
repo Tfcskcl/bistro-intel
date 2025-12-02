@@ -19,7 +19,7 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedSOP, setGeneratedSOP] = useState<SOP | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [hasApiKey, setHasApiKey] = useState(false);
+  const [hasApiKey, setHasApiKey] = useState(() => hasValidApiKey());
 
   // Saved SOPs
   const [savedSOPs, setSavedSOPs] = useState<SOP[]>([]);
@@ -37,7 +37,6 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
     if (isAdmin) {
       loadRequests();
     }
-    if (hasValidApiKey()) setHasApiKey(true);
   }, [user.id, isAdmin]);
 
   // Poll for API Key Status
@@ -270,7 +269,7 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
                             <AlertCircle size={16} /> {error}
                         </div>
                         <div className="flex items-center gap-2">
-                            {(error.includes('API Key') || error.includes('configure') || error.includes('unauthenticated')) && (
+                            {(error.includes('API Key') || error.includes('configure') || error.includes('unauthenticated')) && !hasApiKey && (
                                 <button 
                                     onClick={handleConnectKey}
                                     className="px-3 py-1 bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-200 text-xs font-bold rounded hover:bg-red-200 dark:hover:bg-red-700 transition-colors"
