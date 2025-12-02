@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { PLANS, CREDIT_COSTS } from '../constants';
-import { generateRecipeCard, generateRecipeVariation } from '../services/geminiService';
+import { generateRecipeCard, generateRecipeVariation, hasValidApiKey } from '../services/geminiService';
 import { ingredientService } from '../services/ingredientService';
 import { RecipeCard, MenuItem, User, UserRole, POSChangeRequest, RecipeRequest } from '../types';
 import { Loader2, ChefHat, Scale, Clock, AlertCircle, Upload, Lock, Sparkles, Check, Save, RefreshCw, Search, Plus, Store, Zap, Trash2, Building2, FileSignature, X, AlignLeft, UtensilsCrossed, Inbox, UserCheck, CheckCircle2, Clock3, Carrot, Type, Wallet, Filter, Tag, Eye, Flame, Wand2, Eraser, FileDown, TrendingDown, ArrowRight, Key } from 'lucide-react';
@@ -38,7 +38,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
   const [importStatus, setImportStatus] = useState<string | null>(null);
   
   // API Key State
-  const [hasApiKey, setHasApiKey] = useState(true);
+  const [hasApiKey, setHasApiKey] = useState(false);
 
   // Supplier Costing State
   const [altPrices, setAltPrices] = useState<Record<number, string>>({});
@@ -85,11 +85,23 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
     setSavedRecipes(storageService.getSavedRecipes(user.id));
     setMenuItems(storageService.getMenu(user.id));
     refreshRequests();
+    // Initial check
+    if (hasValidApiKey()) setHasApiKey(true);
   }, [user.id, user.role]);
 
   // Poll for API Key Status
   useEffect(() => {
     const checkKey = async () => {
+        // 1. Check local manual key
+        if (hasValidApiKey()) {
+            setHasApiKey(true);
+            if (error && (error.includes('API Key') || error.includes('missing'))) {
+                setError(null);
+            }
+            return;
+        }
+
+        // 2. Check AI Studio Bridge
         if ((window as any).aistudio) {
             try {
                 const has = await (window as any).aistudio.hasSelectedApiKey();
@@ -519,13 +531,19 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
           try {
               await (window as any).aistudio.openSelectKey();
               setError(null);
-              // Optimistically update
               setHasApiKey(true);
           } catch (e) {
               console.error(e);
           }
       } else {
-          alert("API Key configuration is only available in the AI Studio environment.");
+          // Manual Fallback for Live Site
+          const key = window.prompt("Enter your Google Gemini API Key (from https://aistudio.google.com):");
+          if (key && key.trim()) {
+              localStorage.setItem('gemini_api_key', key.trim());
+              setHasApiKey(true);
+              setError(null);
+              alert("API Key saved locally!");
+          }
       }
   };
 
@@ -693,6 +711,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
 
       {/* Top Bar */}
       <div className="flex justify-between items-center">
+        {/* ... (Same as original) */}
         <div className="flex gap-2">
             <button 
                 onClick={() => handleTabChange('generator')}
@@ -732,6 +751,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       </div>
 
       {viewMode === 'requests' && (
+          // ... (Same as original)
           <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm p-6 overflow-y-auto flex-1 animate-fade-in transition-colors">
               <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-4">{isAdmin ? 'Customer Request Queue' : 'My Recipe Requests'}</h2>
               
@@ -787,6 +807,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       )}
 
       {viewMode === 'saved' && (
+          // ... (Same as original)
           <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col flex-1 animate-fade-in transition-colors">
               <div className="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 flex flex-col sm:flex-row justify-between items-center gap-4">
                   <h2 className="text-xl font-bold text-slate-800 dark:text-white">Your Saved Recipes</h2>
@@ -927,6 +948,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       <div className="flex gap-6 h-full overflow-hidden">
         {/* List */}
         <div className="w-1/3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col overflow-hidden animate-fade-in transition-colors">
+            {/* ... List Content (Search, Chips etc) ... */}
             <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex flex-col gap-3">
                 <div className="flex justify-between items-center">
                     <h3 className="font-bold text-slate-700 dark:text-white">Menu Items</h3>
@@ -1027,6 +1049,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
         {/* Detail / Generator View */}
         <div className="flex-1 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col animate-fade-in transition-colors">
             {generatedRecipe ? (
+                 // ... (Generated Recipe View - Same as original)
                  <div className="flex flex-col h-full animate-fade-in">
                         {/* Header */}
                         <div className="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex justify-between items-start">
@@ -1079,6 +1102,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
 
                             {/* Costing Section */}
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                {/* ... Costing cards ... */}
                                 <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 rounded-xl shadow-sm">
                                     <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1">Original Food Cost</p>
                                     <p className="text-2xl font-bold text-slate-800 dark:text-white">₹{generatedRecipe.food_cost_per_serving?.toFixed(2)}</p>

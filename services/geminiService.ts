@@ -5,10 +5,21 @@ import { RecipeCard, SOP, StrategyReport, ImplementationGuide, MenuItem, MenuGen
 import { ingredientService } from "./ingredientService";
 
 const getApiKey = (): string => {
+  // 1. Check Environment Variable (Build time / AI Studio injection)
   if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
     return process.env.API_KEY;
   }
+  // 2. Check Local Storage (Manual entry on live sites)
+  if (typeof localStorage !== 'undefined') {
+      const localKey = localStorage.getItem('gemini_api_key');
+      if (localKey) return localKey;
+  }
   return '';
+};
+
+// Helper for UI components to check status
+export const hasValidApiKey = (): boolean => {
+    return !!getApiKey();
 };
 
 // Helper to clean AI output before parsing

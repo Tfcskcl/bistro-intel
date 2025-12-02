@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { User, SOP, SOPRequest, UserRole } from '../types';
-import { generateSOP } from '../services/geminiService';
+import { generateSOP, hasValidApiKey } from '../services/geminiService';
 import { storageService } from '../services/storageService';
 import { CREDIT_COSTS } from '../constants';
 import { FileText, Loader2, Sparkles, Save, Search, AlertCircle, CheckCircle2, Clock, Wallet, BookOpen, Printer, Share2, User as UserIcon, X, Copy, Mail, Key } from 'lucide-react';
@@ -20,7 +20,7 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedSOP, setGeneratedSOP] = useState<SOP | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [hasApiKey, setHasApiKey] = useState(true);
+  const [hasApiKey, setHasApiKey] = useState(false);
 
   // Saved SOPs
   const [savedSOPs, setSavedSOPs] = useState<SOP[]>([]);
@@ -38,11 +38,18 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
     if (isAdmin) {
       loadRequests();
     }
+    if (hasValidApiKey()) setHasApiKey(true);
   }, [user.id, isAdmin]);
 
   // Poll for API Key Status
   useEffect(() => {
     const checkKey = async () => {
+        if (hasValidApiKey()) {
+            setHasApiKey(true);
+            if (error && (error.includes('API Key') || error.includes('missing'))) setError(null);
+            return;
+        }
+
         if ((window as any).aistudio) {
             try {
                 const has = await (window as any).aistudio.hasSelectedApiKey();
@@ -110,6 +117,15 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
               setError(null);
           } catch (e) {
               console.error(e);
+          }
+      } else {
+          // Fallback manual entry
+          const key = window.prompt("Enter your Google Gemini API Key (from https://aistudio.google.com):");
+          if (key && key.trim()) {
+              localStorage.setItem('gemini_api_key', key.trim());
+              setHasApiKey(true);
+              setError(null);
+              alert("API Key saved locally!");
           }
       }
   };

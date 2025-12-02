@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { User, KitchenWorkflowRequest, UserRole } from '../types';
 import { storageService } from '../services/storageService';
-import { generateKitchenWorkflow } from '../services/geminiService';
+import { generateKitchenWorkflow, hasValidApiKey } from '../services/geminiService';
 import { CREDIT_COSTS } from '../constants';
 import { GitMerge, Upload, FileVideo, Image as ImageIcon, CheckCircle2, Clock, Wallet, Loader2, PlayCircle, Eye, Edit3, Send, X, Trash2, ArrowLeft, Sparkles, AlertTriangle, Key } from 'lucide-react';
 
@@ -30,15 +30,22 @@ export const KitchenWorkflow: React.FC<KitchenWorkflowProps> = ({ user, onUserUp
     const [adminDraft, setAdminDraft] = useState('');
     const [isGenerating, setIsGenerating] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [hasApiKey, setHasApiKey] = useState(true);
+    const [hasApiKey, setHasApiKey] = useState(false);
 
     useEffect(() => {
         refreshData();
+        if (hasValidApiKey()) setHasApiKey(true);
     }, [user.id, isAdmin]);
 
     // Poll for API Key Status
     useEffect(() => {
         const checkKey = async () => {
+            if (hasValidApiKey()) {
+                setHasApiKey(true);
+                if (error && error.includes('API Key')) setError(null);
+                return;
+            }
+
             if ((window as any).aistudio) {
                 try {
                     const has = await (window as any).aistudio.hasSelectedApiKey();
@@ -62,6 +69,14 @@ export const KitchenWorkflow: React.FC<KitchenWorkflowProps> = ({ user, onUserUp
                 setError(null);
             } catch (e) {
                 console.error(e);
+            }
+        } else {
+            const key = window.prompt("Enter your Google Gemini API Key (from https://aistudio.google.com):");
+            if (key && key.trim()) {
+                localStorage.setItem('gemini_api_key', key.trim());
+                setHasApiKey(true);
+                setError(null);
+                alert("API Key saved locally!");
             }
         }
     };
@@ -194,6 +209,7 @@ export const KitchenWorkflow: React.FC<KitchenWorkflowProps> = ({ user, onUserUp
         <div className="h-[calc(100vh-6rem)] flex flex-col gap-6">
             {/* Header */}
             <div className="flex justify-between items-center">
+                {/* ... (Same as original) */}
                 <div className="flex gap-2">
                     <button 
                         onClick={() => setView('list')}
@@ -218,6 +234,7 @@ export const KitchenWorkflow: React.FC<KitchenWorkflowProps> = ({ user, onUserUp
 
             {/* List View */}
             {view === 'list' && (
+                // ... (Same as original)
                 <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm p-6 overflow-y-auto flex-1 transition-colors">
                     <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-4">{isAdmin ? 'Incoming Workflow Requests' : 'Your Kitchen Optimizations'}</h2>
                     {requests.length === 0 ? (
@@ -256,6 +273,7 @@ export const KitchenWorkflow: React.FC<KitchenWorkflowProps> = ({ user, onUserUp
 
             {/* Create View (Customer) */}
             {view === 'create' && (
+                // ... (Same as original)
                 <div className="max-w-2xl mx-auto w-full bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm p-8 overflow-y-auto transition-colors">
                     <h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-2">Request Kitchen Workflow</h2>
                     <p className="text-slate-500 dark:text-slate-400 mb-6">Upload videos or images of your kitchen layout. Our experts (and AI) will design an optimized workflow for you. Cost: {CREDIT_COSTS.WORKFLOW} CR.</p>

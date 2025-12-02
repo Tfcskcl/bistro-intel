@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { User, UserRole, MarketingRequest } from '../types';
-import { generateMarketingVideo, generateMarketingImage } from '../services/geminiService';
+import { generateMarketingVideo, generateMarketingImage, hasValidApiKey } from '../services/geminiService';
 import { storageService } from '../services/storageService';
 import { CREDIT_COSTS } from '../constants';
 import { Clapperboard, Image as ImageIcon, Loader2, PlayCircle, Download, RefreshCw, Upload, CheckCircle2, Clock, Wallet, Sparkles, Key } from 'lucide-react';
@@ -42,6 +42,9 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
     if (isAdmin) {
       setRequests(allRequests.filter(r => r.status === 'pending'));
     }
+    
+    // Check initial key status
+    if (hasValidApiKey()) setHasVeoKey(true);
   }, [user.id, isAdmin, viewMode]);
 
   // Check for Veo API Key status
@@ -49,6 +52,12 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
     let interval: any;
     
     const checkVeoKey = async () => {
+        if (hasValidApiKey()) {
+            setHasVeoKey(true);
+            if (error && error.includes('API key')) setError(null);
+            return;
+        }
+
         if (mediaType === 'video' && (window as any).aistudio) {
             try {
                 const has = await (window as any).aistudio.hasSelectedApiKey();
@@ -84,7 +93,14 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
             // Revert if explicitly failed, but usually openSelectKey doesn't throw on close
           }
       } else {
-          alert("AI Studio environment not detected. Please ensure you are running in the correct environment.");
+          // Manual Fallback
+          const key = window.prompt("Enter your Google Cloud API Key (from https://aistudio.google.com):");
+          if (key && key.trim()) {
+              localStorage.setItem('gemini_api_key', key.trim());
+              setHasVeoKey(true);
+              setError(null);
+              alert("API Key saved locally!");
+          }
       }
   };
 
@@ -303,7 +319,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
                           onClick={handleSelectVeoKey}
                           className="w-full py-2 bg-slate-800 dark:bg-slate-700 text-white text-xs font-bold rounded-lg hover:bg-slate-700 dark:hover:bg-slate-600 transition-colors flex items-center justify-center gap-2"
                         >
-                          Select API Key
+                          Select / Enter API Key
                         </button>
                      </div>
                  ) : (

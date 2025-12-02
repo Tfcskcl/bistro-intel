@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { generateStrategy, generateImplementationPlan } from '../services/geminiService';
+import { generateStrategy, generateImplementationPlan, hasValidApiKey } from '../services/geminiService';
 import { StrategyReport, UserRole, User, PlanType, ImplementationGuide } from '../types';
 import { Send, Loader2, User as UserIcon, Briefcase, TrendingUp, Lock, HelpCircle, ArrowRight, Play, LifeBuoy, CheckCircle2, Clock, X, BookOpen, UserCheck, Calendar, Zap, ChevronDown, Trash2, Sparkles, Activity, Target, AlertTriangle, ArrowUpRight, ArrowDownRight, Lightbulb, Map, BarChart2, PieChart as PieChartIcon, ScatterChart as ScatterChartIcon, Info, Wallet, Key } from 'lucide-react';
 import { 
@@ -56,7 +56,7 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
   const [report, setReport] = useState<StrategyReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [hasApiKey, setHasApiKey] = useState(true);
+  const [hasApiKey, setHasApiKey] = useState(false);
   
   // Track status of individual action items
   const [actionStates, setActionStates] = useState<ActionState>({});
@@ -102,11 +102,18 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
         setQuery('');
         setError(null);
     }
+    if (hasValidApiKey()) setHasApiKey(true);
   }, [role, user.role]);
 
   // Poll for API Key Status
   useEffect(() => {
     const checkKey = async () => {
+        if (hasValidApiKey()) {
+            setHasApiKey(true);
+            if (error && error.includes('API Key')) setError(null);
+            return;
+        }
+
         if ((window as any).aistudio) {
             try {
                 const has = await (window as any).aistudio.hasSelectedApiKey();
@@ -130,6 +137,14 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
               setError(null);
           } catch (e) {
               console.error(e);
+          }
+      } else {
+          const key = window.prompt("Enter your Google Gemini API Key (from https://aistudio.google.com):");
+          if (key && key.trim()) {
+              localStorage.setItem('gemini_api_key', key.trim());
+              setHasApiKey(true);
+              setError(null);
+              alert("API Key saved locally!");
           }
       }
   };
@@ -530,6 +545,7 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
             </div>
         )}
 
+        {/* ... (Rest of Strategy Component - Render logic unchanged) ... */}
         {!report && !loading && (
           <div className="h-full flex flex-col items-center justify-center p-4">
             <div className="text-slate-400 dark:text-slate-500 opacity-60 mb-8 flex flex-col items-center animate-fade-in-up">
@@ -581,8 +597,7 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
 
         {report && (
           <div className="max-w-6xl mx-auto space-y-8 animate-fade-in pb-20">
-            {/* ... Report Rendering (Unchanged) ... */}
-            
+            {/* ... (Report visualization - unchanged) ... */}
             {/* Header */}
             <div className="flex items-center gap-3 mb-2">
                 <div className="p-2 bg-emerald-600 text-white rounded-lg shadow-lg shadow-emerald-500/30">
@@ -812,6 +827,7 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                 </div>
             )}
 
+            {/* Action Plan & Seasonal Menu ... (Same as original) */}
             {/* Action Plan */}
             <div>
               <div className="flex items-center justify-between mb-6">
