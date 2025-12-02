@@ -603,7 +603,7 @@ export const generateMarketingVideo = async (images: string[], prompt: string, a
         const validRatio = aspectRatio === '9:16' ? '9:16' : '16:9';
         const key = getApiKey();
 
-        let operation = await ai.models.generateVideos({
+        const generateRequest: any = {
             model: 'veo-3.1-fast-generate-preview',
             prompt: prompt,
             config: {
@@ -611,7 +611,20 @@ export const generateMarketingVideo = async (images: string[], prompt: string, a
                 aspectRatio: validRatio,
                 resolution: '720p'
             }
-        });
+        };
+
+        // Support Image-to-Video if an image is provided
+        if (images.length > 0 && images[0].startsWith('data:')) {
+            const match = images[0].match(/^data:(.+);base64,(.+)$/);
+            if (match) {
+                generateRequest.image = {
+                    mimeType: match[1],
+                    imageBytes: match[2]
+                };
+            }
+        }
+
+        let operation = await ai.models.generateVideos(generateRequest);
 
         // Poll for completion
         let retries = 0;

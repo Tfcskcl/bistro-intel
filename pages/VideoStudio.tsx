@@ -1,10 +1,10 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { User, UserRole, MarketingRequest } from '../types';
 import { generateMarketingVideo, generateMarketingImage, hasValidApiKey } from '../services/geminiService';
 import { storageService } from '../services/storageService';
 import { CREDIT_COSTS } from '../constants';
-import { Clapperboard, Image as ImageIcon, Loader2, PlayCircle, Download, RefreshCw, Upload, CheckCircle2, Clock, Wallet, Sparkles, Key, AlertCircle, History, Maximize2 } from 'lucide-react';
+import { Clapperboard, Image as ImageIcon, Loader2, PlayCircle, Download, RefreshCw, Upload, CheckCircle2, Clock, Wallet, Sparkles, Key, AlertCircle, History, Maximize2, X } from 'lucide-react';
 
 interface VideoStudioProps {
   user: User;
@@ -17,6 +17,10 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
   const [prompt, setPrompt] = useState('');
   const [mediaType, setMediaType] = useState<'video' | 'image'>('video');
   const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16' | '1:1'>('16:9');
+  
+  // Image-to-Video State
+  const [referenceImage, setReferenceImage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Execution State
   const [isGenerating, setIsGenerating] = useState(false);
@@ -36,8 +40,18 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
       setHistory(all.filter(r => r.userId === user.id).sort((a,b) => new Date(b.requestDate).getTime() - new Date(a.requestDate).getTime()));
   };
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files && e.target.files[0]) {
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+              if (ev.target?.result) setReferenceImage(ev.target.result as string);
+          };
+          reader.readAsDataURL(e.target.files[0]);
+      }
+  };
+
   const handleGenerate = async () => {
-      if (!prompt) return;
+      if (!prompt && !referenceImage) return;
       
       // Note: We no longer block if no key is found. 
       // The service will handle missing keys by returning a demo/mock response.
@@ -63,7 +77,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
           // 2. Call AI Service
           let url = '';
           if (mediaType === 'video') {
-              url = await generateMarketingVideo([], prompt, aspectRatio);
+              url = await generateMarketingVideo(referenceImage ? [referenceImage] : [], prompt, aspectRatio);
           } else {
               url = await generateMarketingImage(prompt, aspectRatio);
           }
@@ -143,7 +157,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
                       {/* Media Type */}
                       <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
                           <button 
-                              onClick={() => setMediaType('video')}
+                              onClick={() => { setMediaType('video'); if (aspectRatio === '1:1') setAspectRatio('16:9'); }}
                               className={`flex-1 py-2 text-sm font-bold rounded-md transition-all flex items-center justify-center gap-2 ${mediaType === 'video' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
                           >
                               <Clapperboard size={16} /> Video
@@ -160,21 +174,53 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
                       <div>
                           <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Aspect Ratio</label>
                           <div className="grid grid-cols-3 gap-2">
-                              {['16:9', '9:16', '1:1'].map((ratio) => (
-                                  <button
-                                      key={ratio}
-                                      onClick={() => setAspectRatio(ratio as any)}
-                                      className={`py-2 px-3 rounded-lg border text-xs font-bold transition-all ${
-                                          aspectRatio === ratio 
-                                          ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' 
-                                          : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 text-slate-600 dark:text-slate-300'
-                                      }`}
-                                  >
-                                      {ratio}
-                                  </button>
-                              ))}
+                              {['16:9', '9:16', '1:1'].map((ratio) => {
+                                  if (mediaType === 'video' && ratio === '1:1') return null; // Veo doesn't support 1:1
+                                  return (
+                                      <button
+                                          key={ratio}
+                                          onClick={() => setAspectRatio(ratio as any)}
+                                          className={`py-2 px-3 rounded-lg border text-xs font-bold transition-all ${
+                                              aspectRatio === ratio 
+                                              ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' 
+                                              : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 text-slate-600 dark:text-slate-300'
+                                          }`}
+                                      >
+                                          {ratio}
+                                      </button>
+                                  );
+                              })}
                           </div>
                       </div>
+
+                      {/* Reference Image (Video Only) */}
+                      {mediaType === 'video' && (
+                          <div>
+                              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Reference Image (Optional)</label>
+                              <div 
+                                onClick={() => fileInputRef.current?.click()}
+                                className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-lg p-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 text-center relative overflow-hidden transition-colors"
+                              >
+                                  {referenceImage ? (
+                                      <div className="relative h-32 w-full">
+                                          <img src={referenceImage} alt="Ref" className="h-full w-full object-contain" />
+                                          <button 
+                                            onClick={(e) => { e.stopPropagation(); setReferenceImage(null); }}
+                                            className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+                                          >
+                                              <X size={12} />
+                                          </button>
+                                      </div>
+                                  ) : (
+                                      <div className="text-slate-400 dark:text-slate-500">
+                                          <Upload size={20} className="mx-auto mb-1" />
+                                          <span className="text-xs">Click to upload starting frame</span>
+                                      </div>
+                                  )}
+                                  <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
+                              </div>
+                          </div>
+                      )}
 
                       {/* Prompt */}
                       <div>
@@ -199,7 +245,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
                       {/* Generate Button */}
                       <button 
                           onClick={handleGenerate}
-                          disabled={isGenerating || !prompt}
+                          disabled={isGenerating || (!prompt && !referenceImage)}
                           className="w-full py-3 bg-slate-900 dark:bg-emerald-600 text-white font-bold rounded-xl hover:opacity-90 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                       >
                           {isGenerating ? <Loader2 className="animate-spin" size={18} /> : <Sparkles size={18} />}

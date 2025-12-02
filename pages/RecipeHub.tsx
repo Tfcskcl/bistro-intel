@@ -52,6 +52,7 @@ const getBgImage = (cuisine: string = '', dishName: string = '') => {
     const map: Record<string, string> = {
         'italian': 'https://images.unsplash.com/photo-1498579150354-977475b7ea0b?auto=format&fit=crop&w=1200&q=60',
         'pizza': 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=1200&q=60',
+        'pasta': 'https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?auto=format&fit=crop&w=1200&q=60',
         'burger': 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=1200&q=60',
         'indian': 'https://images.unsplash.com/photo-1585937421612-70a008356f36?auto=format&fit=crop&w=1200&q=60',
         'curry': 'https://images.unsplash.com/photo-1565557623262-b51c2513a641?auto=format&fit=crop&w=1200&q=60',
@@ -63,7 +64,19 @@ const getBgImage = (cuisine: string = '', dishName: string = '') => {
         'dessert': 'https://images.unsplash.com/photo-1563729768640-d31d582845c4?auto=format&fit=crop&w=1200&q=60',
         'cake': 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&w=1200&q=60',
         'healthy': 'https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=1200&q=60',
-        'salad': 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=1200&q=60'
+        'salad': 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=1200&q=60',
+        'japanese': 'https://images.unsplash.com/photo-1580822184713-fc5400e7fe10?auto=format&fit=crop&w=1200&q=60',
+        'sushi': 'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?auto=format&fit=crop&w=1200&q=60',
+        'chinese': 'https://images.unsplash.com/photo-1525755662778-989d0524087e?auto=format&fit=crop&w=1200&q=60',
+        'noodles': 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=1200&q=60',
+        'soup': 'https://images.unsplash.com/photo-1547592166-23ac45744acd?auto=format&fit=crop&w=1200&q=60',
+        'sandwich': 'https://images.unsplash.com/photo-1528735602780-2552fd46c7af?auto=format&fit=crop&w=1200&q=60',
+        'breakfast': 'https://images.unsplash.com/photo-1533089862017-90f545430939?auto=format&fit=crop&w=1200&q=60',
+        'coffee': 'https://images.unsplash.com/photo-1497935586351-b67a49e012bf?auto=format&fit=crop&w=1200&q=60',
+        'chocolate': 'https://images.unsplash.com/photo-1511381939415-e44015466834?auto=format&fit=crop&w=1200&q=60',
+        'steak': 'https://images.unsplash.com/photo-1600891964092-4316c288032e?auto=format&fit=crop&w=1200&q=60',
+        'seafood': 'https://images.unsplash.com/photo-1534080564583-6be75777b70a?auto=format&fit=crop&w=1200&q=60',
+        'vegan': 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=1200&q=60'
     };
     
     const key = Object.keys(map).find(k => term.includes(k));
@@ -816,16 +829,15 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                       <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
                           {/* Recipe Card UI */}
                           <div 
-                            className="bg-white dark:bg-slate-900 shadow-xl rounded-2xl overflow-hidden border border-slate-100 dark:border-slate-800 mb-8 relative"
+                            className="bg-white dark:bg-slate-900 shadow-xl rounded-2xl overflow-hidden border border-slate-100 dark:border-slate-800 mb-8 relative group"
                             style={{ 
                                 backgroundImage: `url(${getBgImage(generatedRecipe.tags?.[0], generatedRecipe.name)})`,
                                 backgroundSize: 'cover',
                                 backgroundPosition: 'center',
-                                backgroundBlendMode: 'overlay',
                             }}
                           >
                               {/* Background Overlay for readability */}
-                              <div className="absolute inset-0 bg-white/95 dark:bg-slate-900/95 z-0"></div>
+                              <div className="absolute inset-0 bg-white/92 dark:bg-slate-950/92 backdrop-blur-[1px] z-0 transition-opacity duration-500"></div>
                               
                               <div className="relative z-10">
                                 <div className="bg-slate-900/90 dark:bg-black/80 text-white p-8 backdrop-blur-sm">
@@ -955,9 +967,9 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                             </button>
                                         </div>
                                     </div>
-                                    <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm">
+                                    <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm shadow-sm">
                                         <table className="w-full text-sm text-left">
-                                            <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold uppercase text-xs">
+                                            <thead className="bg-slate-50/80 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 font-bold uppercase text-xs backdrop-blur-sm">
                                                 <tr>
                                                     <th className="px-4 py-3">Ingredient</th>
                                                     <th className="px-4 py-3">Qty / Portion</th>
@@ -978,8 +990,8 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                                     const displayCost = marketRate > 0 ? (ing.cost_per_serving || 0) * (userRate / marketRate) : (ing.cost_per_serving || 0);
 
                                                     return (
-                                                        <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 group odd:bg-slate-50/50 dark:odd:bg-slate-800/30">
-                                                            <td className="px-4 py-3 font-medium text-slate-700 dark:text-slate-200 flex items-center gap-2">
+                                                        <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 group odd:bg-slate-50/30 dark:odd:bg-slate-800/20 transition-colors">
+                                                            <td className="px-4 py-4 font-medium text-slate-700 dark:text-slate-200 flex items-center gap-2 border-r border-transparent">
                                                                 {ing.name}
                                                                 <button 
                                                                   onClick={() => handleIngredientSwap(idx)} 
@@ -989,13 +1001,13 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                                                     {swappingIndex === idx ? <Loader2 size={14} className="animate-spin"/> : <ArrowLeftRight size={14} />}
                                                                 </button>
                                                             </td>
-                                                            <td className="px-4 py-3 text-slate-500 dark:text-slate-400 border-l border-slate-100 dark:border-slate-800">
+                                                            <td className="px-4 py-4 text-slate-500 dark:text-slate-400 border-l border-slate-100 dark:border-slate-800/50">
                                                                 {ing.qty_per_serving ? `${ing.qty_per_serving.toFixed(2)} ${ing.unit}` : ing.qty}
                                                             </td>
-                                                            <td className="px-4 py-3 text-slate-500 dark:text-slate-400 border-l border-slate-100 dark:border-slate-800">
+                                                            <td className="px-4 py-4 text-slate-500 dark:text-slate-400 border-l border-slate-100 dark:border-slate-800/50">
                                                                 ₹{marketRate.toFixed(2)} / {ing.unit}
                                                             </td>
-                                                            <td className="px-4 py-3 bg-emerald-50/30 dark:bg-emerald-900/5 border-l border-slate-100 dark:border-slate-800">
+                                                            <td className="px-4 py-4 bg-emerald-50/30 dark:bg-emerald-900/5 border-l border-slate-100 dark:border-slate-800/50">
                                                                 <div className="flex items-center gap-2">
                                                                     <input 
                                                                         type="number" 
@@ -1011,7 +1023,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                                                     )}
                                                                 </div>
                                                             </td>
-                                                            <td className="px-4 py-3 text-right font-bold text-slate-700 dark:text-slate-300 border-l border-slate-100 dark:border-slate-800">
+                                                            <td className="px-4 py-4 text-right font-bold text-slate-700 dark:text-slate-300 border-l border-slate-100 dark:border-slate-800/50">
                                                                 ₹{displayCost.toFixed(2)}
                                                             </td>
                                                         </tr>
