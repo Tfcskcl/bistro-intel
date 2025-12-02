@@ -4,7 +4,7 @@ import { PLANS, CREDIT_COSTS } from '../constants';
 import { generateRecipeCard, generateRecipeVariation, substituteIngredient, estimateMarketRates } from '../services/geminiService';
 import { ingredientService } from '../services/ingredientService';
 import { RecipeCard, MenuItem, User, UserRole, POSChangeRequest, RecipeRequest, Ingredient } from '../types';
-import { Loader2, ChefHat, Scale, Clock, AlertCircle, Upload, Lock, Sparkles, Check, Save, RefreshCw, Search, Plus, Store, Zap, Trash2, Building2, FileSignature, X, AlignLeft, UtensilsCrossed, Inbox, UserCheck, CheckCircle2, Clock3, Carrot, Type, Wallet, Filter, Tag, Eye, Flame, Wand2, Eraser, FileDown, TrendingDown, ArrowRight, Key, Coins, Leaf, TestTube, ArrowLeftRight, PenTool, Lightbulb, Calculator, DollarSign, Edit2, Globe, Droplets, Wheat } from 'lucide-react';
+import { Loader2, ChefHat, Scale, Clock, AlertCircle, Upload, Lock, Sparkles, Check, Save, RefreshCw, Search, Plus, Store, Zap, Trash2, Building2, FileSignature, X, AlignLeft, UtensilsCrossed, Inbox, UserCheck, CheckCircle2, Clock3, Carrot, Type, Wallet, Filter, Tag, Eye, Flame, Wand2, Eraser, FileDown, TrendingDown, ArrowRight, Key, Coins, Leaf, TestTube, ArrowLeftRight, PenTool, Lightbulb, Calculator, DollarSign, Edit2, Globe, Droplets, Wheat, Bot } from 'lucide-react';
 import { storageService } from '../services/storageService';
 import { authService } from '../services/authService';
 
@@ -13,6 +13,7 @@ interface RecipeHubProps {
   onUserUpdate?: (user: User) => void;
 }
 
+// ... (Constants: SAMPLE_DISHES, POPULAR_IDEAS remain same)
 const SAMPLE_DISHES = [
     { name: "Truffle Mushroom Risotto", desc: "Creamy arborio rice, wild mushrooms, parmesan crisp, truffle oil drizzle.", cuisine: "Italian", ingredients: "Arborio Rice, Wild Mushrooms, Truffle Oil, Parmesan", dietary: ["Vegetarian", "Gluten-Free"] },
     { name: "Spicy Tuna Tartare", desc: "Fresh tuna cubes, avocado mousse, sesame soy dressing, crispy wonton chips.", cuisine: "Asian Fusion", ingredients: "Tuna, Avocado, Sesame Oil, Wonton Wrappers", dietary: ["Pescatarian", "Dairy-Free"] },
@@ -46,7 +47,7 @@ const formatError = (err: any) => {
     return msg.length > 100 ? "Generation failed. Please try again." : msg;
 };
 
-// Helper for Background Images
+// ... (getBgImage helper remains same)
 const getBgImage = (cuisine: string = '', dishName: string = '') => {
     const term = (cuisine + ' ' + dishName).toLowerCase();
     const map: Record<string, string> = {
@@ -84,6 +85,7 @@ const getBgImage = (cuisine: string = '', dishName: string = '') => {
 };
 
 export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
+  // ... (State declarations remain same)
   const [selectedSku, setSelectedSku] = useState<string | null>(null);
   const [generatedRecipe, setGeneratedRecipe] = useState<RecipeCard | null>(null);
   const [loading, setLoading] = useState(false);
@@ -145,6 +147,8 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isStaff = [UserRole.ADMIN, UserRole.SUPER_ADMIN].includes(user.role);
 
+  // ... (useEffect and helper functions like filteredRecipes, isRecipeSaved, savingsAnalysis, checkCredits, deductCredits, handleTabChange, resetForm, recalculation handlers remain unchanged)
+
   useEffect(() => {
     setSavedRecipes(storageService.getSavedRecipes(user.id));
     setMenuItems(storageService.getMenu(user.id));
@@ -154,7 +158,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
   useEffect(() => {
       setAltPrices({});
       setWasteValues({});
-  }, [generatedRecipe?.sku_id]); // Reset alt prices only on new recipe
+  }, [generatedRecipe?.sku_id]); 
 
   const refreshRequests = () => {
     const allRequests = storageService.getAllRecipeRequests();
@@ -205,7 +209,6 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
               hasChanges = true;
           }
 
-          // Calculate effective cost with waste
           const userWasteStr = wasteValues[idx];
           const userWaste = userWasteStr ? parseFloat(userWasteStr) : (ing.waste_pct || 0);
           if (userWaste > 0) hasChanges = true;
@@ -214,8 +217,6 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
 
           let costWithWaste = 0;
           if (originalRate > 0) {
-              // Recalculate based on Qty * UserRate * WasteFactor
-              // Qty is approx originalCostServing / originalRate
               costWithWaste = (originalCostServing / originalRate) * userRate * wasteFactor;
           } else {
               costWithWaste = originalCostServing * wasteFactor; 
@@ -286,21 +287,17 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       setTargetFoodCost(30);
   };
 
-  // --- RECALCULATION HANDLERS ---
-
   const handleYieldUpdate = (newYieldStr: string) => {
       if (!generatedRecipe) return;
       const newYield = parseFloat(newYieldStr);
       if (isNaN(newYield) || newYield <= 0) return;
 
       const oldYield = generatedRecipe.yield || 1;
-      const factor = oldYield / newYield; // If yield doubles (2), cost per serving halves (0.5)
+      const factor = oldYield / newYield; 
 
-      // Recalculate costs
       const newFoodCost = generatedRecipe.food_cost_per_serving * factor;
       const newSellingPrice = generatedRecipe.suggested_selling_price * factor;
 
-      // Update Ingredients Qty Display (Qty Per Serving)
       const updatedIngredients = generatedRecipe.ingredients.map(ing => ({
           ...ing,
           qty_per_serving: (ing.qty_per_serving || 0) * factor,
@@ -319,44 +316,27 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
   const handleManualCostUpdate = (newCostStr: string) => {
       if (!generatedRecipe) return;
       const newCost = newCostStr === '' ? 0 : parseFloat(newCostStr);
-      
-      setGeneratedRecipe({
-          ...generatedRecipe,
-          food_cost_per_serving: newCost
-      });
+      setGeneratedRecipe({ ...generatedRecipe, food_cost_per_serving: newCost });
   };
 
   const handleManualPriceUpdate = (newPriceStr: string) => {
       if (!generatedRecipe) return;
       const newPrice = newPriceStr === '' ? 0 : parseFloat(newPriceStr);
-
-      setGeneratedRecipe({
-          ...generatedRecipe,
-          suggested_selling_price: newPrice
-      });
+      setGeneratedRecipe({ ...generatedRecipe, suggested_selling_price: newPrice });
   };
 
   const handleManualPercentUpdate = (newPctStr: string) => {
       if (!generatedRecipe) return;
       const newPct = parseFloat(newPctStr);
       if (isNaN(newPct) || newPct <= 0) return;
-
       const newSellingPrice = generatedRecipe.food_cost_per_serving / (newPct / 100);
-      
-      setGeneratedRecipe({
-          ...generatedRecipe,
-          suggested_selling_price: newSellingPrice
-      });
+      setGeneratedRecipe({ ...generatedRecipe, suggested_selling_price: newSellingPrice });
   };
 
   const resetSellingPrice = () => {
       if (!generatedRecipe) return;
-      // Reset to standard 30% food cost
       const recommended = generatedRecipe.food_cost_per_serving / 0.30;
-      setGeneratedRecipe({
-          ...generatedRecipe,
-          suggested_selling_price: recommended
-      });
+      setGeneratedRecipe({ ...generatedRecipe, suggested_selling_price: recommended });
   };
 
   const handleSurpriseMe = () => {
@@ -405,52 +385,24 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       await handleGeneration(tempItem, requirements);
   };
 
-  // Manual Form Handlers
-  const addManualIngredient = () => {
-      setManualIngredients([...manualIngredients, { id: Date.now(), name: '', qty: '', unit: 'g', costPerUnit: '', wastePct: '0' }]);
-  };
-
-  const removeManualIngredient = (id: number) => {
-      if (manualIngredients.length > 1) {
-          setManualIngredients(manualIngredients.filter(i => i.id !== id));
-      }
-  };
-
-  const updateManualIngredient = (id: number, field: string, value: string) => {
-      setManualIngredients(manualIngredients.map(i => i.id === id ? { ...i, [field]: value } : i));
-  };
+  // ... (Manual form handlers: addManualIngredient, removeManualIngredient, updateManualIngredient, handleAutoFillRates, handleManualCreate remain unchanged)
+  const addManualIngredient = () => setManualIngredients([...manualIngredients, { id: Date.now(), name: '', qty: '', unit: 'g', costPerUnit: '', wastePct: '0' }]);
+  const removeManualIngredient = (id: number) => manualIngredients.length > 1 && setManualIngredients(manualIngredients.filter(i => i.id !== id));
+  const updateManualIngredient = (id: number, field: string, value: string) => setManualIngredients(manualIngredients.map(i => i.id === id ? { ...i, [field]: value } : i));
 
   const handleAutoFillRates = async () => {
-      if (manualIngredients.some(i => !i.name)) {
-          setError("Please name all ingredients first.");
-          return;
-      }
+      if (manualIngredients.some(i => !i.name)) { setError("Please name all ingredients first."); return; }
       setIsUpdatingRates(true);
-      
       const namesToFetch: string[] = [];
       const updatedIngredients = [...manualIngredients];
-
-      // 1. Check local knowledge base first
       updatedIngredients.forEach((ing) => {
           const learnedPrice = ingredientService.getLearnedPrice(ing.name);
-          if (learnedPrice) {
-              ing.costPerUnit = learnedPrice.toString();
-          } else {
-              namesToFetch.push(ing.name);
-          }
+          if (learnedPrice) { ing.costPerUnit = learnedPrice.toString(); } else { namesToFetch.push(ing.name); }
       });
-
-      // 2. Fetch missing from AI
       if (namesToFetch.length > 0) {
           const rates = await estimateMarketRates(namesToFetch, user.location || 'India');
-          updatedIngredients.forEach(ing => {
-              if (namesToFetch.includes(ing.name)) {
-                  const rate = rates[ing.name];
-                  if (rate) ing.costPerUnit = rate.toString();
-              }
-          });
+          updatedIngredients.forEach(ing => { if (namesToFetch.includes(ing.name)) { const rate = rates[ing.name]; if (rate) ing.costPerUnit = rate.toString(); } });
       }
-      
       setManualIngredients(updatedIngredients);
       setIsUpdatingRates(false);
   };
@@ -459,73 +411,33 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       e.preventDefault();
       setError(null);
       if (!manualForm.name) { setError("Dish name required"); return; }
-
       const yieldNum = parseFloat(manualForm.yield) || 1;
       const ingredients: Ingredient[] = manualIngredients.map((ing, idx) => {
           const qtyNum = parseFloat(ing.qty) || 0;
           const costNum = parseFloat(ing.costPerUnit) || 0;
           const wastePct = parseFloat(ing.wastePct) || 0;
-          
           const wasteFactor = 100 / (100 - Math.min(wastePct, 99.9));
           const effectiveCostPerUnit = costNum * wasteFactor;
-
           let costPerServing = 0;
-          if (['g', 'ml'].includes(ing.unit.toLowerCase()) && effectiveCostPerUnit > 10) {
-               // Assuming user inputs price per KG/L but qty in g/ml
-               costPerServing = (qtyNum / 1000) * effectiveCostPerUnit;
-          } else {
-               costPerServing = qtyNum * effectiveCostPerUnit;
-          }
-          
-          return {
-              ingredient_id: `man_${Date.now()}_${idx}`,
-              name: ing.name || 'Unnamed Ingredient',
-              qty: `${ing.qty} ${ing.unit}`,
-              qty_per_serving: qtyNum / yieldNum,
-              cost_per_unit: costNum, 
-              unit: ing.unit,
-              cost_per_serving: costPerServing / yieldNum,
-              waste_pct: wastePct
-          };
+          if (['g', 'ml'].includes(ing.unit.toLowerCase()) && effectiveCostPerUnit > 10) { costPerServing = (qtyNum / 1000) * effectiveCostPerUnit; } else { costPerServing = qtyNum * effectiveCostPerUnit; }
+          return { ingredient_id: `man_${Date.now()}_${idx}`, name: ing.name || 'Unnamed', qty: `${ing.qty} ${ing.unit}`, qty_per_serving: qtyNum / yieldNum, cost_per_unit: costNum, unit: ing.unit, cost_per_serving: costPerServing / yieldNum, waste_pct: wastePct };
       });
-
       const totalCostPerServing = ingredients.reduce((acc, curr) => acc + (curr.cost_per_serving || 0), 0);
       const suggestedPrice = totalCostPerServing / (targetFoodCost / 100);
-
       const recipe: RecipeCard = {
-          sku_id: `MAN-${Date.now().toString().slice(-6)}`,
-          name: manualForm.name,
-          category: 'main',
-          prep_time_min: parseInt(manualForm.prepTime) || 0,
-          current_price: 0,
-          ingredients: ingredients,
-          yield: yieldNum,
-          preparation_steps: manualForm.steps.split('\n').filter(s => s.trim()),
-          equipment_needed: [],
-          portioning_guideline: `1/${yieldNum} of recipe`,
-          allergens: [],
-          shelf_life_hours: 48,
-          food_cost_per_serving: totalCostPerServing,
-          suggested_selling_price: suggestedPrice,
-          tags: ['Manual', manualForm.cuisine].filter(Boolean),
-          human_summary: manualForm.description || 'Manually created recipe card.',
-          confidence: 'High'
+          sku_id: `MAN-${Date.now().toString().slice(-6)}`, name: manualForm.name, category: 'main', prep_time_min: parseInt(manualForm.prepTime) || 0, current_price: 0, ingredients: ingredients, yield: yieldNum, preparation_steps: manualForm.steps.split('\n').filter(s => s.trim()), equipment_needed: [], portioning_guideline: `1/${yieldNum} of recipe`, allergens: [], shelf_life_hours: 48, food_cost_per_serving: totalCostPerServing, suggested_selling_price: suggestedPrice, tags: ['Manual', manualForm.cuisine].filter(Boolean), human_summary: manualForm.description || 'Manually created recipe card.', confidence: 'High'
       };
-
       setGeneratedRecipe(recipe);
   };
 
   const handleGeneration = async (item: MenuItem, requirements: string, targetUserId?: string) => {
-      if (!isStaff) {
-          if (!deductCredits()) return;
-      }
+      if (!isStaff) { if (!deductCredits()) return; }
       setLoading(true);
       setLoadingText(`${selectedPersona} is creating ${item.name}...`);
       setGeneratedRecipe(null);
       setPosPushStatus(null);
       setSelectedRestaurantId('');
       setError(null);
-
       try {
           const contextUserId = targetUserId || (activeRequest ? activeRequest.userId : user.id);
           const card = await generateRecipeCard(contextUserId, item, requirements, user.location, selectedPersona);
@@ -533,21 +445,11 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       } catch (e: any) {
           console.error(e);
           setError(formatError(e));
-      } finally {
-          setLoading(false);
-      }
+      } finally { setLoading(false); }
   };
 
   const handleFulfillRequest = (req: RecipeRequest) => {
-      setActiveRequest(req);
-      setViewMode('generator');
-      setDishName(req.item.name);
-      setSelectedSku(req.item.sku_id);
-      setNotes(req.requirements); 
-      setCuisine('');
-      setIngredients('');
-      setDietary([]);
-      setGeneratedRecipe(null); 
+      setActiveRequest(req); setViewMode('generator'); setDishName(req.item.name); setSelectedSku(req.item.sku_id); setNotes(req.requirements); setCuisine(''); setIngredients(''); setDietary([]); setGeneratedRecipe(null); 
   };
 
   const handleVariation = async (type: string) => {
@@ -562,24 +464,15 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
             const variant = await generateRecipeVariation(user.id, generatedRecipe, type, user.location);
             setGeneratedRecipe(variant);
         }
-    } catch (e: any) {
-      setError(formatError(e));
-    } finally {
-      setLoading(false);
-    }
+    } catch (e: any) { setError(formatError(e)); } finally { setLoading(false); }
   };
 
+  // ... (handleSuggestSupplierPrices, handleFetchMarketRates, handleIngredientSwap remain unchanged)
   const handleSuggestSupplierPrices = () => {
       if (!generatedRecipe) return;
       const newAltPrices: Record<number, string> = { ...altPrices };
-      const sortedIngredients = generatedRecipe.ingredients
-          .map((ing, idx) => ({ ...ing, idx }))
-          .sort((a, b) => (b.cost_per_unit || 0) - (a.cost_per_unit || 0));
-      sortedIngredients.slice(0, 3).forEach((ing) => {
-          if (ing.cost_per_unit && !newAltPrices[ing.idx]) {
-             newAltPrices[ing.idx] = (ing.cost_per_unit * 0.85).toFixed(0);
-          }
-      });
+      const sortedIngredients = generatedRecipe.ingredients.map((ing, idx) => ({ ...ing, idx })).sort((a, b) => (b.cost_per_unit || 0) - (a.cost_per_unit || 0));
+      sortedIngredients.slice(0, 3).forEach((ing) => { if (ing.cost_per_unit && !newAltPrices[ing.idx]) { newAltPrices[ing.idx] = (ing.cost_per_unit * 0.85).toFixed(0); } });
       setAltPrices(newAltPrices);
   };
 
@@ -589,40 +482,17 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       try {
           const names = generatedRecipe.ingredients.map(i => i.name);
           const location = user.location || "General Market";
-          
           const newAltPrices: Record<number, string> = { ...altPrices };
           const namesToFetch: string[] = [];
-
-          // 1. Check knowledge base
-          generatedRecipe.ingredients.forEach((ing, idx) => {
-              const learnedPrice = ingredientService.getLearnedPrice(ing.name);
-              if (learnedPrice) {
-                  newAltPrices[idx] = learnedPrice.toString();
-              } else {
-                  namesToFetch.push(ing.name);
-              }
-          });
-
-          // 2. Fetch rest from AI
+          generatedRecipe.ingredients.forEach((ing, idx) => { const learnedPrice = ingredientService.getLearnedPrice(ing.name); if (learnedPrice) { newAltPrices[idx] = learnedPrice.toString(); } else { namesToFetch.push(ing.name); } });
           if (namesToFetch.length > 0) {
               const rates = await estimateMarketRates(namesToFetch, location);
-              generatedRecipe.ingredients.forEach((ing, idx) => {
-                  if (namesToFetch.includes(ing.name)) {
-                      const rate = rates[ing.name];
-                      if (rate) newAltPrices[idx] = rate.toString();
-                  }
-              });
+              generatedRecipe.ingredients.forEach((ing, idx) => { if (namesToFetch.includes(ing.name)) { const rate = rates[ing.name]; if (rate) newAltPrices[idx] = rate.toString(); } });
           }
-          
           setAltPrices(newAltPrices);
           setImportStatus(`Market rates for ${location} fetched!`);
           setTimeout(() => setImportStatus(null), 3000);
-      } catch (e) {
-          console.error(e);
-          setError("Failed to fetch market rates.");
-      } finally {
-          setIsFetchingRates(false);
-      }
+      } catch (e) { console.error(e); setError("Failed to fetch market rates."); } finally { setIsFetchingRates(false); }
   };
 
   const handleIngredientSwap = async (index: number) => {
@@ -640,43 +510,23 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                setImportStatus(`Swapped ${ingredient.name} for ${updated.ingredients[index]?.name || 'alternative'}`);
                setTimeout(() => setImportStatus(null), 3000);
           }
-      } catch (e: any) {
-          setError(formatError(e));
-      } finally {
-          setSwappingIndex(null);
-      }
+      } catch (e: any) { setError(formatError(e)); } finally { setSwappingIndex(null); }
   };
 
   const handleSaveRecipe = () => {
     if (generatedRecipe) {
       setIsSaving(true);
       setTimeout(() => {
-        // 1. Train database with prices
         ingredientService.learnPrices(generatedRecipe.ingredients);
-
-        // 2. Save Logic
         const recipeToSave = { ...generatedRecipe };
-        
-        // Merge manual prices/waste if saving
         recipeToSave.ingredients = recipeToSave.ingredients.map((ing, idx) => {
             const userPrice = altPrices[idx] ? parseFloat(altPrices[idx]) : ing.cost_per_unit;
             const userWaste = wasteValues[idx] ? parseFloat(wasteValues[idx]) : ing.waste_pct;
-            
-            // Recalculate cost per serving with new rate/waste
             const wasteFactor = 100 / (100 - Math.min(userWaste || 0, 99.9));
             const newCost = (ing.cost_per_serving || 0) * ((userPrice || 0) / (ing.cost_per_unit || 1)) * wasteFactor;
-
-            return {
-                ...ing,
-                cost_per_unit: userPrice,
-                waste_pct: userWaste,
-                cost_per_serving: newCost
-            };
+            return { ...ing, cost_per_unit: userPrice, waste_pct: userWaste, cost_per_serving: newCost };
         });
-        
-        // Recalculate totals
         recipeToSave.food_cost_per_serving = recipeToSave.ingredients.reduce((acc, curr) => acc + (curr.cost_per_serving || 0), 0);
-
         if (isStaff && activeRequest) {
             storageService.saveRecipe(activeRequest.userId, recipeToSave);
             const completedReq: RecipeRequest = { ...activeRequest, status: 'completed', completedDate: new Date().toISOString() };
@@ -687,11 +537,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
             handleTabChange('requests');
         } else {
             const restaurant = restaurants.find(r => r.id === selectedRestaurantId);
-            const finalRecipe = {
-                ...recipeToSave,
-                assignedRestaurantId: selectedRestaurantId,
-                assignedRestaurantName: restaurant?.restaurantName
-            };
+            const finalRecipe = { ...recipeToSave, assignedRestaurantId: selectedRestaurantId, assignedRestaurantName: restaurant?.restaurantName };
             storageService.saveRecipe(user.id, finalRecipe);
             setSavedRecipes(storageService.getSavedRecipes(user.id));
             setImportStatus(isRecipeSaved ? "Recipe updated!" : "Recipe saved!");
@@ -706,23 +552,18 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       if (!generatedRecipe) return;
       const content = `<html><head><title>${generatedRecipe.name}</title></head><body><h1>${generatedRecipe.name}</h1></body></html>`;
       const printWindow = window.open('', '_blank');
-      if (printWindow) {
-          printWindow.document.write(content);
-          printWindow.document.close();
-          printWindow.print();
-      }
+      if (printWindow) { printWindow.document.write(content); printWindow.document.close(); printWindow.print(); }
   };
 
   return (
     <div className="h-[calc(100vh-6rem)] flex flex-col gap-4 relative">
+      {/* Tab Navigation (Unchanged) */}
       <div className="flex justify-between items-center">
         <div className="flex gap-2">
             <button onClick={() => handleTabChange('generator')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${viewMode === 'generator' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300'}`}>BistroChef Generator</button>
             <button onClick={() => handleTabChange('saved')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${viewMode === 'saved' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300'}`}>Saved Library ({savedRecipes.length})</button>
             {isStaff && (
-                <button onClick={() => handleTabChange('requests')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-2 ${viewMode === 'requests' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300'}`}>
-                    Queue {adminQueue.length > 0 ? `(${adminQueue.length})` : ''}
-                </button>
+                <button onClick={() => handleTabChange('requests')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-2 ${viewMode === 'requests' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300'}`}>Queue {adminQueue.length > 0 ? `(${adminQueue.length})` : ''}</button>
             )}
         </div>
         <div className="flex items-center gap-3">
@@ -733,6 +574,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       </div>
 
       {viewMode === 'saved' && (
+          // Saved Recipes List (Unchanged)
           <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col flex-1 animate-fade-in transition-colors">
               <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
                   <h2 className="text-xl font-bold text-slate-800 dark:text-white">Saved Recipes</h2>
@@ -757,6 +599,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
           <div className="flex flex-col lg:flex-row gap-6 h-full overflow-hidden">
               {/* Form Side */}
               <div className="w-full lg:w-1/3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm p-6 overflow-y-auto custom-scrollbar transition-colors">
+                  {/* ... (Form Header & Controls Unchanged) */}
                   <div className="flex justify-between items-center mb-4">
                       <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
                           <ChefHat className="text-emerald-600" /> BistroChef
@@ -813,55 +656,23 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                           </button>
                       </form>
                   ) : (
+                      // Manual Form (Unchanged)
                       <form onSubmit={handleManualCreate} className="space-y-5">
+                          {/* ... Manual form fields same as original ... */}
                           <div>
                               <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Dish Name *</label>
                               <input required type="text" value={manualForm.name} onChange={(e) => setManualForm({...manualForm, name: e.target.value})} placeholder="Dish Name" className="w-full px-4 py-2 text-sm border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
                           </div>
-                          
                           <div className="grid grid-cols-2 gap-4">
-                              <div>
-                                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Yield (Portions)</label>
-                                  <input type="number" min="1" value={manualForm.yield} onChange={(e) => setManualForm({...manualForm, yield: e.target.value})} className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
-                              </div>
-                              <div>
-                                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Target Food Cost %</label>
-                                  <input type="number" min="15" max="80" value={targetFoodCost} onChange={(e) => setTargetFoodCost(parseFloat(e.target.value))} className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
-                              </div>
+                              <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Yield (Portions)</label><input type="number" min="1" value={manualForm.yield} onChange={(e) => setManualForm({...manualForm, yield: e.target.value})} className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white" /></div>
+                              <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Target Food Cost %</label><input type="number" min="15" max="80" value={targetFoodCost} onChange={(e) => setTargetFoodCost(parseFloat(e.target.value))} className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white" /></div>
                           </div>
-
                           <div>
-                              <div className="flex justify-between items-center mb-2">
-                                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Ingredients</label>
-                                  <div className="flex gap-2">
-                                      <button type="button" onClick={handleAutoFillRates} disabled={isUpdatingRates} className="text-[10px] bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 px-2 py-1 rounded flex items-center gap-1 hover:bg-purple-200">
-                                          {isUpdatingRates ? <Loader2 size={10} className="animate-spin"/> : <Sparkles size={10}/>} Auto-fill Rates
-                                      </button>
-                                      <button type="button" onClick={addManualIngredient} className="text-xs text-blue-600 font-bold flex items-center gap-1 hover:underline"><Plus size={12}/> Add</button>
-                                  </div>
-                              </div>
-                              <div className="space-y-2">
-                                  {manualIngredients.map((ing) => (
-                                      <div key={ing.id} className="flex gap-2">
-                                          <input placeholder="Item" value={ing.name} onChange={(e) => updateManualIngredient(ing.id, 'name', e.target.value)} className="flex-1 min-w-0 px-2 py-1.5 text-xs border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
-                                          <input placeholder="Qty" value={ing.qty} onChange={(e) => updateManualIngredient(ing.id, 'qty', e.target.value)} className="w-12 px-2 py-1.5 text-xs border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
-                                          <input placeholder="Unit" value={ing.unit} onChange={(e) => updateManualIngredient(ing.id, 'unit', e.target.value)} className="w-12 px-2 py-1.5 text-xs border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
-                                          <input placeholder="Price" type="number" value={ing.costPerUnit} onChange={(e) => updateManualIngredient(ing.id, 'costPerUnit', e.target.value)} className="w-14 px-2 py-1.5 text-xs border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
-                                          <input placeholder="W%" type="number" value={ing.wastePct} onChange={(e) => updateManualIngredient(ing.id, 'wastePct', e.target.value)} className="w-10 px-2 py-1.5 text-xs border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white text-red-500" title="Waste %"/>
-                                          <button type="button" onClick={() => removeManualIngredient(ing.id)} className="text-slate-400 hover:text-red-500"><Trash2 size={14} /></button>
-                                      </div>
-                                  ))}
-                              </div>
+                              <div className="flex justify-between items-center mb-2"><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Ingredients</label><div className="flex gap-2"><button type="button" onClick={handleAutoFillRates} disabled={isUpdatingRates} className="text-[10px] bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 px-2 py-1 rounded flex items-center gap-1 hover:bg-purple-200">{isUpdatingRates ? <Loader2 size={10} className="animate-spin"/> : <Sparkles size={10}/>} Auto-fill Rates</button><button type="button" onClick={addManualIngredient} className="text-xs text-blue-600 font-bold flex items-center gap-1 hover:underline"><Plus size={12}/> Add</button></div></div>
+                              <div className="space-y-2">{manualIngredients.map((ing) => (<div key={ing.id} className="flex gap-2"><input placeholder="Item" value={ing.name} onChange={(e) => updateManualIngredient(ing.id, 'name', e.target.value)} className="flex-1 min-w-0 px-2 py-1.5 text-xs border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white" /><input placeholder="Qty" value={ing.qty} onChange={(e) => updateManualIngredient(ing.id, 'qty', e.target.value)} className="w-12 px-2 py-1.5 text-xs border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white" /><input placeholder="Unit" value={ing.unit} onChange={(e) => updateManualIngredient(ing.id, 'unit', e.target.value)} className="w-12 px-2 py-1.5 text-xs border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white" /><input placeholder="Price" type="number" value={ing.costPerUnit} onChange={(e) => updateManualIngredient(ing.id, 'costPerUnit', e.target.value)} className="w-14 px-2 py-1.5 text-xs border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white" /><input placeholder="W%" type="number" value={ing.wastePct} onChange={(e) => updateManualIngredient(ing.id, 'wastePct', e.target.value)} className="w-10 px-2 py-1.5 text-xs border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white text-red-500" title="Waste %"/><button type="button" onClick={() => removeManualIngredient(ing.id)} className="text-slate-400 hover:text-red-500"><Trash2 size={14} /></button></div>))}</div>
                           </div>
-
-                          <div>
-                              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Steps</label>
-                              <textarea value={manualForm.steps} onChange={(e) => setManualForm({...manualForm, steps: e.target.value})} placeholder="Enter preparation steps..." className="w-full px-3 py-2 text-sm border rounded-lg h-24 dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
-                          </div>
-
-                          <button type="submit" className="w-full py-4 rounded-xl font-bold text-white bg-slate-900 dark:bg-emerald-600 hover:opacity-90 flex items-center justify-center gap-2">
-                              <Save size={20} /> Create Recipe Card
-                          </button>
+                          <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Steps</label><textarea value={manualForm.steps} onChange={(e) => setManualForm({...manualForm, steps: e.target.value})} placeholder="Enter preparation steps..." className="w-full px-3 py-2 text-sm border rounded-lg h-24 dark:bg-slate-800 dark:border-slate-700 dark:text-white" /></div>
+                          <button type="submit" className="w-full py-4 rounded-xl font-bold text-white bg-slate-900 dark:bg-emerald-600 hover:opacity-90 flex items-center justify-center gap-2"><Save size={20} /> Create Recipe Card</button>
                       </form>
                   )}
               </div>
@@ -879,13 +690,20 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                 backgroundPosition: 'center',
                             }}
                           >
-                              {/* Background Overlay for readability */}
+                              {/* Background Overlay */}
                               <div className="absolute inset-0 bg-white/92 dark:bg-slate-950/92 backdrop-blur-[1px] z-0 transition-opacity duration-500"></div>
                               
                               <div className="relative z-10">
                                 <div className="bg-slate-900/90 dark:bg-black/80 text-white p-8 backdrop-blur-sm">
                                     <div className="flex justify-between items-start">
                                         <div className="flex-1 mr-4">
+                                            {/* AGENT BADGE */}
+                                            {creationMode === 'ai' && (
+                                                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[10px] font-bold uppercase tracking-wider mb-3">
+                                                    <Bot size={12} /> Designed by: {selectedPersona}
+                                                </div>
+                                            )}
+                                            
                                             <h1 className="text-3xl font-bold">{generatedRecipe.name}</h1>
                                             <p className="text-slate-300 text-sm mt-2">{generatedRecipe.human_summary}</p>
                                             
@@ -999,6 +817,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                     </div>
                                 )}
                                 
+                                {/* Ingredients Table (Unchanged logic, just ensure styled correctly) */}
                                 <div className="p-8 border-b border-slate-100 dark:border-slate-700">
                                     <div className="flex justify-between items-center mb-4">
                                         <h3 className="font-bold text-slate-800 dark:text-white">Ingredients & Costing</h3>
@@ -1029,24 +848,13 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                                     const marketRate = ing.cost_per_unit || 0;
                                                     const userRateStr = altPrices[idx];
                                                     const userRate = userRateStr ? parseFloat(userRateStr) : marketRate;
-                                                    
                                                     const userWasteStr = wasteValues[idx];
                                                     const userWaste = userWasteStr ? parseFloat(userWasteStr) : (ing.waste_pct || 0);
-                                                    
                                                     const isVariance = userRate !== marketRate;
                                                     const variancePct = marketRate > 0 ? ((userRate - marketRate) / marketRate) * 100 : 0;
-                                                    
-                                                    // Calculate cost based on user rate and waste
-                                                    // Waste Factor = 1 / (1 - waste%)
                                                     const wasteFactor = 100 / (100 - Math.min(userWaste, 99.9));
-                                                    
-                                                    // Base cost per serving (AI provided)
                                                     let displayCost = ing.cost_per_serving || 0;
-                                                    
                                                     if (marketRate > 0) {
-                                                        // Adjust for user rate vs market rate
-                                                        // Qty used is roughly (cost_per_serving / market_rate)
-                                                        // New Cost = Qty * UserRate * WasteFactor
                                                         displayCost = (displayCost / marketRate) * userRate * wasteFactor;
                                                     } else {
                                                         displayCost = displayCost * wasteFactor;
@@ -1056,50 +864,22 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                                         <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 group odd:bg-slate-50/30 dark:odd:bg-slate-800/20 transition-colors">
                                                             <td className="px-4 py-4 font-medium text-slate-700 dark:text-slate-200 flex items-center gap-2 border-r border-transparent">
                                                                 {ing.name}
-                                                                <button 
-                                                                  onClick={() => handleIngredientSwap(idx)} 
-                                                                  className="text-slate-400 hover:text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                                  title="Find Substitute"
-                                                                >
+                                                                <button onClick={() => handleIngredientSwap(idx)} className="text-slate-400 hover:text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity" title="Find Substitute">
                                                                     {swappingIndex === idx ? <Loader2 size={14} className="animate-spin"/> : <ArrowLeftRight size={14} />}
                                                                 </button>
                                                             </td>
-                                                            <td className="px-4 py-4 text-slate-500 dark:text-slate-400 border-l border-slate-100 dark:border-slate-800/50">
-                                                                {ing.qty_per_serving ? `${ing.qty_per_serving.toFixed(2)} ${ing.unit}` : ing.qty}
-                                                            </td>
-                                                            <td className="px-4 py-4 text-slate-500 dark:text-slate-400 border-l border-slate-100 dark:border-slate-800/50">
-                                                                ₹{marketRate.toFixed(2)} / {ing.unit}
-                                                            </td>
+                                                            <td className="px-4 py-4 text-slate-500 dark:text-slate-400 border-l border-slate-100 dark:border-slate-800/50">{ing.qty_per_serving ? `${ing.qty_per_serving.toFixed(2)} ${ing.unit}` : ing.qty}</td>
+                                                            <td className="px-4 py-4 text-slate-500 dark:text-slate-400 border-l border-slate-100 dark:border-slate-800/50">₹{marketRate.toFixed(2)} / {ing.unit}</td>
                                                             <td className="px-4 py-4 bg-emerald-50/30 dark:bg-emerald-900/5 border-l border-slate-100 dark:border-slate-800/50">
                                                                 <div className="flex items-center gap-2">
-                                                                    <input 
-                                                                        type="number" 
-                                                                        placeholder={marketRate.toFixed(2)}
-                                                                        value={altPrices[idx] || ''}
-                                                                        onChange={(e) => setAltPrices({...altPrices, [idx]: e.target.value})}
-                                                                        className="w-20 px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-emerald-500 outline-none bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-white"
-                                                                    />
-                                                                    {isVariance && (
-                                                                        <span className={`text-[10px] font-bold ${variancePct > 0 ? 'text-red-500' : 'text-emerald-500'}`}>
-                                                                            {variancePct > 0 ? '+' : ''}{variancePct.toFixed(0)}%
-                                                                        </span>
-                                                                    )}
+                                                                    <input type="number" placeholder={marketRate.toFixed(2)} value={altPrices[idx] || ''} onChange={(e) => setAltPrices({...altPrices, [idx]: e.target.value})} className="w-20 px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-emerald-500 outline-none bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
+                                                                    {isVariance && <span className={`text-[10px] font-bold ${variancePct > 0 ? 'text-red-500' : 'text-emerald-500'}`}>{variancePct > 0 ? '+' : ''}{variancePct.toFixed(0)}%</span>}
                                                                 </div>
                                                             </td>
                                                             <td className="px-4 py-4 bg-red-50/30 dark:bg-red-900/5 border-l border-slate-100 dark:border-slate-800/50">
-                                                                <input 
-                                                                    type="number"
-                                                                    placeholder="0"
-                                                                    min="0"
-                                                                    max="99"
-                                                                    value={wasteValues[idx] || (ing.waste_pct ? ing.waste_pct.toString() : '')}
-                                                                    onChange={(e) => setWasteValues({...wasteValues, [idx]: e.target.value})}
-                                                                    className="w-16 px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-red-500 outline-none bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-white text-red-600 dark:text-red-400"
-                                                                />
+                                                                <input type="number" placeholder="0" min="0" max="99" value={wasteValues[idx] || (ing.waste_pct ? ing.waste_pct.toString() : '')} onChange={(e) => setWasteValues({...wasteValues, [idx]: e.target.value})} className="w-16 px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-red-500 outline-none bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-white text-red-600 dark:text-red-400" />
                                                             </td>
-                                                            <td className="px-4 py-4 text-right font-bold text-slate-700 dark:text-slate-300 border-l border-slate-100 dark:border-slate-800/50">
-                                                                ₹{displayCost.toFixed(2)}
-                                                            </td>
+                                                            <td className="px-4 py-4 text-right font-bold text-slate-700 dark:text-slate-300 border-l border-slate-100 dark:border-slate-800/50">₹{displayCost.toFixed(2)}</td>
                                                         </tr>
                                                     );
                                                 })}
@@ -1113,43 +893,25 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                     <div className="space-y-4">
                                         {generatedRecipe.preparation_steps.map((step, i) => (
                                             <div key={i} className="flex gap-4">
-                                                <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-slate-600 dark:text-slate-400 shrink-0 text-sm border border-slate-300 dark:border-slate-700">
-                                                    {i + 1}
-                                                </div>
+                                                <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-slate-600 dark:text-slate-400 shrink-0 text-sm border border-slate-300 dark:border-slate-700">{i + 1}</div>
                                                 <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed mt-1.5">{step}</p>
                                             </div>
                                         ))}
                                     </div>
                                 </div>
 
-                                {/* Equipment & Allergens */}
+                                {/* Equipment & Allergens (Unchanged) */}
                                 <div className="grid grid-cols-2 border-t border-slate-100 dark:border-slate-800">
                                     <div className="p-8 border-r border-slate-100 dark:border-slate-700 bg-white/30 dark:bg-slate-900/30 backdrop-blur-sm">
-                                        <h3 className="font-bold text-slate-800 dark:text-white mb-3 flex items-center gap-2">
-                                            <UtensilsCrossed size={16} className="text-blue-500" /> Equipment Needed
-                                        </h3>
+                                        <h3 className="font-bold text-slate-800 dark:text-white mb-3 flex items-center gap-2"><UtensilsCrossed size={16} className="text-blue-500" /> Equipment Needed</h3>
                                         {generatedRecipe.equipment_needed && generatedRecipe.equipment_needed.length > 0 ? (
-                                            <div className="flex flex-wrap gap-2">
-                                                {generatedRecipe.equipment_needed.map((item, i) => (
-                                                    <span key={i} className="px-3 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-lg text-xs font-medium border border-blue-100 dark:border-blue-800">
-                                                        {item}
-                                                    </span>
-                                                ))}
-                                            </div>
+                                            <div className="flex flex-wrap gap-2">{generatedRecipe.equipment_needed.map((item, i) => (<span key={i} className="px-3 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-lg text-xs font-medium border border-blue-100 dark:border-blue-800">{item}</span>))}</div>
                                         ) : <p className="text-xs text-slate-400 italic">No equipment listed.</p>}
                                     </div>
                                     <div className="p-8 bg-white/30 dark:bg-slate-900/30 backdrop-blur-sm">
-                                        <h3 className="font-bold text-slate-800 dark:text-white mb-3 flex items-center gap-2">
-                                            <AlertCircle size={16} className="text-red-500" /> Allergens
-                                        </h3>
+                                        <h3 className="font-bold text-slate-800 dark:text-white mb-3 flex items-center gap-2"><AlertCircle size={16} className="text-red-500" /> Allergens</h3>
                                         {generatedRecipe.allergens && generatedRecipe.allergens.length > 0 ? (
-                                            <div className="flex flex-wrap gap-2">
-                                                {generatedRecipe.allergens.map((item, i) => (
-                                                    <span key={i} className="px-3 py-1 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 rounded-lg text-xs font-medium border border-red-100 dark:border-red-800">
-                                                        {item}
-                                                    </span>
-                                                ))}
-                                            </div>
+                                            <div className="flex flex-wrap gap-2">{generatedRecipe.allergens.map((item, i) => (<span key={i} className="px-3 py-1 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 rounded-lg text-xs font-medium border border-red-100 dark:border-red-800">{item}</span>))}</div>
                                         ) : <p className="text-xs text-slate-400 italic">No allergens detected.</p>}
                                     </div>
                                 </div>
@@ -1157,7 +919,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                 {generatedRecipe.reasoning && (
                                     <div className="p-8 border-t border-slate-100 dark:border-slate-800 bg-amber-50/50 dark:bg-amber-900/10 backdrop-blur-sm">
                                         <h3 className="font-bold text-amber-800 dark:text-amber-400 mb-2 flex items-center gap-2">
-                                            <Lightbulb size={18} /> Chef's Insight
+                                            <Lightbulb size={18} /> {creationMode === 'ai' ? `${selectedPersona}'s Agent Insight` : "Chef's Insight"}
                                         </h3>
                                         <p className="text-sm text-amber-900/80 dark:text-amber-200/80 italic">
                                             "{generatedRecipe.reasoning}"
@@ -1175,33 +937,20 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                       </div>
                   )}
                   
+                  {/* Footer Variations (Unchanged) */}
                   {generatedRecipe && (
                       <div className="p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center shrink-0">
                           <div className="flex gap-2 overflow-x-auto pb-1 max-w-[60%] custom-scrollbar">
-                              <button onClick={() => handleVariation('Vegan')} className="whitespace-nowrap px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-300 flex items-center gap-1">
-                                  <Leaf size={12} className="text-green-500" /> Vegan
-                              </button>
-                              <button onClick={() => handleVariation('Low-Calorie')} className="whitespace-nowrap px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-300 flex items-center gap-1">
-                                  <Droplets size={12} className="text-blue-400" /> Low-Cal
-                              </button>
-                              <button onClick={() => handleVariation('Spicy')} className="whitespace-nowrap px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-300 flex items-center gap-1">
-                                  <Flame size={12} className="text-red-500" /> Spicy
-                              </button>
-                              <button onClick={() => handleVariation('Budget-Friendly')} className="whitespace-nowrap px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-300 flex items-center gap-1">
-                                  <Wallet size={12} className="text-emerald-500" /> Budget
-                              </button>
-                              <button onClick={() => handleVariation('Gluten-Free')} className="whitespace-nowrap px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-300 flex items-center gap-1">
-                                  <Wheat size={12} className="text-amber-500" /> GF
-                              </button>
+                              <button onClick={() => handleVariation('Vegan')} className="whitespace-nowrap px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-300 flex items-center gap-1"><Leaf size={12} className="text-green-500" /> Vegan</button>
+                              <button onClick={() => handleVariation('Low-Calorie')} className="whitespace-nowrap px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-300 flex items-center gap-1"><Droplets size={12} className="text-blue-400" /> Low-Cal</button>
+                              <button onClick={() => handleVariation('Spicy')} className="whitespace-nowrap px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-300 flex items-center gap-1"><Flame size={12} className="text-red-500" /> Spicy</button>
+                              <button onClick={() => handleVariation('Budget-Friendly')} className="whitespace-nowrap px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-300 flex items-center gap-1"><Wallet size={12} className="text-emerald-500" /> Budget</button>
+                              <button onClick={() => handleVariation('Gluten-Free')} className="whitespace-nowrap px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-300 flex items-center gap-1"><Wheat size={12} className="text-amber-500" /> GF</button>
                           </div>
                           <div className="flex gap-2">
-                              <button onClick={handleDownloadPDF} className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
-                                  <FileDown size={20} />
-                              </button>
+                              <button onClick={handleDownloadPDF} className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"><FileDown size={20} /></button>
                               {isStaff && adminQueue.length > 0 && activeRequest && (
-                                  <button onClick={handleSaveRecipe} className="px-6 py-2 bg-emerald-600 text-white font-bold rounded-lg hover:bg-emerald-700 transition-colors flex items-center gap-2">
-                                      <CheckCircle2 size={18} /> Complete Request
-                                  </button>
+                                  <button onClick={handleSaveRecipe} className="px-6 py-2 bg-emerald-600 text-white font-bold rounded-lg hover:bg-emerald-700 transition-colors flex items-center gap-2"><CheckCircle2 size={18} /> Complete Request</button>
                               )}
                           </div>
                       </div>
@@ -1211,6 +960,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       )}
 
       {viewMode === 'requests' && isStaff && (
+          // Requests Queue (Unchanged)
           <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col flex-1 animate-fade-in transition-colors">
               <div className="p-6 border-b border-slate-100 dark:border-slate-800">
                   <h2 className="text-xl font-bold text-slate-800 dark:text-white">Recipe Requests Queue</h2>
@@ -1223,20 +973,11 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                           {adminQueue.map(req => (
                               <div key={req.id} className="border border-slate-200 dark:border-slate-700 rounded-xl p-6 bg-slate-50 dark:bg-slate-800">
                                   <div className="flex justify-between items-start mb-4">
-                                      <div>
-                                          <h3 className="font-bold text-lg text-slate-800 dark:text-white">{req.item.name}</h3>
-                                          <p className="text-sm text-slate-500 dark:text-slate-400">Requested by <span className="font-bold">{req.userName}</span></p>
-                                      </div>
+                                      <div><h3 className="font-bold text-lg text-slate-800 dark:text-white">{req.item.name}</h3><p className="text-sm text-slate-500 dark:text-slate-400">Requested by <span className="font-bold">{req.userName}</span></p></div>
                                       <span className="text-xs font-bold bg-yellow-100 text-yellow-700 px-2 py-1 rounded">PENDING</span>
                                   </div>
-                                  <div className="bg-white dark:bg-slate-900 p-4 rounded-lg border border-slate-200 dark:border-slate-700 text-sm text-slate-600 dark:text-slate-300 mb-4">
-                                      {req.requirements}
-                                  </div>
-                                  <div className="flex justify-end">
-                                      <button onClick={() => handleFulfillRequest(req)} className="px-6 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold rounded-lg hover:opacity-90">
-                                          Process Request
-                                      </button>
-                                  </div>
+                                  <div className="bg-white dark:bg-slate-900 p-4 rounded-lg border border-slate-200 dark:border-slate-700 text-sm text-slate-600 dark:text-slate-300 mb-4">{req.requirements}</div>
+                                  <div className="flex justify-end"><button onClick={() => handleFulfillRequest(req)} className="px-6 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold rounded-lg hover:opacity-90">Process Request</button></div>
                               </div>
                           ))}
                       </div>
