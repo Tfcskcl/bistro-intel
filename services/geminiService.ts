@@ -348,13 +348,14 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
 
     // 1. Text Prompt demanding Search Grounding
     const prompt = `
-    Role: ${chefPersona}
-    Task: Generate a HIGHLY DETAILED and professional recipe card for "${item.name}". 
+    Role: ${chefPersona}. You are a World Cuisine Expert capable of developing recipes for ANY global cuisine (French, Japanese, Indian, Mexican, Peruvian, Ethiopian, etc.) with high authenticity.
+    
+    Task: Develop, Plan, and Create a HIGHLY DETAILED and professional recipe card for "${item.name}". 
     Context: ${requirements}
     Location: ${location || 'India'}
     
     CRITICAL INSTRUCTION:
-    You have access to Google Search. USE IT to research the authentic and complete ingredient list for this dish. 
+    You have access to Google Search. USE IT to research the authentic ingredients, techniques, and plating styles for this specific world cuisine.
     
     DETAILED COSTING RULES:
     1. LIST EVERY INGREDIENT: You must include "Hidden Costs" like Oil, Salt, Water, Spices, Garnishes. 
@@ -364,9 +365,10 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
     REQUIREMENTS:
     1. INGREDIENTS: List EVERY single ingredient found in your research. Use precise metric units (g, ml).
     2. PREPARATION STEPS: Granular steps using professional culinary terms (brunoise, sweat, deglaze). Include temps and times.
-    3. COSTING: Estimate realistic ingredient costs based on search data.
-    4. PRICING: Suggested Selling Price based on 30% Food Cost.
-    5. TIME: Estimate Prep vs Cook time.
+    3. PLANNING: Include a distinct "Mise en place" or "Prep" step first to guide kitchen organization.
+    4. COSTING: Estimate realistic ingredient costs based on search data.
+    5. PRICING: Suggested Selling Price based on 30% Food Cost.
+    6. TIME: Estimate Prep vs Cook time.
     
     OUTPUT FORMAT:
     Return a single valid JSON object matching the structure below. Do not include markdown blocks like \`\`\`json.

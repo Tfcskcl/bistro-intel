@@ -26,7 +26,8 @@ const POPULAR_IDEAS = [
     { name: "Pad Thai", desc: "Rice noodles, tamarind sauce, peanuts, bean sprouts, lime, shrimp/tofu.", cuisine: "Thai", ingredients: "Rice Noodles, Tamarind Paste, Peanuts, Bean Sprouts", dietary: ["Gluten-Free", "Dairy-Free"] },
     { name: "Caesar Salad", desc: "Romaine lettuce, croutons, parmesan, creamy caesar dressing.", cuisine: "American", ingredients: "Romaine Lettuce, Parmesan, Croutons, Anchovies", dietary: [] },
     { name: "Butter Chicken", desc: "Tandoori chicken in a rich tomato and butter gravy.", cuisine: "Indian", ingredients: "Chicken, Tomato, Butter, Cream, Garam Masala", dietary: ["Gluten-Free"] },
-    { name: "Acai Bowl", desc: "Frozen acai blend topped with granola, banana, and berries.", cuisine: "Health Food", ingredients: "Acai Pulp, Banana, Granola, Berries", dietary: ["Vegan", "Dairy-Free"] }
+    { name: "Acai Bowl", desc: "Frozen acai blend topped with granola, banana, and berries.", cuisine: "Health Food", ingredients: "Acai Pulp, Banana, Granola, Berries", dietary: ["Vegan", "Dairy-Free"] },
+    { name: "Spicy Chicken Pasta", desc: "Penne pasta with grilled chicken, cherry tomatoes, and chili flakes in a creamy sauce. Moderate spice.", cuisine: "Italian Fusion", ingredients: "Chicken Breast, Penne, Chili Flakes, Cream, Tomato", dietary: [] }
 ];
 
 const CHEF_PERSONAS = [
@@ -35,6 +36,12 @@ const CHEF_PERSONAS = [
     { id: 'The Accountant', name: 'The Accountant', icon: Coins, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-100 dark:bg-emerald-900/30', desc: 'Cost-Optimized' },
     { id: 'The Purist', name: 'The Purist', icon: Flame, color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-100 dark:bg-orange-900/30', desc: 'Authentic & Traditional' },
     { id: 'The Wellness Guru', name: 'The Wellness Guru', icon: Leaf, color: 'text-green-600 dark:text-green-400', bg: 'bg-green-100 dark:bg-green-900/30', desc: 'Healthy & Dietary' }
+];
+
+const CUISINE_OPTIONS = [
+    "Italian", "French", "Indian", "Japanese", "Mexican", "Thai", "Chinese", "Mediterranean", 
+    "Lebanese", "Greek", "Spanish", "Turkish", "Korean", "Vietnamese", "Peruvian", 
+    "Ethiopian", "Moroccan", "Brazilian", "American", "British", "German", "Caribbean", "Indonesian"
 ];
 
 const formatError = (err: any) => {
@@ -87,6 +94,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       cuisine: '',
       yield: '1',
       prepTime: '20',
+      cookTime: '15',
       description: '',
       steps: ''
   });
@@ -253,7 +261,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       setError(null);
       setAltPrices({});
       setSelectedPersona('Executive Chef');
-      setManualForm({ name: '', cuisine: '', yield: '1', prepTime: '20', description: '', steps: '' });
+      setManualForm({ name: '', cuisine: '', yield: '1', prepTime: '20', cookTime: '15', description: '', steps: '' });
       setManualIngredients([{ id: 1, name: '', qty: '', unit: 'g', costPerUnit: '' }]);
       setTargetFoodCost(30);
   };
@@ -439,12 +447,14 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
 
       const totalCostPerServing = ingredients.reduce((acc, curr) => acc + (curr.cost_per_serving || 0), 0);
       const suggestedPrice = totalCostPerServing / (targetFoodCost / 100);
+      const prepTime = parseInt(manualForm.prepTime) || 20;
+      const cookTime = parseInt(manualForm.cookTime) || 15;
 
       const recipe: RecipeCard = {
           sku_id: `MAN-${Date.now().toString().slice(-6)}`,
           name: manualForm.name,
           category: 'main',
-          prep_time_min: parseInt(manualForm.prepTime) || 0,
+          prep_time_min: prepTime,
           current_price: 0,
           ingredients: ingredients,
           yield: yieldNum,
@@ -457,7 +467,10 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
           suggested_selling_price: suggestedPrice,
           tags: ['Manual', manualForm.cuisine].filter(Boolean),
           human_summary: manualForm.description || 'Manually created recipe card.',
-          confidence: 'High'
+          confidence: 'High',
+          prep_time_minutes: prepTime,
+          cook_time_minutes: cookTime,
+          total_time_minutes: prepTime + cookTime
       };
 
       setGeneratedRecipe(recipe);
@@ -468,7 +481,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
           if (!deductCredits()) return;
       }
       setLoading(true);
-      setLoadingText(`${selectedPersona} is creating ${item.name}...`);
+      setLoadingText(`${selectedPersona} is planning and developing ${item.name}...`);
       setGeneratedRecipe(null);
       setPosPushStatus(null);
       setSelectedRestaurantId('');
@@ -710,7 +723,18 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                               </div>
                           )}
                           <div className="grid grid-cols-2 gap-4">
-                              <input type="text" value={cuisine} onChange={(e) => setCuisine(e.target.value)} placeholder="Cuisine Style" className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
+                              <div>
+                                <input 
+                                    list="cuisine-options" 
+                                    value={cuisine} 
+                                    onChange={(e) => setCuisine(e.target.value)} 
+                                    placeholder="Cuisine Style" 
+                                    className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white" 
+                                />
+                                <datalist id="cuisine-options">
+                                    {CUISINE_OPTIONS.map((c, i) => <option key={i} value={c} />)}
+                                </datalist>
+                              </div>
                               <input type="text" value={ingredients} onChange={(e) => setIngredients(e.target.value)} placeholder="Key Ingredients" className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
                           </div>
                           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Preparation context..." className="w-full px-3 py-2 text-sm border rounded-lg h-24 dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
@@ -740,6 +764,17 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                               <div>
                                   <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Target Food Cost %</label>
                                   <input type="number" min="15" max="80" value={targetFoodCost} onChange={(e) => setTargetFoodCost(parseFloat(e.target.value))} className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
+                              </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Prep Time (min)</label>
+                                  <input type="number" value={manualForm.prepTime} onChange={(e) => setManualForm({...manualForm, prepTime: e.target.value})} className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
+                              </div>
+                              <div>
+                                  <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Cook Time (min)</label>
+                                  <input type="number" value={manualForm.cookTime} onChange={(e) => setManualForm({...manualForm, cookTime: e.target.value})} className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
                               </div>
                           </div>
 
@@ -802,17 +837,38 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                             <h1 className="text-3xl font-bold">{generatedRecipe.name}</h1>
                                             <p className="text-slate-300 text-sm mt-2">{generatedRecipe.human_summary}</p>
                                             
-                                            {/* Editable Yield */}
-                                            <div className="flex items-center gap-2 mt-4 bg-white/10 w-fit px-3 py-1.5 rounded-lg border border-white/10">
-                                                <Scale size={16} className="text-emerald-400" />
-                                                <span className="text-xs font-bold uppercase tracking-wide text-slate-300">Yield:</span>
-                                                <input 
-                                                    type="number"
-                                                    value={generatedRecipe.yield || 1}
-                                                    onChange={(e) => handleYieldUpdate(e.target.value)}
-                                                    className="w-12 bg-transparent text-white font-bold text-sm text-center border-b border-white/30 focus:border-emerald-400 outline-none"
-                                                />
-                                                <span className="text-xs text-slate-400">Servings</span>
+                                            <div className="flex gap-4 mt-4">
+                                                {/* Editable Yield */}
+                                                <div className="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-lg border border-white/10">
+                                                    <Scale size={16} className="text-emerald-400" />
+                                                    <span className="text-xs font-bold uppercase tracking-wide text-slate-300">Yield:</span>
+                                                    <input 
+                                                        type="number"
+                                                        value={generatedRecipe.yield || 1}
+                                                        onChange={(e) => handleYieldUpdate(e.target.value)}
+                                                        className="w-12 bg-transparent text-white font-bold text-sm text-center border-b border-white/30 focus:border-emerald-400 outline-none"
+                                                    />
+                                                    <span className="text-xs text-slate-400">Servings</span>
+                                                </div>
+
+                                                {/* Time Display */}
+                                                {(generatedRecipe.prep_time_minutes || 0) > 0 && (
+                                                    <div className="flex items-center gap-4 text-xs font-bold text-slate-300 bg-white/10 px-3 py-1.5 rounded-lg border border-white/10">
+                                                        <div className="flex items-center gap-1.5" title="Prep Time">
+                                                            <Clock size={14} className="text-blue-400"/>
+                                                            <span>{generatedRecipe.prep_time_minutes}m Prep</span>
+                                                        </div>
+                                                        {generatedRecipe.cook_time_minutes && generatedRecipe.cook_time_minutes > 0 && (
+                                                            <>
+                                                                <span className="text-white/20">|</span>
+                                                                <div className="flex items-center gap-1.5" title="Cook Time">
+                                                                    <Flame size={14} className="text-orange-400"/>
+                                                                    <span>{generatedRecipe.cook_time_minutes}m Cook</span>
+                                                                </div>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                         <div className="text-right flex flex-col items-end gap-2 shrink-0">
@@ -823,9 +879,9 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                                 <span className="text-2xl font-black text-white/50">₹</span>
                                                 <input 
                                                     type="number"
-                                                    value={generatedRecipe.suggested_selling_price}
+                                                    value={generatedRecipe.suggested_selling_price.toFixed(2)}
                                                     onChange={(e) => handleManualPriceUpdate(e.target.value)}
-                                                    className="w-28 bg-transparent text-3xl font-black text-right text-white border-b-2 border-white/20 focus:border-emerald-500 outline-none"
+                                                    className="w-32 bg-transparent text-3xl font-black text-right text-white border-b-2 border-white/20 focus:border-emerald-500 outline-none"
                                                 />
                                                 <button onClick={resetSellingPrice} title="Reset to 30% Cost" className="ml-2 p-1 hover:bg-white/10 rounded-full text-slate-400 hover:text-white transition-colors">
                                                     <RefreshCw size={14} />
@@ -851,9 +907,9 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                             <span className="text-lg font-bold text-slate-500 mr-0.5">₹</span>
                                             <input 
                                                 type="number"
-                                                value={generatedRecipe.food_cost_per_serving}
+                                                value={generatedRecipe.food_cost_per_serving.toFixed(2)}
                                                 onChange={(e) => handleManualCostUpdate(e.target.value)}
-                                                className="w-20 bg-transparent text-xl font-bold text-slate-800 dark:text-white text-center border-b border-dashed border-slate-300 focus:border-emerald-500 outline-none"
+                                                className="w-24 bg-transparent text-xl font-bold text-slate-800 dark:text-white text-center border-b border-dashed border-slate-300 focus:border-emerald-500 outline-none"
                                             />
                                         </div>
                                     </div>
@@ -864,7 +920,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                                 type="number"
                                                 value={((generatedRecipe.food_cost_per_serving / generatedRecipe.suggested_selling_price) * 100).toFixed(1)}
                                                 onChange={(e) => handleManualPercentUpdate(e.target.value)}
-                                                className="w-16 bg-transparent text-xl font-bold text-slate-800 dark:text-white text-center border-b border-dashed border-slate-300 focus:border-emerald-500 outline-none"
+                                                className="w-20 bg-transparent text-xl font-bold text-slate-800 dark:text-white text-center border-b border-dashed border-slate-300 focus:border-emerald-500 outline-none"
                                             />
                                             <span className="text-lg font-bold text-slate-500 ml-0.5">%</span>
                                         </div>
@@ -982,18 +1038,39 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                     </div>
                                 </div>
 
-                                <div className="p-8 bg-slate-50/50 dark:bg-slate-950/50 backdrop-blur-sm">
-                                    <h3 className="font-bold text-slate-800 dark:text-white mb-4">Preparation Steps</h3>
-                                    <div className="space-y-4">
-                                        {generatedRecipe.preparation_steps.map((step, i) => (
-                                            <div key={i} className="flex gap-4">
-                                                <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-slate-600 dark:text-slate-400 shrink-0 text-sm border border-slate-300 dark:border-slate-700">
-                                                    {i + 1}
+                                <div className="grid md:grid-cols-2 gap-8 p-8 bg-slate-50/50 dark:bg-slate-950/50 backdrop-blur-sm">
+                                    <div>
+                                        <h3 className="font-bold text-slate-800 dark:text-white mb-4">Preparation Steps</h3>
+                                        <div className="space-y-4">
+                                            {generatedRecipe.preparation_steps.map((step, i) => (
+                                                <div key={i} className="flex gap-4">
+                                                    <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-slate-600 dark:text-slate-400 shrink-0 text-sm border border-slate-300 dark:border-slate-700">
+                                                        {i + 1}
+                                                    </div>
+                                                    <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed mt-1.5">{step}</p>
                                                 </div>
-                                                <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed mt-1.5">{step}</p>
-                                            </div>
-                                        ))}
+                                            ))}
+                                        </div>
                                     </div>
+                                    
+                                    {/* Equipment Section */}
+                                    {generatedRecipe.equipment_needed && generatedRecipe.equipment_needed.length > 0 && (
+                                        <div>
+                                            <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                                                <UtensilsCrossed size={18} className="text-slate-500" /> Equipment Needed
+                                            </h3>
+                                            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-4">
+                                                <ul className="space-y-2">
+                                                    {generatedRecipe.equipment_needed.map((item, i) => (
+                                                        <li key={i} className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+                                                            <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
+                                                            {item}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {generatedRecipe.reasoning && (
