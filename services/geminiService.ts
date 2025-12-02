@@ -74,10 +74,36 @@ export const verifyLocationWithMaps = async (locationQuery: string): Promise<str
   }
 };
 
-export const generateRecipeCard = async (userId: string, item: MenuItem, requirements: string, location?: string): Promise<RecipeCard> => {
+export const generateRecipeCard = async (userId: string, item: MenuItem, requirements: string, location?: string, chefPersona: string = 'Executive Chef'): Promise<RecipeCard> => {
     const apiKey = getApiKey();
     if (!apiKey) throw new Error("API Key Required");
     const ai = new GoogleGenAI({ apiKey });
+
+    // Determine Model and Persona-specific instruction
+    let modelName = 'gemini-2.5-flash';
+    let personaInstruction = "You are a professional Executive Chef. Balance flavor, presentation, and cost.";
+
+    switch (chefPersona) {
+        case 'The Alchemist':
+            modelName = 'gemini-3-pro-preview'; // More reasoning for complex fusion
+            personaInstruction = "You are an avant-garde Molecular Gastronomy Chef. Focus on innovative textures, modern techniques (sous-vide, foams, gels), and fusion of cuisines. Prioritize the 'wow' factor.";
+            break;
+        case 'The Accountant':
+            modelName = 'gemini-2.5-flash'; // Efficiency
+            personaInstruction = "You are a Cost-Control Specialist Chef. Maximize profit margins. Suggest ingredients that have high yield and low waste. Prioritize speed of service and shelf life.";
+            break;
+        case 'The Purist':
+            modelName = 'gemini-3-pro-preview';
+            personaInstruction = "You are a Traditionalist Chef. Focus on authenticity, heritage, and using fewer, higher-quality ingredients. Avoid shortcuts. Highlight the origin of the dish.";
+            break;
+        case 'The Wellness Guru':
+            modelName = 'gemini-2.5-flash';
+            personaInstruction = "You are a Nutrition-focused Chef. Prioritize macros, superfoods, and dietary compatibility (Gluten-free, Keto, Vegan). Highlight health benefits in the summary.";
+            break;
+        default:
+            // Executive Chef
+            break;
+    }
 
     const schema: Schema = {
         type: Type.OBJECT,
@@ -112,20 +138,25 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
         }
     };
 
-    const prompt = `Generate a detailed recipe card for "${item.name}". 
+    const prompt = `
+    Role: ${chefPersona}
+    Mission: ${personaInstruction}
+    
+    Generate a detailed recipe card for "${item.name}". 
     Context/Requirements: ${requirements}
     ${location ? `Location for Costing: ${location}. 
     - Estimate ingredient prices (cost_per_unit) reflective of local wholesale market rates in ${location}.
     - Use local currency (e.g. INR for India) for all costs.` : 'Estimate costs based on average wholesale rates.'}
+    
     ${SYSTEM_INSTRUCTION}`;
 
     const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: modelName,
         contents: prompt,
         config: {
             responseMimeType: 'application/json',
             responseSchema: schema,
-            systemInstruction: SYSTEM_INSTRUCTION
+            systemInstruction: SYSTEM_INSTRUCTION // Base instruction + specific prompt override
         }
     });
 

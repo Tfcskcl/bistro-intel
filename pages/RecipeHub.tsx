@@ -4,7 +4,7 @@ import { PLANS, CREDIT_COSTS } from '../constants';
 import { generateRecipeCard, generateRecipeVariation, hasValidApiKey } from '../services/geminiService';
 import { ingredientService } from '../services/ingredientService';
 import { RecipeCard, MenuItem, User, UserRole, POSChangeRequest, RecipeRequest } from '../types';
-import { Loader2, ChefHat, Scale, Clock, AlertCircle, Upload, Lock, Sparkles, Check, Save, RefreshCw, Search, Plus, Store, Zap, Trash2, Building2, FileSignature, X, AlignLeft, UtensilsCrossed, Inbox, UserCheck, CheckCircle2, Clock3, Carrot, Type, Wallet, Filter, Tag, Eye, Flame, Wand2, Eraser, FileDown, TrendingDown, ArrowRight, Key } from 'lucide-react';
+import { Loader2, ChefHat, Scale, Clock, AlertCircle, Upload, Lock, Sparkles, Check, Save, RefreshCw, Search, Plus, Store, Zap, Trash2, Building2, FileSignature, X, AlignLeft, UtensilsCrossed, Inbox, UserCheck, CheckCircle2, Clock3, Carrot, Type, Wallet, Filter, Tag, Eye, Flame, Wand2, Eraser, FileDown, TrendingDown, ArrowRight, Key, Coins, Leaf, TestTube } from 'lucide-react';
 import { storageService } from '../services/storageService';
 import { authService } from '../services/authService';
 
@@ -27,6 +27,14 @@ const POPULAR_IDEAS = [
     { name: "Caesar Salad", desc: "Romaine lettuce, croutons, parmesan, creamy caesar dressing.", cuisine: "American", ingredients: "Romaine Lettuce, Parmesan, Croutons, Anchovies", dietary: [] },
     { name: "Butter Chicken", desc: "Tandoori chicken in a rich tomato and butter gravy.", cuisine: "Indian", ingredients: "Chicken, Tomato, Butter, Cream, Garam Masala", dietary: ["Gluten-Free"] },
     { name: "Acai Bowl", desc: "Frozen acai blend topped with granola, banana, and berries.", cuisine: "Health Food", ingredients: "Acai Pulp, Banana, Granola, Berries", dietary: ["Vegan", "Dairy-Free"] }
+];
+
+const CHEF_PERSONAS = [
+    { id: 'Executive Chef', name: 'Executive Chef', icon: ChefHat, color: 'text-slate-600 dark:text-slate-300', bg: 'bg-slate-100 dark:bg-slate-800', desc: 'Balanced & Professional' },
+    { id: 'The Alchemist', name: 'The Alchemist', icon: TestTube, color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-100 dark:bg-purple-900/30', desc: 'Modern & Innovative' },
+    { id: 'The Accountant', name: 'The Accountant', icon: Coins, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-100 dark:bg-emerald-900/30', desc: 'Cost-Optimized' },
+    { id: 'The Purist', name: 'The Purist', icon: Flame, color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-100 dark:bg-orange-900/30', desc: 'Authentic & Traditional' },
+    { id: 'The Wellness Guru', name: 'The Wellness Guru', icon: Leaf, color: 'text-green-600 dark:text-green-400', bg: 'bg-green-100 dark:bg-green-900/30', desc: 'Healthy & Dietary' }
 ];
 
 export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
@@ -75,6 +83,8 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
   const [ingredients, setIngredients] = useState('');
   const [dietary, setDietary] = useState<string[]>([]);
   const [notes, setNotes] = useState('');
+  const [selectedPersona, setSelectedPersona] = useState('Executive Chef');
+
   // Helper for sidebar input
   const [customItemName, setCustomItemName] = useState('');
 
@@ -249,6 +259,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       setError(null);
       setCustomItemName('');
       setAltPrices({});
+      setSelectedPersona('Executive Chef');
   };
 
   const loadItemIntoForm = (item: MenuItem) => {
@@ -368,7 +379,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
 
   const runAdminGeneration = async (item: MenuItem, requirements: string, targetUserId?: string) => {
       setLoading(true);
-      setLoadingText(`Designing ${item.name}...`);
+      setLoadingText(`${selectedPersona} is creating ${item.name}...`);
       setGeneratedRecipe(null);
       setPosPushStatus(null);
       setSelectedRestaurantId('');
@@ -377,7 +388,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       try {
           // Use target user ID to fetch correct ingredients
           const contextUserId = targetUserId || (activeRequest ? activeRequest.userId : user.id);
-          const card = await generateRecipeCard(contextUserId, item, requirements, user.location);
+          const card = await generateRecipeCard(contextUserId, item, requirements, user.location, selectedPersona);
           setGeneratedRecipe(card);
       } catch (e: any) {
           console.error(e);
@@ -731,7 +742,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                 onClick={() => handleTabChange('generator')}
                 className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${viewMode === 'generator' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
             >
-                {isAdmin ? (activeRequest ? 'Fulfilling Request' : 'AI Generator') : 'Request Recipe'}
+                {isAdmin ? (activeRequest ? 'Fulfilling Request' : 'BistroChef') : 'Request Recipe'}
             </button>
             <button 
                 onClick={() => handleTabChange('saved')}
@@ -925,7 +936,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                   <div className="flex justify-between items-center mb-6">
                       <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
                           {isAdmin && activeRequest ? <Sparkles className="text-purple-500" /> : <ChefHat className="text-emerald-600" />}
-                          {isAdmin && activeRequest ? 'Fulfilling Request' : 'AI Recipe Generator'}
+                          {isAdmin && activeRequest ? 'Fulfilling Request' : 'BistroChef'}
                       </h2>
                       <button onClick={resetForm} className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 flex items-center gap-1">
                           <RefreshCw size={12} /> Clear Form
@@ -945,6 +956,34 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                   )}
 
                   <form onSubmit={handleFormSubmit} className="space-y-5">
+                      
+                      {/* Chef Persona Selector */}
+                      <div>
+                          <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Chef Persona (AI Model)</label>
+                          <div className="grid grid-cols-2 gap-2">
+                              {CHEF_PERSONAS.map(persona => (
+                                  <button
+                                      key={persona.id}
+                                      type="button"
+                                      onClick={() => setSelectedPersona(persona.id)}
+                                      className={`p-2 rounded-lg border text-left transition-all ${
+                                          selectedPersona === persona.id 
+                                          ? `border-emerald-500 ring-1 ring-emerald-500 ${persona.bg}` 
+                                          : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'
+                                      }`}
+                                  >
+                                      <div className="flex items-center gap-2 mb-1">
+                                          <persona.icon size={14} className={selectedPersona === persona.id ? persona.color : 'text-slate-400'} />
+                                          <span className={`text-xs font-bold ${selectedPersona === persona.id ? 'text-slate-900 dark:text-slate-100' : 'text-slate-600 dark:text-slate-400'}`}>
+                                              {persona.name}
+                                          </span>
+                                      </div>
+                                      <p className="text-[10px] text-slate-500 dark:text-slate-500">{persona.desc}</p>
+                                  </button>
+                              ))}
+                          </div>
+                      </div>
+
                       {/* Dish Name */}
                       <div>
                           <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Dish Name</label>
@@ -1333,8 +1372,8 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                           <div className="w-24 h-24 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-6">
                               <ChefHat size={48} />
                           </div>
-                          <p className="text-lg font-medium">Your AI Chef is Ready</p>
-                          <p className="text-sm text-center max-w-xs mt-2">Fill out the details on the left to generate a professional, cost-optimized recipe card instantly.</p>
+                          <p className="text-lg font-medium">BistroChef is Ready</p>
+                          <p className="text-sm text-center max-w-xs mt-2">Select a persona and fill out the details to generate professional recipe cards instantly.</p>
                       </div>
                   )}
               </div>
