@@ -42,27 +42,27 @@ const formatError = (err: any) => {
     if (!err) return "Unknown error occurred";
     let msg = typeof err === 'string' ? err : err.message || JSON.stringify(err);
     
-    // Attempt to parse JSON error strings
+    // Attempt to parse JSON error strings from Google
     try {
-        // Handle "Error: { ... }" strings that sometimes leak from libraries
         if (msg.startsWith('Error: ')) msg = msg.substring(7);
-        
         if (msg.trim().startsWith('{')) {
             const parsed = JSON.parse(msg);
             if (parsed.error) {
-                if (parsed.error.message) return parsed.error.message;
-                // Handle nested Google error format
+                // Handle specific Google API error structure
                 if (parsed.error.code === 403 || parsed.error.status === 'PERMISSION_DENIED') {
-                    return "Access Denied: The API Key is invalid, expired, or blocked.";
+                    return "Access Denied: Your API Key is invalid or has been blocked/leaked.";
                 }
+                return parsed.error.message || "API Error";
             }
         }
     } catch (e) {}
     
-    // Friendly overrides for common API errors
-    if (msg.includes('PERMISSION_DENIED') || msg.includes('403')) return "Access Denied: Please update your API Key.";
-    if (msg.includes('leaked') || msg.includes('compromised')) return "Your API Key was blocked for security reasons. Please generate a new one.";
-    if (msg.includes('API Key Required')) return "API Key is missing. Please connect one.";
+    if (msg.includes('PERMISSION_DENIED') || msg.includes('403') || msg.includes('leaked')) {
+        return "Access Denied: Your API Key is invalid or blocked.";
+    }
+    if (msg.includes('API Key Required') || msg.includes('missing')) {
+        return "API Key is missing. Please connect one to continue.";
+    }
     
     return msg;
 };
@@ -133,23 +133,21 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
     refreshRequests();
   }, [user.id, user.role]);
 
-  // Poll for API Key Status & Auto-recover if key is added
+  // Poll for API Key Status & Auto-recover
   useEffect(() => {
     const checkKey = async () => {
-        // 1. Check local key (includes blacklist check in service)
+        // 1. Check local key
         if (hasValidApiKey()) {
             setHasApiKey(true);
-            // Auto-clear API errors if key is now present
-            if (error && (error.includes('API Key') || error.includes('missing') || error.includes('Access Denied'))) {
+            if (error && (error.includes('API Key') || error.includes('missing'))) {
                 setError(null);
             }
             return;
         } else {
-            // Ensure state reflects invalid key
             setHasApiKey(false);
         }
 
-        // 2. Check AI Studio Bridge
+        // 2. Check AI Studio Bridge (Dev Mode)
         if ((window as any).aistudio) {
             try {
                 const has = await (window as any).aistudio.hasSelectedApiKey();
@@ -163,18 +161,17 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
         }
     };
     
-    // Initial immediate check
     checkKey();
-    
     const interval = setInterval(checkKey, 2000);
     return () => clearInterval(interval);
   }, [error]);
 
-  // Handle Leaked Key / Permission Errors - Force Reset
+  // Handle Leaked Key Automatically
   useEffect(() => {
-      if (error && (error.includes('leaked') || error.includes('Access Denied') || error.includes('403'))) {
-          setHasApiKey(false); // Force UI to show "Connect Key"
-          localStorage.removeItem('gemini_api_key'); // Ensure bad key is gone
+      if (error && (error.includes('blocked') || error.includes('Access Denied') || error.includes('403'))) {
+          console.warn("API Key appears invalid/leaked. Clearing storage.");
+          localStorage.removeItem('gemini_api_key');
+          setHasApiKey(false);
       }
   }, [error]);
 
@@ -599,7 +596,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
   };
 
   const handleConnectKey = async () => {
-      // 1. Try AI Studio
+      // 1. Try AI Studio Bridge (if in IDX/Dev)
       if ((window as any).aistudio) {
           try {
               await (window as any).aistudio.openSelectKey();
@@ -611,12 +608,13 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
           }
       }
       
-      // 2. Fallback to manual entry
-      const key = prompt("Please enter your Google Gemini API Key:", "");
-      if (key) {
-          setStoredApiKey(key);
+      // 2. Fallback to manual entry for live site
+      const key = prompt("Please enter your Google Gemini API Key:\n(It will be stored securely in your browser)");
+      if (key && key.trim().length > 10) {
+          setStoredApiKey(key.trim());
           setHasApiKey(true);
           setError(null);
+          alert("API Key connected successfully! You can now generate recipes.");
       }
   };
 
@@ -740,7 +738,8 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
 
   return (
     <div className="h-[calc(100vh-6rem)] flex flex-col gap-4 relative">
-      {/* ... [Request Preview Modal] ... */}
+      {/* ... [Request Preview Modal omitted for brevity - no changes needed] ... */}
+      {/* Copied from previous logic as it remains valid */}
       {previewRequest && (
           <div className="absolute inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
               <div className="bg-white dark:bg-slate-900 rounded-xl w-full max-w-md shadow-2xl border border-slate-200 dark:border-slate-800 animate-scale-in">
@@ -816,9 +815,19 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
             </button>
         </div>
         
-        <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-400 rounded-full text-xs font-bold">
-            <Wallet size={12} />
-            Credits: {user.credits}
+        <div className="flex items-center gap-3">
+            <button 
+                onClick={handleConnectKey}
+                className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold border transition-colors ${hasApiKey ? 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50' : 'bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-100'}`}
+                title="Manage API Key"
+            >
+                <Key size={12} />
+                {hasApiKey ? 'API Key Active' : 'API Key Missing'}
+            </button>
+            <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-400 rounded-full text-xs font-bold">
+                <Wallet size={12} />
+                Credits: {user.credits}
+            </div>
         </div>
       </div>
 
@@ -877,7 +886,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
           </div>
       )}
 
-      {/* [Saved View Render Code Omitted for brevity - same as before] */}
+      {/* Saved View */}
       {viewMode === 'saved' && (
           <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col flex-1 animate-fade-in transition-colors">
               <div className="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 flex flex-col sm:flex-row justify-between items-center gap-4">
@@ -1138,8 +1147,10 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                       {error && (
                           <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm rounded-lg flex flex-col gap-2 border border-red-100 dark:border-red-900/50 animate-fade-in">
                               <div className="flex items-center gap-2">
-                                  <AlertCircle size={16} /> <span className="font-bold">Error:</span> {error}
+                                  <AlertCircle size={16} /> <span className="font-bold">System Message:</span>
                               </div>
+                              <p className="text-xs opacity-90 leading-relaxed">{error}</p>
+                              
                               <div className="flex items-center gap-2 mt-1">
                                   {/* Prompt for key if API Key issue or 403 Permission Denied */}
                                   {(!hasApiKey || error.includes('API Key') || error.includes('Access Denied')) && (

@@ -1,22 +1,23 @@
 
-import { GoogleGenAI, Type, Schema } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 import { SYSTEM_INSTRUCTION, MARKDOWN_INSTRUCTION, APP_CONTEXT } from "../constants";
 import { RecipeCard, SOP, StrategyReport, ImplementationGuide, MenuItem, MenuGenerationRequest } from "../types";
 
 const getApiKey = (): string => {
-  // 1. Check Local Storage (User Override / Manual Entry)
+  // 1. Check Environment Variable (Preferred for Production deployments)
+  if (process.env.API_KEY) return process.env.API_KEY;
+
+  // 2. Check Local Storage (User Override / Manual Entry for Live Site)
   const localKey = localStorage.getItem('gemini_api_key');
   if (localKey) return localKey;
-
-  // 2. Check Environment Variable (Cloud / Build time)
-  if (process.env.API_KEY) return process.env.API_KEY;
 
   return '';
 };
 
 export const setStoredApiKey = (key: string) => {
-    localStorage.setItem('gemini_api_key', key);
-    window.location.reload(); // Reload to reset state with new key
+    if (!key) return;
+    localStorage.setItem('gemini_api_key', key.trim());
+    // We don't reload automatically to allow UI to update state gracefully
 };
 
 // Helper for UI components to check status
@@ -57,96 +58,96 @@ const parseJSON = <T>(text: string | undefined): T => {
         } catch (e2) {
             // Ignore secondary error
         }
-        throw new Error("Failed to parse AI response. The model might be overloaded or returned invalid data.");
+        throw new Error("Failed to parse AI response. The model generated invalid JSON.");
     }
 };
 
-export const verifyLocationWithMaps = async (locationQuery: string): Promise<string> => {
-  const apiKey = getApiKey();
-  if (!apiKey) return "API Key Required for location verification.";
+const createAIClient = () => {
+    const key = getApiKey();
+    if (!key) throw new Error("API Key is missing. Please connect your Google Gemini API Key.");
+    return new GoogleGenAI({ apiKey: key });
+};
 
-  const ai = new GoogleGenAI({ apiKey });
-  
+export const verifyLocationWithMaps = async (locationQuery: string): Promise<string> => {
   try {
+    const ai = createAIClient();
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
-      contents: [{ parts: [{ text: `Verify this location for a business registration: "${locationQuery}". Return the official formatted address and a very brief description of the area type (e.g. commercial, residential).` }] }],
+      contents: [{ parts: [{ text: `Verify this location for a business: "${locationQuery}". Return the formatted address and area type (Commercial/Residential).` }] }],
       config: {
         tools: [{ googleMaps: {} }],
-        // responseMimeType is not allowed when using the googleMaps tool.
       }
     });
     
     return response.text || "Could not verify location.";
   } catch (error: any) {
       console.error("Maps Error:", error);
-      return "Verification unavailable.";
+      return "Location verification unavailable.";
   }
 };
 
 export const generateRecipeCard = async (userId: string, item: MenuItem, requirements: string, location?: string, chefPersona: string = 'Executive Chef'): Promise<RecipeCard> => {
-    const apiKey = getApiKey();
-    if (!apiKey) throw new Error("API Key Required");
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = createAIClient();
 
     // Determine Model and Persona-specific instruction
-    let modelName = 'gemini-2.5-flash';
+    let modelName = 'gemini-2.5-flash'; 
     let personaInstruction = "You are a professional Executive Chef. Balance flavor, presentation, and cost.";
 
     switch (chefPersona) {
         case 'The Alchemist':
-            modelName = 'gemini-3-pro-preview'; // More reasoning for complex fusion
-            personaInstruction = "You are an avant-garde Molecular Gastronomy Chef. Focus on innovative textures, modern techniques (sous-vide, foams, gels), and fusion of cuisines. Prioritize the 'wow' factor.";
+            personaInstruction = "You are an avant-garde Molecular Gastronomy Chef. Focus on innovative textures, modern techniques (sous-vide, foams, gels), and fusion. Prioritize the 'wow' factor.";
             break;
         case 'The Accountant':
-            modelName = 'gemini-2.5-flash'; // Efficiency
-            personaInstruction = "You are a Cost-Control Specialist Chef. Maximize profit margins. Suggest ingredients that have high yield and low waste. Prioritize speed of service and shelf life.";
+            personaInstruction = "You are a Cost-Control Specialist Chef. Maximize profit margins. Suggest ingredients that have high yield and low waste. Prioritize speed of service.";
             break;
         case 'The Purist':
-            modelName = 'gemini-3-pro-preview';
-            personaInstruction = "You are a Traditionalist Chef. Focus on authenticity, heritage, and using fewer, higher-quality ingredients. Avoid shortcuts. Highlight the origin of the dish.";
+            personaInstruction = "You are a Traditionalist Chef. Focus on authenticity, heritage, and using fewer, higher-quality ingredients. Avoid shortcuts. Highlight the origin.";
             break;
         case 'The Wellness Guru':
-            modelName = 'gemini-2.5-flash';
-            personaInstruction = "You are a Nutrition-focused Chef. Prioritize macros, superfoods, and dietary compatibility (Gluten-free, Keto, Vegan). Highlight health benefits in the summary.";
+            personaInstruction = "You are a Nutrition-focused Chef. Prioritize macros, superfoods, and dietary compatibility (Gluten-free, Keto, Vegan). Highlight health benefits.";
             break;
         default:
-            // Executive Chef
             break;
     }
 
-    // Template to guide the model (More robust than strict Schema for complex creative tasks)
-    const jsonTemplate = {
-        sku_id: "string",
-        name: "string",
-        category: "main",
-        prep_time_min: 0,
-        current_price: 0,
-        ingredients: [
-            { name: "string", qty: "string", qty_per_serving: 0, cost_per_unit: 0, unit: "string", cost_per_serving: 0 }
+    // Explicit JSON Template for Prompt-Guided Generation
+    const jsonStructure = `
+    {
+        "sku_id": "${item.sku_id || 'generated'}",
+        "name": "Dish Name",
+        "category": "main",
+        "prep_time_min": 15,
+        "current_price": 0,
+        "ingredients": [
+            { "name": "Ingredient Name", "qty": "100g", "qty_per_serving": 100, "cost_per_unit": 50, "unit": "g", "cost_per_serving": 5 }
         ],
-        yield: 0,
-        preparation_steps: ["string"],
-        food_cost_per_serving: 0,
-        suggested_selling_price: 0,
-        tags: ["string"],
-        human_summary: "string",
-        reasoning: "string",
-        confidence: "High"
-    };
+        "yield": 1,
+        "preparation_steps": ["Step 1", "Step 2"],
+        "food_cost_per_serving": 0,
+        "suggested_selling_price": 0,
+        "tags": ["Tag1", "Tag2"],
+        "human_summary": "A brief description...",
+        "reasoning": "Why this recipe works...",
+        "confidence": "High"
+    }
+    `;
 
     const prompt = `
     Role: ${chefPersona}
     Mission: ${personaInstruction}
     
-    Generate a detailed recipe card for "${item.name}". 
-    Context/Requirements: ${requirements}
-    ${location ? `Location for Costing: ${location}. 
-    - Estimate ingredient prices (cost_per_unit) reflective of local wholesale market rates in ${location}.
-    - Use local currency (e.g. INR for India) for all costs.` : 'Estimate costs based on average wholesale rates.'}
+    Task: Generate a professional recipe card for "${item.name}". 
+    Context: ${requirements}
     
-    Output STRICT JSON matching this structure:
-    ${JSON.stringify(jsonTemplate)}
+    Costing Rules:
+    - Location: ${location || 'Global Average'}.
+    - Estimate ingredient 'cost_per_unit' based on wholesale market rates in ${location || 'this region'}.
+    - Calculate 'cost_per_serving' = (qty_per_serving * cost_per_unit).
+    - Calculate 'food_cost_per_serving' as sum of ingredient costs.
+    - Set 'suggested_selling_price' to achieve a 25-30% food cost percentage.
+    
+    Output STRICT JSON matching this structure exactly:
+    ${jsonStructure}
     
     ${SYSTEM_INSTRUCTION}`;
 
@@ -154,8 +155,7 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
         model: modelName,
         contents: prompt,
         config: {
-            responseMimeType: 'application/json',
-            // Removed strict responseSchema to prevent validation errors on creative outputs
+            responseMimeType: 'application/json'
         }
     });
 
@@ -163,13 +163,18 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
 };
 
 export const generateRecipeVariation = async (userId: string, original: RecipeCard, variationType: string, location?: string): Promise<RecipeCard> => {
-    const apiKey = getApiKey();
-    if (!apiKey) throw new Error("API Key Required");
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = createAIClient();
 
-    const prompt = `Create a "${variationType}" variation of the following recipe: ${JSON.stringify(original)}.
-    Maintain the same JSON structure. Adjust ingredients, steps, and costs accordingly.
-    ${location ? `Ensure revised costs reflect local market rates in ${location}.` : ''}
+    const prompt = `
+    Task: Create a "${variationType}" variation of the following recipe.
+    Original Recipe JSON: ${JSON.stringify(original)}
+    
+    Requirements:
+    1. Adjust ingredients to match the "${variationType}" style (e.g. Vegan = no animal products, Budget = cheaper alternatives).
+    2. Recalculate all costs based on new ingredients.
+    3. Keep the exact same JSON structure.
+    4. Update the 'name' to reflect the variation.
+    
     Output STRICT JSON.`;
 
     const response = await ai.models.generateContent({
@@ -184,25 +189,22 @@ export const generateRecipeVariation = async (userId: string, original: RecipeCa
 };
 
 export const substituteIngredient = async (recipe: RecipeCard, ingredientName: string, location?: string): Promise<RecipeCard> => {
-    const apiKey = getApiKey();
-    if (!apiKey) throw new Error("API Key Required");
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = createAIClient();
 
     const prompt = `
     Context: Professional Kitchen.
-    Task: Substitute the ingredient "${ingredientName}" in the provided recipe with a suitable alternative.
+    Task: Substitute "${ingredientName}" in the provided recipe with a suitable alternative.
     Goal: Reduce cost or improve availability while maintaining the dish's essence.
     
     Recipe JSON:
     ${JSON.stringify(recipe)}
 
     Instructions:
-    1. Identify a good substitute for "${ingredientName}".
-    2. Replace the ingredient in the 'ingredients' list.
-    3. Update 'qty', 'cost_per_unit', 'cost_per_serving' for the new ingredient based on local market rates in "${location || 'General Market'}".
+    1. Identify a good substitute.
+    2. Replace the ingredient object in the 'ingredients' array.
+    3. Update 'qty', 'cost_per_unit', 'cost_per_serving' based on local rates in "${location || 'General Market'}".
     4. Recalculate 'food_cost_per_serving' and 'margin_pct' for the whole dish.
-    5. Update 'preparation_steps' if the new ingredient requires different processing.
-    6. Return the COMPLETE updated RecipeCard JSON.
+    5. Return the COMPLETE updated RecipeCard JSON.
     `;
 
     const response = await ai.models.generateContent({
@@ -217,32 +219,32 @@ export const substituteIngredient = async (recipe: RecipeCard, ingredientName: s
 };
 
 export const generateSOP = async (topic: string): Promise<SOP> => {
-    const apiKey = getApiKey();
-    if (!apiKey) throw new Error("API Key Required");
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = createAIClient();
 
     const jsonTemplate = {
-        sop_id: "string",
-        title: "string",
-        scope: "string",
-        prerequisites: "string",
-        materials_equipment: ["string"],
+        sop_id: "SOP-GEN-001",
+        title: "SOP Title",
+        scope: "Who this applies to",
+        prerequisites: "Requirements before starting",
+        materials_equipment: ["Item 1", "Item 2"],
         stepwise_procedure: [
-            { step_no: 1, action: "string", responsible_role: "string", time_limit: "string" }
+            { step_no: 1, action: "Action description", responsible_role: "Role", time_limit: "5 mins" }
         ],
-        critical_control_points: ["string"],
-        monitoring_checklist: ["string"],
-        kpis: ["string"],
-        quick_troubleshooting: "string"
+        critical_control_points: ["Safety check 1"],
+        monitoring_checklist: ["Check 1"],
+        kpis: ["Success Metric"],
+        quick_troubleshooting: "If X happens, do Y"
     };
 
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: `Create a Standard Operating Procedure (SOP) for: ${topic}. 
+        contents: `Create a Standard Operating Procedure (SOP) for: "${topic}". 
+        Role: F&B Operations Manager.
+        Tone: Professional, Clear, Actionable.
+        
         Output STRICT JSON matching this structure: ${JSON.stringify(jsonTemplate)}`,
         config: {
-            responseMimeType: 'application/json',
-            systemInstruction: SYSTEM_INSTRUCTION
+            responseMimeType: 'application/json'
         }
     });
 
@@ -250,31 +252,38 @@ export const generateSOP = async (topic: string): Promise<SOP> => {
 };
 
 export const generateStrategy = async (role: string, query: string): Promise<StrategyReport> => {
-    const apiKey = getApiKey();
-    if (!apiKey) throw new Error("API Key Required");
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = createAIClient();
 
     const jsonTemplate = {
-        summary: ["string"],
-        causes: ["string"],
+        summary: ["Key insight 1", "Key insight 2"],
+        causes: ["Root cause 1", "Root cause 2"],
         action_plan: [
-            { initiative: "string", impact_estimate: "string", cost_estimate: "string", priority: "High" }
+            { initiative: "Action Name", impact_estimate: "High Impact", cost_estimate: "Low Cost", priority: "High" }
         ],
         seasonal_menu_suggestions: [
-            { type: "add", item: "string", reason: "string" }
+            { type: "add", item: "Dish Name", reason: "Why it works" }
         ],
         roadmap: [
-            { phase_name: "string", duration: "string", steps: ["string"], milestone: "string" }
+            { phase_name: "Phase 1", duration: "Week 1", steps: ["Step 1", "Step 2"], milestone: "Goal Achieved" }
         ]
     };
 
+    const prompt = `
+    Role: Senior Restaurant Consultant acting as ${role}.
+    Query: "${query}"
+    
+    Analyze the situation and provide a strategic plan.
+    Focus on: Revenue Growth, Cost Reduction, and Operational Efficiency.
+    
+    Output STRICT JSON matching this structure:
+    ${JSON.stringify(jsonTemplate)}
+    `;
+
     const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
-        contents: `Role: ${role}. Query: ${query}. Provide a strategic analysis.
-        Output STRICT JSON matching this structure: ${JSON.stringify(jsonTemplate)}`,
+        model: 'gemini-2.5-flash',
+        contents: prompt,
         config: {
-            responseMimeType: 'application/json',
-            systemInstruction: APP_CONTEXT
+            responseMimeType: 'application/json'
         }
     });
 
@@ -282,25 +291,22 @@ export const generateStrategy = async (role: string, query: string): Promise<Str
 };
 
 export const generateImplementationPlan = async (title: string): Promise<ImplementationGuide> => {
-    const apiKey = getApiKey();
-    if (!apiKey) throw new Error("API Key Required");
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = createAIClient();
 
     const jsonTemplate = {
-        objective: "string",
-        estimated_timeline: "string",
+        objective: "Clear objective statement",
+        estimated_timeline: "e.g. 2 Weeks",
         phases: [
-            { phase_name: "string", steps: ["string"], resources_needed: ["string"], kpi_to_track: "string" }
+            { phase_name: "Phase 1: Preparation", steps: ["Step 1", "Step 2"], resources_needed: ["Resource A"], kpi_to_track: "Metric" }
         ]
     };
 
     const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
-        contents: `Create a detailed implementation guide for: ${title}.
+        model: 'gemini-2.5-flash',
+        contents: `Create a detailed implementation guide for: "${title}".
         Output STRICT JSON matching this structure: ${JSON.stringify(jsonTemplate)}`,
         config: {
-            responseMimeType: 'application/json',
-            systemInstruction: "You are an operations manager. Provide clear, step-by-step instructions."
+            responseMimeType: 'application/json'
         }
     });
 
@@ -308,22 +314,20 @@ export const generateImplementationPlan = async (title: string): Promise<Impleme
 };
 
 export const generateMarketingVideo = async (images: string[], prompt: string, aspectRatio: '16:9' | '9:16' | '1:1'): Promise<string> => {
+    const ai = createAIClient();
     const apiKey = getApiKey();
-    if (!apiKey) throw new Error("API Key Required");
-    const ai = new GoogleGenAI({ apiKey });
 
-    // Using Veo fast for preview.
-    // Veo supports 16:9 or 9:16. Mapping 1:1 to 9:16 as fallback.
     const ar = aspectRatio === '1:1' ? '9:16' : aspectRatio;
 
     let operation;
+    
     if (images.length > 0) {
         operation = await ai.models.generateVideos({
             model: 'veo-3.1-fast-generate-preview',
             prompt: prompt,
             image: {
                 imageBytes: images[0],
-                mimeType: 'image/png', // Assumption based on input handling
+                mimeType: 'image/png', 
             },
             config: {
                 numberOfVideos: 1,
@@ -356,9 +360,7 @@ export const generateMarketingVideo = async (images: string[], prompt: string, a
 };
 
 export const generateMarketingImage = async (prompt: string, aspectRatio: '16:9' | '9:16' | '1:1'): Promise<string> => {
-    const apiKey = getApiKey();
-    if (!apiKey) throw new Error("API Key Required");
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = createAIClient();
 
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash-image',
@@ -379,13 +381,12 @@ export const generateMarketingImage = async (prompt: string, aspectRatio: '16:9'
 };
 
 export const generateKitchenWorkflow = async (description: string): Promise<string> => {
-    const apiKey = getApiKey();
-    if (!apiKey) throw new Error("API Key Required");
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = createAIClient();
 
     const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
-        contents: `Analyze this kitchen workflow issue and suggest an optimization plan: ${description}. Use Markdown formatting.`,
+        model: 'gemini-2.5-flash',
+        contents: `Analyze this kitchen workflow issue and suggest an optimization plan: ${description}. 
+        Return a well-formatted Markdown response with headings, bullet points, and a diagram description if needed.`,
         config: {
             systemInstruction: MARKDOWN_INSTRUCTION
         }
@@ -395,9 +396,7 @@ export const generateKitchenWorkflow = async (description: string): Promise<stri
 };
 
 export const generateMenu = async (request: MenuGenerationRequest): Promise<string> => {
-    const apiKey = getApiKey();
-    if (!apiKey) throw new Error("API Key Required");
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = createAIClient();
 
     const prompt = `Generate a restaurant menu.
     Restaurant: ${request.restaurantName} (${request.cuisineType})
@@ -406,10 +405,10 @@ export const generateMenu = async (request: MenuGenerationRequest): Promise<stri
     Must Include: ${request.mustIncludeItems}
     Restrictions: ${request.dietaryRestrictions.join(', ')}
     
-    Output in Markdown.`;
+    Output in clean Markdown format with categories, dish names, descriptions, and prices.`;
 
     const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
+        model: 'gemini-2.5-flash',
         contents: prompt,
         config: {
             systemInstruction: MARKDOWN_INSTRUCTION
@@ -420,9 +419,7 @@ export const generateMenu = async (request: MenuGenerationRequest): Promise<stri
 };
 
 export const getChatResponse = async (history: {role: string, text: string}[], message: string): Promise<string> => {
-    const apiKey = getApiKey();
-    if (!apiKey) throw new Error("API Key Required");
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = createAIClient();
 
     const chat = ai.chats.create({
         model: 'gemini-2.5-flash',

@@ -30,7 +30,8 @@ if (isFirebaseConfigured) {
     console.error("Firebase initialization error:", e);
   }
 } else {
-    console.warn("Firebase not configured. Using Mock Authentication.");
+    // Suppress warning, show info instead for cleaner console
+    console.info("BistroIntelligence: Running in Demo Mode (Mock Authentication Active)");
 }
 
 export { app, auth, db };
