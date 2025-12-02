@@ -94,7 +94,9 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
             try {
                 const has = await (window as any).aistudio.hasSelectedApiKey();
                 setHasApiKey(has);
-                if (has && error === 'API Key Missing') setError(null);
+                if (has && error && (error.includes('API Key') || error.includes('missing'))) {
+                    setError(null);
+                }
             } catch (e) {
                 console.error("Error checking API key", e);
             }
@@ -1398,12 +1400,22 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                         <div className="flex items-center gap-2">
                                             <AlertCircle size={16} /> {error}
                                         </div>
-                                        <button 
-                                            onClick={() => setError(null)}
-                                            className="text-xs underline hover:text-red-800 dark:hover:text-red-300"
-                                        >
-                                            Dismiss
-                                        </button>
+                                        <div className="flex items-center gap-2">
+                                            {(error.includes('API Key') || error.includes('configure') || error.includes('unauthenticated')) && (
+                                                <button 
+                                                    onClick={handleConnectKey}
+                                                    className="px-3 py-1 bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-200 text-xs font-bold rounded hover:bg-red-200 dark:hover:bg-red-700 transition-colors"
+                                                >
+                                                    Connect Key
+                                                </button>
+                                            )}
+                                            <button 
+                                                onClick={() => setError(null)}
+                                                className="text-xs underline hover:text-red-800 dark:hover:text-red-300"
+                                            >
+                                                Dismiss
+                                            </button>
+                                        </div>
                                     </div>
                                 )}
 
