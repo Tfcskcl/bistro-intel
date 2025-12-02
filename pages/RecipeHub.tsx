@@ -249,8 +249,6 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       const newSellingPrice = generatedRecipe.suggested_selling_price * factor;
 
       // Update Ingredients Qty Display (Qty Per Serving)
-      // Note: In typical recipe cards, "Yield" changes often imply re-portioning the total batch.
-      // So qty_per_serving should change.
       const updatedIngredients = generatedRecipe.ingredients.map(ing => ({
           ...ing,
           qty_per_serving: (ing.qty_per_serving || 0) * factor,
@@ -268,25 +266,34 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
 
   const handleManualCostUpdate = (newCostStr: string) => {
       if (!generatedRecipe) return;
-      const newCost = parseFloat(newCostStr);
-      if (isNaN(newCost)) return;
-
+      const newCost = newCostStr === '' ? 0 : parseFloat(newCostStr);
+      
       setGeneratedRecipe({
           ...generatedRecipe,
           food_cost_per_serving: newCost
-          // We don't auto-update selling price here to let user see margin impact, 
-          // unless they use the "Auto Calc" button which we can add later.
       });
   };
 
   const handleManualPriceUpdate = (newPriceStr: string) => {
       if (!generatedRecipe) return;
-      const newPrice = parseFloat(newPriceStr);
-      if (isNaN(newPrice)) return;
+      const newPrice = newPriceStr === '' ? 0 : parseFloat(newPriceStr);
 
       setGeneratedRecipe({
           ...generatedRecipe,
           suggested_selling_price: newPrice
+      });
+  };
+
+  const handleManualPercentUpdate = (newPctStr: string) => {
+      if (!generatedRecipe) return;
+      const newPct = parseFloat(newPctStr);
+      if (isNaN(newPct) || newPct <= 0) return;
+
+      const newSellingPrice = generatedRecipe.food_cost_per_serving / (newPct / 100);
+      
+      setGeneratedRecipe({
+          ...generatedRecipe,
+          suggested_selling_price: newSellingPrice
       });
   };
 
@@ -780,7 +787,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                               <span className="text-2xl font-black text-white/50">₹</span>
                                               <input 
                                                   type="number"
-                                                  value={generatedRecipe.suggested_selling_price.toFixed(2)}
+                                                  value={generatedRecipe.suggested_selling_price}
                                                   onChange={(e) => handleManualPriceUpdate(e.target.value)}
                                                   className="w-28 bg-transparent text-3xl font-black text-right text-white border-b-2 border-white/20 focus:border-emerald-500 outline-none"
                                               />
@@ -808,17 +815,23 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                           <span className="text-lg font-bold text-slate-500 mr-0.5">₹</span>
                                           <input 
                                               type="number"
-                                              value={generatedRecipe.food_cost_per_serving.toFixed(2)}
+                                              value={generatedRecipe.food_cost_per_serving}
                                               onChange={(e) => handleManualCostUpdate(e.target.value)}
                                               className="w-20 bg-transparent text-xl font-bold text-slate-800 dark:text-white text-center border-b border-dashed border-slate-300 focus:border-emerald-500 outline-none"
                                           />
                                       </div>
                                   </div>
-                                  <div className="p-4 border-r border-slate-100 dark:border-slate-700">
-                                      <p className="text-xs text-slate-500 dark:text-slate-400 uppercase font-bold">Food Cost %</p>
-                                      <p className="text-xl font-bold text-slate-800 dark:text-white mt-1">
-                                          {((generatedRecipe.food_cost_per_serving / generatedRecipe.suggested_selling_price) * 100).toFixed(1)}%
-                                      </p>
+                                  <div className="p-4 border-r border-slate-100 dark:border-slate-700 flex flex-col items-center">
+                                      <p className="text-xs text-slate-500 dark:text-slate-400 uppercase font-bold mb-1 flex items-center gap-1">Food Cost % <Edit2 size={10}/></p>
+                                      <div className="flex items-center justify-center">
+                                          <input 
+                                              type="number"
+                                              value={((generatedRecipe.food_cost_per_serving / generatedRecipe.suggested_selling_price) * 100).toFixed(1)}
+                                              onChange={(e) => handleManualPercentUpdate(e.target.value)}
+                                              className="w-16 bg-transparent text-xl font-bold text-slate-800 dark:text-white text-center border-b border-dashed border-slate-300 focus:border-emerald-500 outline-none"
+                                          />
+                                          <span className="text-lg font-bold text-slate-500 ml-0.5">%</span>
+                                      </div>
                                   </div>
                                   <div className="p-4">
                                       <p className="text-xs text-slate-500 dark:text-slate-400 uppercase font-bold">Gross Margin</p>
