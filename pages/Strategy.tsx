@@ -470,15 +470,32 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
       {/* Chat Area */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-8 bg-slate-50 dark:bg-slate-900 custom-scrollbar">
         {error && (
-            <div className="max-w-4xl mx-auto mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/50 rounded-lg flex items-center gap-3 text-red-700 dark:text-red-400 animate-fade-in shadow-sm">
-                <AlertTriangle size={20} className="shrink-0" />
-                <p className="flex-1 font-medium text-sm">{error}</p>
-                <button 
-                    onClick={() => setError(null)} 
-                    className="text-xs font-bold uppercase hover:underline"
-                >
-                    Dismiss
-                </button>
+            <div className="max-w-4xl mx-auto mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/50 rounded-lg flex items-center gap-3 text-red-700 dark:text-red-400 animate-fade-in shadow-sm justify-between">
+                <div className="flex items-center gap-3">
+                    <AlertTriangle size={20} className="shrink-0" />
+                    <p className="font-medium text-sm">{error}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                    {(error.includes('API Key') || error.includes('configure') || error.includes('unauthenticated')) && (
+                        <button 
+                            onClick={async () => {
+                                if ((window as any).aistudio) {
+                                    await (window as any).aistudio.openSelectKey();
+                                    setError(null);
+                                }
+                            }}
+                            className="px-3 py-1 bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-200 text-xs font-bold rounded hover:bg-red-200 dark:hover:bg-red-700 transition-colors"
+                        >
+                            Connect Key
+                        </button>
+                    )}
+                    <button 
+                        onClick={() => setError(null)} 
+                        className="text-xs font-bold uppercase hover:underline"
+                    >
+                        Dismiss
+                    </button>
+                </div>
             </div>
         )}
 
@@ -533,6 +550,7 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
 
         {report && (
           <div className="max-w-6xl mx-auto space-y-8 animate-fade-in pb-20">
+            {/* ... Report Rendering (Unchanged) ... */}
             
             {/* Header */}
             <div className="flex items-center gap-3 mb-2">
