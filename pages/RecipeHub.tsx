@@ -4,7 +4,7 @@ import { PLANS, CREDIT_COSTS } from '../constants';
 import { generateRecipeCard, generateRecipeVariation } from '../services/geminiService';
 import { ingredientService } from '../services/ingredientService';
 import { RecipeCard, MenuItem, User, UserRole, POSChangeRequest, RecipeRequest } from '../types';
-import { Loader2, ChefHat, Scale, Clock, AlertCircle, Upload, Lock, Sparkles, Check, Save, RefreshCw, Search, Plus, Store, Zap, Trash2, Building2, FileSignature, X, AlignLeft, UtensilsCrossed, Inbox, UserCheck, CheckCircle2, Clock3, Carrot, Type, Wallet, Filter, Tag, Eye, Flame, Wand2, Eraser, FileDown } from 'lucide-react';
+import { Loader2, ChefHat, Scale, Clock, AlertCircle, Upload, Lock, Sparkles, Check, Save, RefreshCw, Search, Plus, Store, Zap, Trash2, Building2, FileSignature, X, AlignLeft, UtensilsCrossed, Inbox, UserCheck, CheckCircle2, Clock3, Carrot, Type, Wallet, Filter, Tag, Eye, Flame, Wand2, Eraser, FileDown, TrendingDown, ArrowRight } from 'lucide-react';
 import { storageService } from '../services/storageService';
 import { authService } from '../services/authService';
 
@@ -37,6 +37,9 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
   const [error, setError] = useState<string | null>(null);
   const [importStatus, setImportStatus] = useState<string | null>(null);
   
+  // Supplier Costing State
+  const [altPrices, setAltPrices] = useState<Record<number, string>>({});
+
   // View Modes
   const [viewMode, setViewMode] = useState<'generator' | 'saved' | 'requests'>('generator');
   
@@ -80,6 +83,11 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
     setMenuItems(storageService.getMenu(user.id));
     refreshRequests();
   }, [user.id, user.role]);
+
+  // Reset alt prices when recipe changes
+  useEffect(() => {
+      setAltPrices({});
+  }, [generatedRecipe]);
 
   const refreshRequests = () => {
     const allRequests = storageService.getAllRecipeRequests();
@@ -130,6 +138,33 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
     );
   };
 
+  // Savings Calculation
+  const savingsAnalysis = useMemo(() => {
+      if (!generatedRecipe) return null;
+      let projectedCost = 0;
+      let hasChanges = false;
+
+      generatedRecipe.ingredients.forEach((ing, idx) => {
+          const qty = ing.qty_per_serving || 0;
+          const originalRate = ing.cost_per_unit || 0;
+          const userRate = altPrices[idx] ? parseFloat(altPrices[idx]) : originalRate;
+          
+          if (altPrices[idx]) hasChanges = true;
+          projectedCost += (qty * userRate);
+      });
+
+      const originalCost = generatedRecipe.food_cost_per_serving;
+      const savings = originalCost - projectedCost;
+      const savingsPct = originalCost > 0 ? (savings / originalCost) * 100 : 0;
+
+      return {
+          projectedCost,
+          savings,
+          savingsPct,
+          hasChanges
+      };
+  }, [generatedRecipe, altPrices]);
+
   const checkCredits = (): boolean => {
       if (isAdmin) return true;
       
@@ -177,6 +212,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       setPosPushStatus(null);
       setError(null);
       setCustomItemName('');
+      setAltPrices({});
   };
 
   const loadItemIntoForm = (item: MenuItem) => {
@@ -1004,16 +1040,41 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                             )}
 
                             {/* Costing Section */}
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 rounded-xl shadow-sm">
-                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1">Food Cost (Per Serving)</p>
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1">Original Food Cost</p>
                                     <p className="text-2xl font-bold text-slate-800 dark:text-white">₹{generatedRecipe.food_cost_per_serving?.toFixed(2)}</p>
                                 </div>
+                                <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 rounded-xl shadow-sm">
+                                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1">Projected Food Cost</p>
+                                    <p className={`text-2xl font-bold ${savingsAnalysis?.hasChanges ? 'text-blue-600 dark:text-blue-400' : 'text-slate-800 dark:text-white'}`}>
+                                        ₹{savingsAnalysis?.projectedCost.toFixed(2)}
+                                    </p>
+                                    {savingsAnalysis?.hasChanges && <span className="text-[10px] text-slate-400">Based on inputs</span>}
+                                </div>
+                                
+                                {savingsAnalysis?.savings && savingsAnalysis.savings > 0 ? (
+                                    <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800 p-4 rounded-xl shadow-sm">
+                                        <p className="text-xs font-bold text-emerald-800 dark:text-emerald-400 uppercase tracking-wide mb-1 flex items-center gap-1">
+                                            Savings Potential <TrendingDown size={14}/>
+                                        </p>
+                                        <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">₹{savingsAnalysis.savings.toFixed(2)}</p>
+                                        <p className="text-[10px] text-emerald-700 dark:text-emerald-300 font-bold mt-1">
+                                            {savingsAnalysis.savingsPct.toFixed(1)}% reduction
+                                        </p>
+                                    </div>
+                                ) : (
+                                    <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 p-4 rounded-xl shadow-sm opacity-60">
+                                        <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1">Savings Potential</p>
+                                        <p className="text-2xl font-bold text-slate-300 dark:text-slate-500">₹0.00</p>
+                                    </div>
+                                )}
+
                                 <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-4 rounded-xl shadow-sm">
                                     <p className="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1">Suggested Price</p>
                                     <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">₹{generatedRecipe.suggested_selling_price}</p>
                                     <p className="text-[10px] text-slate-400 mt-1">
-                                        ~{generatedRecipe.suggested_selling_price > 0 ? ((generatedRecipe.food_cost_per_serving / generatedRecipe.suggested_selling_price) * 100).toFixed(1) : 0}% Cost
+                                        ~{generatedRecipe.suggested_selling_price > 0 ? ((savingsAnalysis?.projectedCost || generatedRecipe.food_cost_per_serving) / generatedRecipe.suggested_selling_price * 100).toFixed(1) : 0}% Cost
                                     </p>
                                 </div>
                             </div>
@@ -1021,7 +1082,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                             {/* Ingredients Table */}
                             <div>
                                 <h3 className="font-bold text-slate-800 dark:text-white mb-3 flex items-center gap-2">
-                                    <Scale size={18} className="text-slate-400"/> Ingredients
+                                    <Scale size={18} className="text-slate-400"/> Ingredients & Suppliers
                                 </h3>
                                 <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
                                     <table className="w-full text-sm text-left">
@@ -1029,21 +1090,55 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                             <tr>
                                                 <th className="px-4 py-2">Item</th>
                                                 <th className="px-4 py-2 text-right">Qty</th>
-                                                <th className="px-4 py-2 text-right">Unit Cost</th>
+                                                <th className="px-4 py-2 text-right">Market Rate</th>
+                                                <th className="px-4 py-2 text-right w-32">Supplier Rate</th>
+                                                <th className="px-4 py-2 text-right">Variance</th>
                                                 <th className="px-4 py-2 text-right">Total</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                                            {generatedRecipe.ingredients?.map((ing, i) => (
-                                                <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                                    <td className="px-4 py-2 font-medium text-slate-700 dark:text-slate-200">{ing.name}</td>
-                                                    <td className="px-4 py-2 text-right text-slate-500 dark:text-slate-400">{ing.qty_per_serving} {ing.unit}</td>
-                                                    <td className="px-4 py-2 text-right text-slate-500 dark:text-slate-400 text-xs">
-                                                        {ing.cost_per_unit ? `₹${ing.cost_per_unit}/${ing.unit}` : '-'}
-                                                    </td>
-                                                    <td className="px-4 py-2 text-right text-slate-600 dark:text-slate-300 font-bold">₹{ing.cost_per_serving?.toFixed(2)}</td>
-                                                </tr>
-                                            ))}
+                                            {generatedRecipe.ingredients?.map((ing, i) => {
+                                                const originalRate = ing.cost_per_unit || 0;
+                                                const userRate = altPrices[i] ? parseFloat(altPrices[i]) : originalRate;
+                                                const diff = originalRate - userRate;
+                                                const isCheaper = diff > 0.01;
+                                                const isCostlier = diff < -0.01;
+
+                                                return (
+                                                    <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                                        <td className="px-4 py-2 font-medium text-slate-700 dark:text-slate-200">{ing.name}</td>
+                                                        <td className="px-4 py-2 text-right text-slate-500 dark:text-slate-400">{ing.qty_per_serving} {ing.unit}</td>
+                                                        <td className="px-4 py-2 text-right text-slate-500 dark:text-slate-400 text-xs">
+                                                            {ing.cost_per_unit ? `₹${ing.cost_per_unit}` : '-'}
+                                                        </td>
+                                                        <td className="px-4 py-2 text-right">
+                                                            <div className="flex items-center justify-end">
+                                                                <span className="text-slate-400 mr-1 text-xs">₹</span>
+                                                                <input 
+                                                                    type="number" 
+                                                                    min="0"
+                                                                    step="0.01"
+                                                                    className="w-20 px-2 py-1 text-right text-xs border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 text-slate-800 dark:text-white focus:ring-1 focus:ring-blue-500 outline-none"
+                                                                    placeholder={ing.cost_per_unit?.toString()}
+                                                                    value={altPrices[i] || ''}
+                                                                    onChange={(e) => {
+                                                                        const val = e.target.value;
+                                                                        setAltPrices(prev => ({...prev, [i]: val}));
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-4 py-2 text-right text-xs">
+                                                            {isCheaper && <span className="text-emerald-600 font-bold flex items-center justify-end gap-1"><ArrowRight className="rotate-90" size={10}/> -₹{diff.toFixed(2)}</span>}
+                                                            {isCostlier && <span className="text-red-500 font-bold flex items-center justify-end gap-1"><ArrowRight className="-rotate-90" size={10}/> +₹{Math.abs(diff).toFixed(2)}</span>}
+                                                            {!isCheaper && !isCostlier && <span className="text-slate-300">-</span>}
+                                                        </td>
+                                                        <td className="px-4 py-2 text-right text-slate-600 dark:text-slate-300 font-bold">
+                                                            ₹{((ing.qty_per_serving || 0) * userRate).toFixed(2)}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
                                         </tbody>
                                     </table>
                                 </div>
