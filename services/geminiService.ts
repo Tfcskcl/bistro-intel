@@ -57,12 +57,12 @@ const generateMockRecipe = (item: MenuItem, requirements: string): RecipeCard =>
         yield: 1,
         preparation_steps: [
             `Mise en place: Gather all ingredients for ${baseName}. Ensure work station is sanitized.`,
-            `Prepare the main ingredient by cleaning and cutting to uniform size. Marinate if required for 20 mins.`,
-            `Heat the cooking vessel to medium-high heat. Add oil/butter once hot.`,
-            `Sauté aromatics (onions, garlic, ginger) until golden brown and fragrant.`,
-            `Add the main ingredient and sear to lock in juices.`,
+            `Prepare the main ingredient by cleaning and cutting to uniform size (Brunoise/Julienne as suitable). Marinate if required for 20 mins.`,
+            `Heat the cooking vessel to medium-high heat (approx 180°C). Add oil/butter once hot.`,
+            `Sweat aromatics (onions, garlic, ginger) until translucent and fragrant, avoiding browning unless specified.`,
+            `Add the main ingredient and sear to lock in juices (Maillard reaction).`,
             `Incorporate spices and liquids. Simmer on low heat to develop flavor depth.`,
-            `Check for doneness using a probe thermometer or visual cues.`,
+            `Check for doneness using a probe thermometer or visual cues (e.g. internal temp 75°C for chicken).`,
             `Adjust seasoning with salt, pepper, or acidity as needed.`,
             `Rest the dish for 5 minutes before plating to allow flavors to settle.`,
             "Garnish freshly and serve immediately at the correct temperature."
@@ -331,7 +331,7 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
     
     REQUIREMENTS:
     1. INGREDIENTS: List EVERY single ingredient including oils, spices, and garnishes. Use precise metric units (g, ml). 
-    2. STEPS: Break down preparation into clear, detailed, actionable steps. Include cooking techniques, temperatures, and visual cues (e.g., "golden brown").
+    2. STEPS: Provide a granular, step-by-step preparation guide. Explicitly name cooking techniques (e.g., 'brunoise', 'sear', 'emulsify'). Include precise temperatures (C/F), cooking times, and sensory cues (e.g., "sauté until translucent", "simmer until reduced by half").
     3. COSTING: Estimate realistic ingredient costs for ${location || 'India'} in local currency.
     4. PRICING: Suggested Selling Price should be calculated based on a 30% Food Cost model (Cost * 3.3).
     5. REASONING: Explain the culinary logic behind key ingredient choices or techniques used (e.g. "Acid added to balance richness").
@@ -375,7 +375,7 @@ export const generateRecipeVariation = async (userId: string, original: RecipeCa
     }
 
     try {
-        const prompt = `Task: Create a "${variationType}" variation of the following recipe. Include reasoning for changes. Maintain JSON structure. Update Costing and Selling Price accurately. Original JSON: ${JSON.stringify(original)}.`;
+        const prompt = `Task: Create a "${variationType}" variation of the following recipe. Include reasoning for changes. Maintain JSON structure. Update Costing and Selling Price accurately. Ensure preparation steps are detailed with specific cooking techniques relevant to the variation. Original JSON: ${JSON.stringify(original)}.`;
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
