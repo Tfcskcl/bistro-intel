@@ -1,16 +1,18 @@
 
 import React, { useState, useEffect } from 'react';
-import { Bell, Search, X, Check, Moon, Sun } from 'lucide-react';
+import { Bell, Search, X, Check, Moon, Sun, ChevronRight, Home } from 'lucide-react';
 import { authService } from '../services/authService';
 import { storageService } from '../services/storageService';
-import { AppNotification } from '../types';
+import { AppNotification, AppView } from '../types';
 
 interface HeaderProps {
     theme: 'light' | 'dark';
     toggleTheme: () => void;
+    currentView: AppView;
+    onChangeView: (view: AppView) => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ theme, toggleTheme }) => {
+export const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, currentView, onChangeView }) => {
   const user = authService.getCurrentUser();
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
@@ -38,16 +40,56 @@ export const Header: React.FC<HeaderProps> = ({ theme, toggleTheme }) => {
       }
   };
 
+  const getViewName = (view: AppView) => {
+      switch (view) {
+          case AppView.DASHBOARD: return 'Dashboard';
+          case AppView.RECIPES: return 'Recipe & Costing';
+          case AppView.SOP: return 'SOP Studio';
+          case AppView.STRATEGY: return 'Strategy AI';
+          case AppView.VIDEO: return 'Marketing Studio';
+          case AppView.KITCHEN_WORKFLOW: return 'Kitchen Workflow';
+          case AppView.MENU_GENERATOR: return 'Menu Generator';
+          case AppView.INTEGRATIONS: return 'Data & Integrations';
+          case AppView.BILLING: return 'Plans & Billing';
+          default: return 'Dashboard';
+      }
+  };
+
   return (
     <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-4 sm:px-6 lg:px-8 sticky top-0 z-10 transition-colors duration-200">
-      <div className="relative flex-1 max-w-xs md:max-w-md mr-4">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
-        <input 
-          type="text" 
-          placeholder="Search recipes, ingredients, or reports..." 
-          className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
-        />
+      
+      {/* Left Section: Breadcrumbs + Search */}
+      <div className="flex items-center flex-1 gap-4 lg:gap-8 mr-4">
+          
+          {/* Breadcrumbs (Desktop) */}
+          <nav className="hidden md:flex items-center text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">
+              <button 
+                onClick={() => onChangeView(AppView.DASHBOARD)}
+                className="hover:text-slate-800 dark:hover:text-white transition-colors flex items-center gap-1"
+              >
+                  <Home size={14} />
+                  <span>Home</span>
+              </button>
+              {currentView !== AppView.DASHBOARD && (
+                  <>
+                    <ChevronRight size={14} className="mx-2 text-slate-300 dark:text-slate-600" />
+                    <span className="font-semibold text-slate-900 dark:text-white">{getViewName(currentView)}</span>
+                  </>
+              )}
+          </nav>
+
+          {/* Search Input */}
+          <div className="relative flex-1 max-w-xs md:max-w-md">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
+            <input 
+              type="text" 
+              placeholder="Search recipes, ingredients..." 
+              className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
+            />
+          </div>
       </div>
+
+      {/* Right Section: Actions */}
       <div className="flex items-center gap-2 sm:gap-4">
         {/* Theme Toggle */}
         <button

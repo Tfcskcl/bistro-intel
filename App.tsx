@@ -138,7 +138,12 @@ function App() {
           />
           
           <div className="ml-64 flex flex-col min-h-screen">
-            <Header theme={theme} toggleTheme={toggleTheme} />
+            <Header 
+              theme={theme} 
+              toggleTheme={toggleTheme} 
+              currentView={currentView}
+              onChangeView={setCurrentView}
+            />
             <main className="flex-1 p-8 overflow-y-auto">
               {renderView()}
             </main>

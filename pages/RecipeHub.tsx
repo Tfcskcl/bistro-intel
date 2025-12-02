@@ -425,6 +425,29 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
     }
   };
 
+  const handleSuggestSupplierPrices = () => {
+      if (!generatedRecipe) return;
+      
+      const newAltPrices: Record<number, string> = { ...altPrices };
+      
+      // Find top 3 most expensive ingredients per unit to target for savings
+      const sortedIngredients = generatedRecipe.ingredients
+          .map((ing, idx) => ({ ...ing, idx }))
+          .sort((a, b) => (b.cost_per_unit || 0) - (a.cost_per_unit || 0));
+
+      let changed = 0;
+      sortedIngredients.slice(0, 3).forEach((ing) => {
+          // Only suggest if not already overridden and cost exists
+          if (ing.cost_per_unit && !newAltPrices[ing.idx]) {
+             // Suggest a 15% cheaper price as a target
+             newAltPrices[ing.idx] = (ing.cost_per_unit * 0.85).toFixed(0);
+             changed++;
+          }
+      });
+      
+      setAltPrices(newAltPrices);
+  };
+
   const handleImportClick = () => {
     fileInputRef.current?.click();
   };
@@ -1180,9 +1203,17 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                   <div className="grid md:grid-cols-2">
                                       {/* Ingredients Column */}
                                       <div className="p-8 border-r border-slate-100 dark:border-slate-700">
-                                          <h3 className="font-bold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
-                                              <Scale size={18} className="text-emerald-500" /> Ingredients
-                                          </h3>
+                                          <div className="flex justify-between items-center mb-6">
+                                              <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                                                  <Scale size={18} className="text-emerald-500" /> Ingredients
+                                              </h3>
+                                              <button 
+                                                  onClick={handleSuggestSupplierPrices}
+                                                  className="text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-3 py-1.5 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/40 flex items-center gap-1.5 transition-colors border border-blue-100 dark:border-blue-800"
+                                              >
+                                                  <Sparkles size={14} /> Suggest Cheaper Prices
+                                              </button>
+                                          </div>
                                           <div className="space-y-3">
                                               {/* Header for Supplier Input */}
                                               <div className="flex justify-between text-[10px] text-slate-400 font-bold uppercase mb-2 px-2">
