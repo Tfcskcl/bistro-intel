@@ -4,7 +4,7 @@ import { PLANS, CREDIT_COSTS } from '../constants';
 import { generateRecipeCard, generateRecipeVariation, substituteIngredient, estimateMarketRates } from '../services/geminiService';
 import { ingredientService } from '../services/ingredientService';
 import { RecipeCard, MenuItem, User, UserRole, POSChangeRequest, RecipeRequest, Ingredient } from '../types';
-import { Loader2, ChefHat, Scale, Clock, AlertCircle, Upload, Lock, Sparkles, Check, Save, RefreshCw, Search, Plus, Store, Zap, Trash2, Building2, FileSignature, X, AlignLeft, UtensilsCrossed, Inbox, UserCheck, CheckCircle2, Clock3, Carrot, Type, Wallet, Filter, Tag, Eye, Flame, Wand2, Eraser, FileDown, TrendingDown, ArrowRight, Key, Coins, Leaf, TestTube, ArrowLeftRight, PenTool, Lightbulb, Calculator, DollarSign, Edit2, Globe } from 'lucide-react';
+import { Loader2, ChefHat, Scale, Clock, AlertCircle, Sparkles, Check, Save, RefreshCw, Search, Plus, Zap, Trash2, UtensilsCrossed, CheckCircle2, Wallet, FileDown, Leaf, TestTube, ArrowLeftRight, PenTool, Lightbulb, Edit2, Globe, Flame, Coins } from 'lucide-react';
 import { storageService } from '../services/storageService';
 import { authService } from '../services/authService';
 

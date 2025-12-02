@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
-import { User, UserRole, MarketingRequest } from '../types';
-import { generateMarketingVideo, generateMarketingImage, hasValidApiKey } from '../services/geminiService';
+import { User, MarketingRequest } from '../types';
+import { generateMarketingVideo, generateMarketingImage } from '../services/geminiService';
 import { storageService } from '../services/storageService';
 import { CREDIT_COSTS } from '../constants';
-import { Clapperboard, Image as ImageIcon, Loader2, PlayCircle, Download, RefreshCw, Upload, CheckCircle2, Clock, Wallet, Sparkles, Key, AlertCircle, History, Maximize2 } from 'lucide-react';
+import { Clapperboard, Image as ImageIcon, Loader2, PlayCircle, Download, Wallet, Sparkles, AlertCircle, History, Maximize2 } from 'lucide-react';
 
 interface VideoStudioProps {
   user: User;

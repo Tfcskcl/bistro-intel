@@ -2,9 +2,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { User, KitchenWorkflowRequest, UserRole } from '../types';
 import { storageService } from '../services/storageService';
-import { generateKitchenWorkflow, hasValidApiKey } from '../services/geminiService';
+import { generateKitchenWorkflow } from '../services/geminiService';
 import { CREDIT_COSTS } from '../constants';
-import { GitMerge, Upload, FileVideo, Image as ImageIcon, CheckCircle2, Clock, Wallet, Loader2, PlayCircle, Eye, Edit3, Send, X, Trash2, ArrowLeft, Sparkles, AlertTriangle, Key } from 'lucide-react';
+import { GitMerge, Upload, FileVideo, Image as ImageIcon, CheckCircle2, Clock, Wallet, Loader2, Send, X, Trash2, ArrowLeft, AlertTriangle, Sparkles } from 'lucide-react';
 
 interface KitchenWorkflowProps {
     user: User;
