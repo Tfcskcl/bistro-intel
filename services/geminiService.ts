@@ -239,7 +239,10 @@ const RECIPE_SCHEMA: Schema = {
     tags: { type: Type.ARRAY, items: { type: Type.STRING } },
     human_summary: { type: Type.STRING },
     reasoning: { type: Type.STRING },
-    confidence: { type: Type.STRING }
+    confidence: { type: Type.STRING },
+    prep_time_minutes: { type: Type.NUMBER },
+    cook_time_minutes: { type: Type.NUMBER },
+    total_time_minutes: { type: Type.NUMBER }
   },
   required: ["name", "ingredients", "preparation_steps", "food_cost_per_serving", "suggested_selling_price"]
 };
@@ -305,10 +308,17 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
     
     REQUIREMENTS:
     1. INGREDIENTS: List EVERY single ingredient including oils, spices, and garnishes. Use precise metric units (g, ml). 
-    2. STEPS: Provide a granular, step-by-step preparation guide. Explicitly name cooking techniques (e.g., 'brunoise', 'sear', 'emulsify'). Include precise temperatures (C/F), cooking times, and sensory cues (e.g., "sauté until translucent", "simmer until reduced by half").
+    2. PREPARATION STEPS (CRITICAL): 
+       - Break down instructions into granular, actionable steps.
+       - MANDATORY: Use professional culinary terminology for techniques (e.g., 'brunoise' instead of 'chop small', 'sweat' instead of 'cook onions', 'emulsify', 'blanch').
+       - Include precise temperatures (e.g., "Bake at 180°C/350°F").
+       - Include specific timings (e.g., "Sear for 2 mins per side").
+       - Include sensory cues for doneness (e.g., "until golden brown and fragrant", "until sauce coats the back of a spoon").
     3. COSTING: Estimate realistic ingredient costs for ${location || 'India'} in local currency.
     4. PRICING: Suggested Selling Price should be calculated based on a 30% Food Cost model (Cost * 3.3).
     5. REASONING: Explain the culinary logic behind key ingredient choices or techniques used (e.g. "Acid added to balance richness").
+    6. TIME BREAKDOWN: Estimate Prep Time and Cook Time separately.
+    7. EQUIPMENT: List all specific kitchen tools required.
     
     IMPORTANT: Provide a complete JSON response matching the schema. Do not truncate.
     `;
@@ -354,7 +364,7 @@ export const generateRecipeVariation = async (userId: string, original: RecipeCa
         1. Maintain the core identity of the dish (e.g. if it's a burger, keep it a burger but modify ingredients).
         2. Reasoning: Explain specifically what was changed to meet the "${variationType}" requirement in the 'reasoning' field.
         3. Costing: Recalculate 'food_cost_per_serving' and 'suggested_selling_price' based on new ingredients.
-        4. Steps: Adjust preparation steps to reflect ingredient changes (e.g. cooking time for tofu vs chicken).
+        4. Steps: Adjust preparation steps to reflect ingredient changes. Ensure steps use professional culinary terms, specific temperatures, and sensory cues just like the original.
         
         Original Recipe JSON: ${JSON.stringify(original)}
         
