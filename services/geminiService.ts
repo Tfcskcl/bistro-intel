@@ -13,141 +13,77 @@ const PREVIEW_KEY = "";
 const generateMockRecipe = (item: MenuItem, requirements: string): RecipeCard => {
     const isDrink = item.category === 'beverage';
     const baseName = item.name || "Custom Dish";
-    // Normalize string: lowercase and remove accents (e.g. Açaí -> acai, Crème -> creme)
-    const nameLower = baseName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const nameLower = baseName.toLowerCase();
     
     // Smart Ingredient Selection based on Name - ORDER MATTERS (Specific -> Generic)
     const mockIngredients = [];
     
-    // 1. HEALTH & BOWLS
-    if (nameLower.includes('acai') || nameLower.includes('smoothie bowl')) {
-        mockIngredients.push({ name: "Frozen Acai Pulp", qty: "100g", qty_per_serving: 0.1, cost_per_unit: 1200, unit: "kg", cost_per_serving: 120 });
-        mockIngredients.push({ name: "Frozen Banana", qty: "1 pc", qty_per_serving: 1, cost_per_unit: 5, unit: "pc", cost_per_serving: 5 });
-        mockIngredients.push({ name: "Granola (Housemade)", qty: "30g", qty_per_serving: 0.03, cost_per_unit: 400, unit: "kg", cost_per_serving: 12 });
-        mockIngredients.push({ name: "Chia Seeds", qty: "5g", qty_per_serving: 0.005, cost_per_unit: 600, unit: "kg", cost_per_serving: 3 });
-        mockIngredients.push({ name: "Almond Milk", qty: "50ml", qty_per_serving: 0.05, cost_per_unit: 200, unit: "l", cost_per_serving: 10 });
-        mockIngredients.push({ name: "Fresh Berries (Garnish)", qty: "20g", qty_per_serving: 0.02, cost_per_unit: 800, unit: "kg", cost_per_serving: 16 });
-    } 
-    // 2. SALADS
-    else if (nameLower.includes('salad') || nameLower.includes('caesar') || nameLower.includes('greek')) {
-        mockIngredients.push({ name: "Romaine Lettuce/Mixed Greens", qty: "150g", qty_per_serving: 0.15, cost_per_unit: 100, unit: "kg", cost_per_serving: 15 });
-        mockIngredients.push({ name: "Cherry Tomatoes", qty: "50g", qty_per_serving: 0.05, cost_per_unit: 120, unit: "kg", cost_per_serving: 6 });
-        mockIngredients.push({ name: "Cucumber", qty: "40g", qty_per_serving: 0.04, cost_per_unit: 40, unit: "kg", cost_per_serving: 1.6 });
-        mockIngredients.push({ name: "Salad Dressing (Vinaigrette)", qty: "30ml", qty_per_serving: 0.03, cost_per_unit: 400, unit: "l", cost_per_serving: 12 });
-        if (nameLower.includes('caesar')) {
-             mockIngredients.push({ name: "Parmesan Shavings", qty: "10g", qty_per_serving: 0.01, cost_per_unit: 1200, unit: "kg", cost_per_serving: 12 });
-             mockIngredients.push({ name: "Croutons", qty: "20g", qty_per_serving: 0.02, cost_per_unit: 150, unit: "kg", cost_per_serving: 3 });
-        } else {
-             mockIngredients.push({ name: "Feta Cheese", qty: "30g", qty_per_serving: 0.03, cost_per_unit: 600, unit: "kg", cost_per_serving: 18 });
-        }
-    }
-    // 3. ITALIAN (Risotto, Pasta, Pizza)
-    else if (nameLower.includes('risotto')) {
+    if (nameLower.includes('risotto')) {
         mockIngredients.push({ name: "Arborio Rice", qty: "150g", qty_per_serving: 0.15, cost_per_unit: 300, unit: "kg", cost_per_serving: 45 });
         mockIngredients.push({ name: "Vegetable Stock", qty: "500ml", qty_per_serving: 0.5, cost_per_unit: 60, unit: "l", cost_per_serving: 30 });
         mockIngredients.push({ name: "Parmesan Cheese", qty: "30g", qty_per_serving: 0.03, cost_per_unit: 1200, unit: "kg", cost_per_serving: 36 });
         mockIngredients.push({ name: "White Wine", qty: "30ml", qty_per_serving: 0.03, cost_per_unit: 800, unit: "l", cost_per_serving: 24 });
-        mockIngredients.push({ name: "Butter (Cold)", qty: "20g", qty_per_serving: 0.02, cost_per_unit: 500, unit: "kg", cost_per_serving: 10 });
         if (nameLower.includes('chicken')) {
              mockIngredients.push({ name: "Chicken Breast", qty: "100g", qty_per_serving: 0.1, cost_per_unit: 250, unit: "kg", cost_per_serving: 25 });
         } else if (nameLower.includes('mushroom')) {
              mockIngredients.push({ name: "Button Mushrooms", qty: "80g", qty_per_serving: 0.08, cost_per_unit: 180, unit: "kg", cost_per_serving: 14.4 });
         }
-    } else if (nameLower.includes('pasta') || nameLower.includes('spaghetti') || nameLower.includes('fettuccine') || nameLower.includes('penne')) {
+    } else if (nameLower.includes('pasta') || nameLower.includes('spaghetti') || nameLower.includes('fettuccine')) {
         mockIngredients.push({ name: "Pasta (Dry)", qty: "120g", qty_per_serving: 0.12, cost_per_unit: 150, unit: "kg", cost_per_serving: 18 });
         mockIngredients.push({ name: "Olive Oil", qty: "20ml", qty_per_serving: 0.02, cost_per_unit: 800, unit: "l", cost_per_serving: 16 });
-        mockIngredients.push({ name: "Garlic (Minced)", qty: "5g", qty_per_serving: 0.005, cost_per_unit: 100, unit: "kg", cost_per_serving: 0.5 });
+        mockIngredients.push({ name: "Garlic", qty: "5g", qty_per_serving: 0.005, cost_per_unit: 100, unit: "kg", cost_per_serving: 0.5 });
         if (nameLower.includes('alfredo') || nameLower.includes('cream')) {
             mockIngredients.push({ name: "Heavy Cream", qty: "80ml", qty_per_serving: 0.08, cost_per_unit: 220, unit: "l", cost_per_serving: 17.6 });
         } else {
             mockIngredients.push({ name: "Tomato Puree", qty: "100g", qty_per_serving: 0.1, cost_per_unit: 60, unit: "kg", cost_per_serving: 6 });
         }
+    } else if (nameLower.includes('burger')) {
+        mockIngredients.push({ name: "Burger Bun", qty: "1 pc", qty_per_serving: 1, cost_per_unit: 15, unit: "pc", cost_per_serving: 15 });
+        mockIngredients.push({ name: "Patty (Meat/Veg)", qty: "1 pc", qty_per_serving: 1, cost_per_unit: 40, unit: "pc", cost_per_serving: 40 });
+        mockIngredients.push({ name: "Lettuce", qty: "20g", qty_per_serving: 0.02, cost_per_unit: 80, unit: "kg", cost_per_serving: 1.6 });
+        mockIngredients.push({ name: "Cheese Slice", qty: "1 slice", qty_per_serving: 1, cost_per_unit: 12, unit: "slice", cost_per_serving: 12 });
+        mockIngredients.push({ name: "Mayo Sauce", qty: "15g", qty_per_serving: 0.015, cost_per_unit: 180, unit: "kg", cost_per_serving: 2.7 });
     } else if (nameLower.includes('pizza')) {
         mockIngredients.push({ name: "Pizza Dough Ball", qty: "200g", qty_per_serving: 0.2, cost_per_unit: 60, unit: "kg", cost_per_serving: 12 });
         mockIngredients.push({ name: "Mozzarella", qty: "80g", qty_per_serving: 0.08, cost_per_unit: 450, unit: "kg", cost_per_serving: 36 });
         mockIngredients.push({ name: "Pizza Sauce", qty: "60g", qty_per_serving: 0.06, cost_per_unit: 100, unit: "kg", cost_per_serving: 6 });
-        mockIngredients.push({ name: "Fresh Basil", qty: "5g", qty_per_serving: 0.005, cost_per_unit: 400, unit: "kg", cost_per_serving: 2 });
-    } 
-    // 4. FAST FOOD (Burger, Sandwich, Wraps)
-    else if (nameLower.includes('burger')) {
-        mockIngredients.push({ name: "Burger Bun (Brioche)", qty: "1 pc", qty_per_serving: 1, cost_per_unit: 15, unit: "pc", cost_per_serving: 15 });
-        mockIngredients.push({ name: "Patty (Meat/Veg)", qty: "1 pc", qty_per_serving: 1, cost_per_unit: 40, unit: "pc", cost_per_serving: 40 });
-        mockIngredients.push({ name: "Lettuce", qty: "20g", qty_per_serving: 0.02, cost_per_unit: 80, unit: "kg", cost_per_serving: 1.6 });
-        mockIngredients.push({ name: "Cheddar Cheese Slice", qty: "1 slice", qty_per_serving: 1, cost_per_unit: 12, unit: "slice", cost_per_serving: 12 });
-        mockIngredients.push({ name: "Burger Sauce", qty: "15g", qty_per_serving: 0.015, cost_per_unit: 180, unit: "kg", cost_per_serving: 2.7 });
-    } else if (nameLower.includes('sandwich') || nameLower.includes('toast')) {
-        mockIngredients.push({ name: "Sourdough Bread", qty: "2 slices", qty_per_serving: 2, cost_per_unit: 10, unit: "slice", cost_per_serving: 20 });
-        mockIngredients.push({ name: "Butter", qty: "10g", qty_per_serving: 0.01, cost_per_unit: 500, unit: "kg", cost_per_serving: 5 });
-        if (nameLower.includes('avocado')) {
-             mockIngredients.push({ name: "Ripe Avocado", qty: "1 pc", qty_per_serving: 1, cost_per_unit: 60, unit: "pc", cost_per_serving: 60 });
-             mockIngredients.push({ name: "Chili Flakes", qty: "1g", qty_per_serving: 0.001, cost_per_unit: 800, unit: "kg", cost_per_serving: 0.8 });
-        } else {
-             mockIngredients.push({ name: "Filling (Cheese/Veg)", qty: "50g", qty_per_serving: 0.05, cost_per_unit: 400, unit: "kg", cost_per_serving: 20 });
-        }
-    } 
-    // 5. MEXICAN (Taco, Burrito)
-    else if (nameLower.includes('taco') || nameLower.includes('burrito')) {
-        mockIngredients.push({ name: nameLower.includes('burrito') ? "Flour Tortilla (Large)" : "Corn Tortilla (Soft)", qty: nameLower.includes('burrito') ? "1 pc" : "3 pcs", qty_per_serving: 1, cost_per_unit: 10, unit: "pc", cost_per_serving: 10 });
-        mockIngredients.push({ name: "Protein (Beans/Meat)", qty: "120g", qty_per_serving: 0.12, cost_per_unit: 300, unit: "kg", cost_per_serving: 36 });
-        mockIngredients.push({ name: "Salsa / Pico de Gallo", qty: "50g", qty_per_serving: 0.05, cost_per_unit: 150, unit: "kg", cost_per_serving: 7.5 });
-        mockIngredients.push({ name: "Sour Cream", qty: "20g", qty_per_serving: 0.02, cost_per_unit: 250, unit: "kg", cost_per_serving: 5 });
-        mockIngredients.push({ name: "Cilantro/Lime", qty: "10g", qty_per_serving: 0.01, cost_per_unit: 100, unit: "kg", cost_per_serving: 1 });
-    }
-    // 6. INDIAN
-    else if (nameLower.includes('chicken') && (nameLower.includes('curry') || nameLower.includes('butter') || nameLower.includes('masala') || nameLower.includes('tikka'))) {
+        mockIngredients.push({ name: "Basil", qty: "5g", qty_per_serving: 0.005, cost_per_unit: 400, unit: "kg", cost_per_serving: 2 });
+    } else if (nameLower.includes('chicken') || nameLower.includes('murgh')) {
+        // Generic Chicken fallback
         mockIngredients.push({ name: "Chicken Breast (Boneless)", qty: "200g", qty_per_serving: 0.2, cost_per_unit: 250, unit: "kg", cost_per_serving: 50 });
         mockIngredients.push({ name: "Ginger Garlic Paste", qty: "1 tbsp", qty_per_serving: 0.015, cost_per_unit: 100, unit: "kg", cost_per_serving: 1.5 });
         mockIngredients.push({ name: "Greek Yogurt (Thick)", qty: "50g", qty_per_serving: 0.05, cost_per_unit: 120, unit: "kg", cost_per_serving: 6 });
-        mockIngredients.push({ name: "Tomato Puree", qty: "100g", qty_per_serving: 0.1, cost_per_unit: 60, unit: "kg", cost_per_serving: 6 });
-        mockIngredients.push({ name: "Cream (Fresh)", qty: "30ml", qty_per_serving: 0.03, cost_per_unit: 200, unit: "l", cost_per_serving: 6 });
-        mockIngredients.push({ name: "Garam Masala / Spices", qty: "10g", qty_per_serving: 0.01, cost_per_unit: 600, unit: "kg", cost_per_serving: 6 });
-    } else if (nameLower.includes('paneer')) {
+        mockIngredients.push({ name: "Lemon Juice", qty: "10ml", qty_per_serving: 0.01, cost_per_unit: 80, unit: "l", cost_per_serving: 0.8 });
+    } else if (nameLower.includes('paneer') || nameLower.includes('cottage cheese')) {
         mockIngredients.push({ name: "Malai Paneer", qty: "180g", qty_per_serving: 0.18, cost_per_unit: 350, unit: "kg", cost_per_serving: 63 });
         mockIngredients.push({ name: "Cashew Paste", qty: "30g", qty_per_serving: 0.03, cost_per_unit: 800, unit: "kg", cost_per_serving: 24 });
         mockIngredients.push({ name: "Fresh Cream", qty: "40ml", qty_per_serving: 0.04, cost_per_unit: 200, unit: "l", cost_per_serving: 8 });
-        mockIngredients.push({ name: "Tomato Gravy Base", qty: "150g", qty_per_serving: 0.15, cost_per_unit: 80, unit: "kg", cost_per_serving: 12 });
-    } else if (nameLower.includes('rice') && (nameLower.includes('biryani') || nameLower.includes('pulao'))) {
+    } else if (nameLower.includes('rice') || nameLower.includes('biryani')) {
         mockIngredients.push({ name: "Basmati Rice (Aged)", qty: "150g", qty_per_serving: 0.15, cost_per_unit: 110, unit: "kg", cost_per_serving: 16.5 });
         mockIngredients.push({ name: "Saffron Strands", qty: "0.1g", qty_per_serving: 0.0001, cost_per_unit: 250000, unit: "kg", cost_per_serving: 25 });
         mockIngredients.push({ name: "Ghee", qty: "20g", qty_per_serving: 0.02, cost_per_unit: 600, unit: "kg", cost_per_serving: 12 });
-        mockIngredients.push({ name: "Biryani Masala", qty: "10g", qty_per_serving: 0.01, cost_per_unit: 800, unit: "kg", cost_per_serving: 8 });
-    } 
-    // 7. DRINKS & DESSERTS
-    else if (isDrink || nameLower.includes('coffee') || nameLower.includes('tea') || nameLower.includes('shake') || nameLower.includes('latte')) {
+    } else if (isDrink) {
         mockIngredients.push({ name: "Base Liquid (Milk/Water)", qty: "200ml", qty_per_serving: 0.2, cost_per_unit: 60, unit: "l", cost_per_serving: 12 });
-        mockIngredients.push({ name: "Flavor Syrup/Powder", qty: "30ml", qty_per_serving: 0.03, cost_per_unit: 400, unit: "l", cost_per_serving: 12 });
+        mockIngredients.push({ name: "Flavor Syrup", qty: "30ml", qty_per_serving: 0.03, cost_per_unit: 400, unit: "l", cost_per_serving: 12 });
         mockIngredients.push({ name: "Ice Cubes", qty: "100g", qty_per_serving: 0.1, cost_per_unit: 5, unit: "kg", cost_per_serving: 0.5 });
-    } else if (nameLower.includes('cake') || nameLower.includes('brownie') || nameLower.includes('dessert') || nameLower.includes('waffle')) {
-        mockIngredients.push({ name: "Flour (All Purpose)", qty: "50g", qty_per_serving: 0.05, cost_per_unit: 40, unit: "kg", cost_per_serving: 2 });
-        mockIngredients.push({ name: "Sugar", qty: "40g", qty_per_serving: 0.04, cost_per_unit: 50, unit: "kg", cost_per_serving: 2 });
-        mockIngredients.push({ name: "Butter", qty: "30g", qty_per_serving: 0.03, cost_per_unit: 500, unit: "kg", cost_per_serving: 15 });
-        mockIngredients.push({ name: "Chocolate/Fruit", qty: "30g", qty_per_serving: 0.03, cost_per_unit: 600, unit: "kg", cost_per_serving: 18 });
-    } 
-    // 8. ASIAN (Noodles, Stir Fry)
-    else if (nameLower.includes('noodle') || nameLower.includes('ramen') || nameLower.includes('fry')) {
-        mockIngredients.push({ name: "Noodles (Egg/Rice)", qty: "150g", qty_per_serving: 0.15, cost_per_unit: 100, unit: "kg", cost_per_serving: 15 });
-        mockIngredients.push({ name: "Soy Sauce", qty: "20ml", qty_per_serving: 0.02, cost_per_unit: 150, unit: "l", cost_per_serving: 3 });
-        mockIngredients.push({ name: "Sesame Oil", qty: "5ml", qty_per_serving: 0.005, cost_per_unit: 400, unit: "l", cost_per_serving: 2 });
-        mockIngredients.push({ name: "Mixed Vegetables (Carrot/Cabbage)", qty: "80g", qty_per_serving: 0.08, cost_per_unit: 60, unit: "kg", cost_per_serving: 4.8 });
-    }
-    // 9. FALLBACK (Generic but specific)
-    else {
-        // Fallback for unknown dishes - invent plausible ingredients
-        mockIngredients.push({ name: `Primary Ingredient for ${baseName}`, qty: "150g", qty_per_serving: 0.15, cost_per_unit: 200, unit: "kg", cost_per_serving: 30 });
-        mockIngredients.push({ name: "Fresh Garnish (Herbs)", qty: "10g", qty_per_serving: 0.01, cost_per_unit: 300, unit: "kg", cost_per_serving: 3 });
-        mockIngredients.push({ name: "Seasoning Mix", qty: "5g", qty_per_serving: 0.005, cost_per_unit: 500, unit: "kg", cost_per_serving: 2.5 });
+    } else {
+        // Generic Base
+        mockIngredients.push({ name: `Main Protein/Veg for ${baseName}`, qty: "150g", qty_per_serving: 0.15, cost_per_unit: 200, unit: "kg", cost_per_serving: 30 });
     }
 
     // Add common complex items if not already added
-    if (!mockIngredients.some(i => i.name.toLowerCase().includes("oil")) && !isDrink && !nameLower.includes('cake') && !nameLower.includes('salad')) {
-        mockIngredients.push({ name: "Cooking Oil/Butter", qty: "15ml", qty_per_serving: 0.015, cost_per_unit: 160, unit: "l", cost_per_serving: 2.4 });
+    if (!mockIngredients.some(i => i.name.includes("Oil"))) {
+        mockIngredients.push({ name: "Cooking Oil/Butter", qty: "20ml", qty_per_serving: 0.02, cost_per_unit: 160, unit: "l", cost_per_serving: 3.2 });
     }
-    if (!mockIngredients.some(i => i.name.toLowerCase().includes("salt")) && !isDrink && !nameLower.includes('cake') && !nameLower.includes('shake')) {
+    if (!mockIngredients.some(i => i.name.includes("Salt"))) {
         mockIngredients.push({ name: "Salt", qty: "5g", qty_per_serving: 0.005, cost_per_unit: 20, unit: "kg", cost_per_serving: 0.1 });
+    }
+    if (!mockIngredients.some(i => i.name.includes("Water")) && !isDrink) {
+        mockIngredients.push({ name: "Water (Prep)", qty: "100ml", qty_per_serving: 0.1, cost_per_unit: 0, unit: "l", cost_per_serving: 0 });
     }
     
     // Add generic aromatics for savory dishes
-    if (!isDrink && !nameLower.includes('cake') && !nameLower.includes('salad') && !nameLower.includes('acai') && !mockIngredients.some(i => i.name.toLowerCase().includes("onion")) && !nameLower.includes('sandwich')) {
+    if (!isDrink && !mockIngredients.some(i => i.name.includes("Onion"))) {
          mockIngredients.push({ name: "Onion", qty: "50g", qty_per_serving: 0.05, cost_per_unit: 40, unit: "kg", cost_per_serving: 2 });
     }
 
@@ -163,15 +99,17 @@ const generateMockRecipe = (item: MenuItem, requirements: string): RecipeCard =>
         yield: 1,
         preparation_steps: [
             `Mise en place: Gather all ingredients for ${baseName}. Ensure work station is sanitized.`,
-            `Prepare the main components (Wash, Peel, Chop).`,
-            `Initialize cooking process (Heat pan, Preheat oven, or Blend ingredients).`,
-            `Combine base ingredients and seasoning.`,
-            `Cook/Blend until desired texture and temperature is reached.`,
-            `Taste and adjust seasoning (Salt/Acid/Sweetness).`,
-            `Plate the dish carefully, ensuring clean edges.`,
-            `Apply final garnish before serving.`
+            `Prepare the main components. Cut vegetables to uniform size.`,
+            `Heat the cooking vessel to proper temperature.`,
+            `Begin cooking base aromatics (onions, garlic) if applicable.`,
+            `Add main ingredients in order of cooking time.`,
+            `Season generously with salt and pepper.`,
+            `Simmer or cook until main protein/veg is tender and cooked through.`,
+            `Check seasoning and adjust acidity or salt.`,
+            `Rest the dish for a few minutes if served hot.`,
+            `Plate carefully and garnish before serving.`
         ],
-        equipment_needed: ["Chef Knife", "Cutting Board", "Prep Bowls", "Cooking Vessel (Pan/Pot/Blender)", "Tongs/Spatula", "Tasting Spoon"],
+        equipment_needed: ["Chef Knife", "Cutting Board", "Heavy Bottom Pan", "Mixing Bowls", "Tongs/Spatula", "Thermometer"],
         portioning_guideline: isDrink ? "350ml Glass" : "Standard Serving Size",
         allergens: ["Check Ingredients"],
         shelf_life_hours: 24,
@@ -179,7 +117,7 @@ const generateMockRecipe = (item: MenuItem, requirements: string): RecipeCard =>
         suggested_selling_price: Math.ceil(totalCost / 0.30), // 30% Food Cost Model
         tags: ["Auto-Generated", "Draft", "Offline Mode"],
         human_summary: `A generated recipe draft for ${baseName}. This uses offline estimations as the AI service was unreachable. Please review costs and ingredients.`,
-        reasoning: "Generated using BistroIntelligence Offline Engine (No Internet/API Key). Please connect API Key for full AI precision.",
+        reasoning: "Generated using BistroIntelligence Offline Engine. Please connect API Key for full AI precision.",
         confidence: "Low",
         prep_time_minutes: 20,
         cook_time_minutes: 15,
@@ -208,6 +146,8 @@ const generateMockSOP = (topic: string): SOP => {
 
 const generateMockStrategy = (user: User, query: string): StrategyReport => {
     const q = query.toLowerCase();
+    
+    // Smart Context Matching based on User
     const location = user.location || "General Market";
     
     if (q.includes('marketing') || q.includes('sale') || q.includes('footfall')) {
@@ -408,20 +348,13 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
 
     // 1. Text Prompt demanding Search Grounding
     const prompt = `
-    Role: ${chefPersona}. You are a World Cuisine Expert capable of developing recipes for ANY global cuisine (French, Japanese, Indian, Mexican, Peruvian, Ethiopian, etc.) with high authenticity.
-    
-    Task: Develop, Plan, and Create a HIGHLY DETAILED and professional recipe card for "${item.name}". 
+    Role: ${chefPersona}
+    Task: Generate a HIGHLY DETAILED and professional recipe card for "${item.name}". 
     Context: ${requirements}
     Location: ${location || 'India'}
     
     CRITICAL INSTRUCTION:
-    You have access to Google Search. USE IT to research the authentic ingredients, techniques, and plating styles for this specific world cuisine.
-    
-    NEGATIVE CONSTRAINTS (DO NOT DO THIS):
-    - DO NOT use generic terms like "Spices", "Garnish", "Main Ingredient", "Cooking Oil", "Protein".
-    - DO NOT use "As per taste" for costs.
-    - DO NOT omit pantry staples like Salt or Water.
-    - DO NOT return partial JSON.
+    You have access to Google Search. USE IT to research the authentic and complete ingredient list for this dish. 
     
     DETAILED COSTING RULES:
     1. LIST EVERY INGREDIENT: You must include "Hidden Costs" like Oil, Salt, Water, Spices, Garnishes. 
@@ -429,12 +362,11 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
     3. ACCURACY: The 'food_cost_per_serving' MUST be the strict mathematical sum of all 'cost_per_serving' values of ingredients.
     
     REQUIREMENTS:
-    1. INGREDIENTS: List EVERY single ingredient found in your research. Use precise metric units (g, ml). Name specific items (e.g. "Cumin Powder" not "Spice").
+    1. INGREDIENTS: List EVERY single ingredient found in your research. Use precise metric units (g, ml).
     2. PREPARATION STEPS: Granular steps using professional culinary terms (brunoise, sweat, deglaze). Include temps and times.
-    3. PLANNING: Include a distinct "Mise en place" or "Prep" step first to guide kitchen organization.
-    4. COSTING: Estimate realistic ingredient costs based on search data.
-    5. PRICING: Suggested Selling Price based on 30% Food Cost.
-    6. TIME: Estimate Prep vs Cook time.
+    3. COSTING: Estimate realistic ingredient costs based on search data.
+    4. PRICING: Suggested Selling Price based on 30% Food Cost.
+    5. TIME: Estimate Prep vs Cook time.
     
     OUTPUT FORMAT:
     Return a single valid JSON object matching the structure below. Do not include markdown blocks like \`\`\`json.
@@ -500,7 +432,7 @@ export const generateRecipeVariation = async (userId: string, original: RecipeCa
         
         Guidelines:
         1. Maintain the core identity of the dish, but adapt for ${variationType}.
-        2. INGREDIENTS: Swap or remove ingredients as needed. SPECIFY EXACT NAMES (e.g. "Almond Milk" not "Plant Milk").
+        2. INGREDIENTS: Swap or remove ingredients as needed. 
         3. STRICT RE-COSTING: You MUST recalculate 'cost_per_serving', 'food_cost_per_serving', and 'suggested_selling_price' based on the NEW ingredients. Do not just copy the old prices.
            Example: If replacing expensive meat with vegetables, the cost SHOULD go down.
         4. Reasoning: Explain what changed in the 'reasoning' field.

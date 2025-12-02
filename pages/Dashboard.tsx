@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { DollarSign, ShoppingBag, Utensils, AlertTriangle, Users, Clock, TrendingUp, Activity, MapPin, Globe, Eye, UserX, UserPlus, Zap, Edit, Save, Brain, Database, ArrowRight, X, ChevronRight, Search, Mail, Phone, Calendar, Shield, ShieldCheck, Trash2, Terminal, UploadCloud, FileText, CheckCircle2, Sliders, Cpu, Layers, Loader2, BarChart3, PlusCircle, Wallet, RefreshCw, Instagram, Facebook, Megaphone, Sparkles, Target, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { StatCard } from '../components/StatCard';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ComposedChart, Line, Bar, Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis } from 'recharts';
@@ -409,7 +409,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onChangeView }) => {
     }
 
     // --- OWNER / ADMIN VIEW LOGIC ---
-    const salesData = storageService.getSalesData(user.id).length > 0 ? storageService.getSalesData(user.id) : MOCK_SALES_DATA;
+    const [dateRange, setDateRange] = useState<'7d' | '30d'>('7d');
+    
+    // Retrieve data
+    const rawSalesData = storageService.getSalesData(user.id).length > 0 ? storageService.getSalesData(user.id) : MOCK_SALES_DATA;
+    
+    // Filter logic
+    const salesData = useMemo(() => {
+        const days = dateRange === '7d' ? 7 : 30;
+        return rawSalesData.slice(-days);
+    }, [rawSalesData, dateRange]);
+
     const socialStats = storageService.getSocialStats(user.id);
     
     // Derived Stats
@@ -481,9 +491,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onChangeView }) => {
                 <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm p-6">
                     <div className="flex justify-between items-center mb-6">
                         <h3 className="font-bold text-slate-800 dark:text-white text-lg">Sales Overview</h3>
-                        <select className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs rounded-lg px-3 py-1 outline-none">
-                            <option>Last 7 Days</option>
-                            <option>Last 30 Days</option>
+                        <select 
+                            value={dateRange} 
+                            onChange={(e) => setDateRange(e.target.value as '7d' | '30d')}
+                            className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs rounded-lg px-3 py-1 outline-none"
+                        >
+                            <option value="7d">Last 7 Days</option>
+                            <option value="30d">Last 30 Days</option>
                         </select>
                     </div>
                     <div className="h-[300px] w-full">

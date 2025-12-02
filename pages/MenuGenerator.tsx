@@ -4,7 +4,7 @@ import { User, MenuGenerationRequest, UserRole } from '../types';
 import { storageService } from '../services/storageService';
 import { generateMenu } from '../services/geminiService';
 import { CREDIT_COSTS } from '../constants';
-import { Sparkles, Loader2, Wallet, BookOpen } from 'lucide-react';
+import { Sparkles, Loader2, Wallet, ArrowRight, History, ChefHat, DollarSign, Users, UtensilsCrossed, AlertCircle, BookOpen } from 'lucide-react';
 
 interface MenuGeneratorProps {
     user: User;
