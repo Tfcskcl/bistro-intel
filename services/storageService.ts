@@ -1,5 +1,5 @@
 
-import { RecipeCard, SOP, AppNotification, UserRole, POSChangeRequest, MenuItem, PlanConfig, PlanType, RecipeRequest, SOPRequest, MarketingRequest, CreditTransaction, SocialStats, KitchenWorkflowRequest, MenuGenerationRequest } from '../types';
+import { RecipeCard, SOP, AppNotification, UserRole, POSChangeRequest, MenuItem, PlanConfig, PlanType, RecipeRequest, SOPRequest, MarketingRequest, CreditTransaction, SocialStats, KitchenWorkflowRequest, MenuGenerationRequest, InventoryItem } from '../types';
 import { MOCK_MENU, MOCK_SALES_DATA, MOCK_INGREDIENT_PRICES, PLANS as DEFAULT_PLANS } from '../constants';
 import { ingredientService } from './ingredientService';
 
@@ -21,6 +21,14 @@ const WELCOME_NOTIFICATION: AppNotification = {
     read: false,
     date: new Date().toISOString()
 };
+
+const MOCK_INVENTORY: InventoryItem[] = [
+    { id: 'inv_1', name: 'Arborio Rice', category: 'Dry Goods', currentStock: 12, unit: 'kg', costPerUnit: 300, parLevel: 10, supplier: 'Metro Cash & Carry', lastUpdated: new Date().toISOString() },
+    { id: 'inv_2', name: 'Truffle Oil', category: 'Pantry', currentStock: 0.5, unit: 'l', costPerUnit: 1800, parLevel: 1, supplier: 'Gourmet Imports', lastUpdated: new Date().toISOString() },
+    { id: 'inv_3', name: 'Chicken Breast', category: 'Meat', currentStock: 15, unit: 'kg', costPerUnit: 250, parLevel: 20, supplier: 'Fresh Meats Co', lastUpdated: new Date().toISOString() },
+    { id: 'inv_4', name: 'Parmesan Cheese', category: 'Dairy', currentStock: 2, unit: 'kg', costPerUnit: 1200, parLevel: 5, supplier: 'Dairy Best', lastUpdated: new Date().toISOString() },
+    { id: 'inv_5', name: 'Olive Oil', category: 'Pantry', currentStock: 25, unit: 'l', costPerUnit: 800, parLevel: 10, supplier: 'Metro Cash & Carry', lastUpdated: new Date().toISOString() },
+];
 
 export const storageService = {
     // --- GENERIC HELPERS ---
@@ -151,6 +159,26 @@ export const storageService = {
             type: 'credit',
             description
         });
+    },
+
+    // --- INVENTORY ---
+    getInventory: (userId: string): InventoryItem[] => {
+        return storageService.getItem<InventoryItem[]>(userId, 'inventory', []);
+    },
+
+    saveInventory: (userId: string, items: InventoryItem[]) => {
+        storageService.setItem(userId, 'inventory', items);
+    },
+
+    updateInventoryItem: (userId: string, item: InventoryItem) => {
+        const current = storageService.getInventory(userId);
+        const index = current.findIndex(i => i.id === item.id);
+        if (index >= 0) {
+            current[index] = item;
+        } else {
+            current.push(item);
+        }
+        storageService.saveInventory(userId, current);
     },
 
     // --- MENU ---
@@ -580,6 +608,7 @@ export const storageService = {
             console.log(`Seeding demo data for ${userId}...`);
             storageService.setItem(userId, 'menu', MOCK_MENU);
             storageService.setItem(userId, 'sales', MOCK_SALES_DATA);
+            storageService.setItem(userId, 'inventory', MOCK_INVENTORY);
             
             // Seed Ingredients via service
             ingredientService.seedDefaults(userId);

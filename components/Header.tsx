@@ -43,6 +43,7 @@ export const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, currentView,
   const getViewName = (view: AppView) => {
       switch (view) {
           case AppView.DASHBOARD: return 'Dashboard';
+          case AppView.INVENTORY: return 'Inventory Manager';
           case AppView.RECIPES: return 'Recipe & Costing';
           case AppView.SOP: return 'SOP Studio';
           case AppView.STRATEGY: return 'Strategy AI';

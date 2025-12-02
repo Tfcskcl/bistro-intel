@@ -13,6 +13,7 @@ import { Billing } from './pages/Billing';
 import { Landing } from './pages/Landing';
 import { KitchenWorkflow } from './pages/KitchenWorkflow';
 import { MenuGenerator } from './pages/MenuGenerator';
+import { InventoryManager } from './pages/InventoryManager'; // New Import
 import { AppView, User, PlanType } from './types';
 import { authService } from './services/authService';
 import { trackingService } from './services/trackingService';
@@ -107,6 +108,8 @@ function App() {
         switch (currentView) {
           case AppView.DASHBOARD:
             return <Dashboard user={user} onChangeView={setCurrentView} />;
+          case AppView.INVENTORY: // New Route
+            return <InventoryManager user={user} onUserUpdate={onUserUpdate} />;
           case AppView.RECIPES:
             return <RecipeHub user={user} onUserUpdate={onUserUpdate} />;
           case AppView.SOP:

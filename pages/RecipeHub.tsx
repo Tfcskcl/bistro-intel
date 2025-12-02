@@ -105,14 +105,15 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
   });
   
   const [manualIngredients, setManualIngredients] = useState([
-      { id: 1, name: '', qty: '', unit: 'g', costPerUnit: '' }
+      { id: 1, name: '', qty: '', unit: 'g', costPerUnit: '', wastePct: '0' }
   ]);
   const [targetFoodCost, setTargetFoodCost] = useState(30);
   const [isUpdatingRates, setIsUpdatingRates] = useState(false);
   const [isFetchingRates, setIsFetchingRates] = useState(false);
 
-  // Supplier Costing State
+  // Supplier Costing & Waste State
   const [altPrices, setAltPrices] = useState<Record<number, string>>({});
+  const [wasteValues, setWasteValues] = useState<Record<number, string>>({});
   const [swappingIndex, setSwappingIndex] = useState<number | null>(null);
 
   const [viewMode, setViewMode] = useState<'generator' | 'saved' | 'requests'>('generator');
@@ -152,6 +153,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
 
   useEffect(() => {
       setAltPrices({});
+      setWasteValues({});
   }, [generatedRecipe?.sku_id]); // Reset alt prices only on new recipe
 
   const refreshRequests = () => {
@@ -203,11 +205,23 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
               hasChanges = true;
           }
 
+          // Calculate effective cost with waste
+          const userWasteStr = wasteValues[idx];
+          const userWaste = userWasteStr ? parseFloat(userWasteStr) : (ing.waste_pct || 0);
+          if (userWaste > 0) hasChanges = true;
+          
+          const wasteFactor = 100 / (100 - Math.min(userWaste, 99.9));
+
+          let costWithWaste = 0;
           if (originalRate > 0) {
-              totalNewCost += (userRate / originalRate) * originalCostServing;
+              // Recalculate based on Qty * UserRate * WasteFactor
+              // Qty is approx originalCostServing / originalRate
+              costWithWaste = (originalCostServing / originalRate) * userRate * wasteFactor;
           } else {
-              totalNewCost += originalCostServing; 
+              costWithWaste = originalCostServing * wasteFactor; 
           }
+          
+          totalNewCost += costWithWaste;
       });
 
       const savings = totalOriginalCost - totalNewCost;
@@ -220,7 +234,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
           savingsPct, 
           hasChanges 
       };
-  }, [generatedRecipe, altPrices]);
+  }, [generatedRecipe, altPrices, wasteValues]);
 
   const checkCredits = (): boolean => {
       if (isStaff) return true;
@@ -265,9 +279,10 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       setPosPushStatus(null);
       setError(null);
       setAltPrices({});
+      setWasteValues({});
       setSelectedPersona('Executive Chef');
       setManualForm({ name: '', cuisine: '', yield: '1', prepTime: '20', description: '', steps: '' });
-      setManualIngredients([{ id: 1, name: '', qty: '', unit: 'g', costPerUnit: '' }]);
+      setManualIngredients([{ id: 1, name: '', qty: '', unit: 'g', costPerUnit: '', wastePct: '0' }]);
       setTargetFoodCost(30);
   };
 
@@ -392,7 +407,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
 
   // Manual Form Handlers
   const addManualIngredient = () => {
-      setManualIngredients([...manualIngredients, { id: Date.now(), name: '', qty: '', unit: 'g', costPerUnit: '' }]);
+      setManualIngredients([...manualIngredients, { id: Date.now(), name: '', qty: '', unit: 'g', costPerUnit: '', wastePct: '0' }]);
   };
 
   const removeManualIngredient = (id: number) => {
@@ -449,12 +464,17 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       const ingredients: Ingredient[] = manualIngredients.map((ing, idx) => {
           const qtyNum = parseFloat(ing.qty) || 0;
           const costNum = parseFloat(ing.costPerUnit) || 0;
+          const wastePct = parseFloat(ing.wastePct) || 0;
           
+          const wasteFactor = 100 / (100 - Math.min(wastePct, 99.9));
+          const effectiveCostPerUnit = costNum * wasteFactor;
+
           let costPerServing = 0;
-          if (['g', 'ml'].includes(ing.unit.toLowerCase()) && costNum > 10) {
-               costPerServing = (qtyNum / 1000) * costNum;
+          if (['g', 'ml'].includes(ing.unit.toLowerCase()) && effectiveCostPerUnit > 10) {
+               // Assuming user inputs price per KG/L but qty in g/ml
+               costPerServing = (qtyNum / 1000) * effectiveCostPerUnit;
           } else {
-               costPerServing = qtyNum * costNum;
+               costPerServing = qtyNum * effectiveCostPerUnit;
           }
           
           return {
@@ -464,7 +484,8 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
               qty_per_serving: qtyNum / yieldNum,
               cost_per_unit: costNum, 
               unit: ing.unit,
-              cost_per_serving: costPerServing / yieldNum
+              cost_per_serving: costPerServing / yieldNum,
+              waste_pct: wastePct
           };
       });
 
@@ -634,8 +655,29 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
         ingredientService.learnPrices(generatedRecipe.ingredients);
 
         // 2. Save Logic
+        const recipeToSave = { ...generatedRecipe };
+        
+        // Merge manual prices/waste if saving
+        recipeToSave.ingredients = recipeToSave.ingredients.map((ing, idx) => {
+            const userPrice = altPrices[idx] ? parseFloat(altPrices[idx]) : ing.cost_per_unit;
+            const userWaste = wasteValues[idx] ? parseFloat(wasteValues[idx]) : ing.waste_pct;
+            
+            // Recalculate cost per serving with new rate/waste
+            const wasteFactor = 100 / (100 - Math.min(userWaste || 0, 99.9));
+            const newCost = (ing.cost_per_serving || 0) * ((userPrice || 0) / (ing.cost_per_unit || 1)) * wasteFactor;
+
+            return {
+                ...ing,
+                cost_per_unit: userPrice,
+                waste_pct: userWaste,
+                cost_per_serving: newCost
+            };
+        });
+        
+        // Recalculate totals
+        recipeToSave.food_cost_per_serving = recipeToSave.ingredients.reduce((acc, curr) => acc + (curr.cost_per_serving || 0), 0);
+
         if (isStaff && activeRequest) {
-            const recipeToSave = { ...generatedRecipe };
             storageService.saveRecipe(activeRequest.userId, recipeToSave);
             const completedReq: RecipeRequest = { ...activeRequest, status: 'completed', completedDate: new Date().toISOString() };
             storageService.updateRecipeRequest(completedReq);
@@ -645,14 +687,14 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
             handleTabChange('requests');
         } else {
             const restaurant = restaurants.find(r => r.id === selectedRestaurantId);
-            const recipeToSave = {
-                ...generatedRecipe,
+            const finalRecipe = {
+                ...recipeToSave,
                 assignedRestaurantId: selectedRestaurantId,
                 assignedRestaurantName: restaurant?.restaurantName
             };
-            storageService.saveRecipe(user.id, recipeToSave);
+            storageService.saveRecipe(user.id, finalRecipe);
             setSavedRecipes(storageService.getSavedRecipes(user.id));
-            setImportStatus(isRecipeSaved ? "Recipe updated & prices learned!" : "Recipe saved & prices learned!");
+            setImportStatus(isRecipeSaved ? "Recipe updated!" : "Recipe saved!");
         }
         setIsSaving(false);
         setTimeout(() => setImportStatus(null), 2000);
@@ -805,6 +847,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                           <input placeholder="Qty" value={ing.qty} onChange={(e) => updateManualIngredient(ing.id, 'qty', e.target.value)} className="w-12 px-2 py-1.5 text-xs border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
                                           <input placeholder="Unit" value={ing.unit} onChange={(e) => updateManualIngredient(ing.id, 'unit', e.target.value)} className="w-12 px-2 py-1.5 text-xs border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
                                           <input placeholder="Price" type="number" value={ing.costPerUnit} onChange={(e) => updateManualIngredient(ing.id, 'costPerUnit', e.target.value)} className="w-14 px-2 py-1.5 text-xs border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
+                                          <input placeholder="W%" type="number" value={ing.wastePct} onChange={(e) => updateManualIngredient(ing.id, 'wastePct', e.target.value)} className="w-10 px-2 py-1.5 text-xs border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white text-red-500" title="Waste %"/>
                                           <button type="button" onClick={() => removeManualIngredient(ing.id)} className="text-slate-400 hover:text-red-500"><Trash2 size={14} /></button>
                                       </div>
                                   ))}
@@ -932,23 +975,25 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                 {savingsAnalysis && savingsAnalysis.hasChanges && (
                                     <div className="mx-8 mt-6 p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800 rounded-xl flex items-center justify-between animate-fade-in backdrop-blur-sm">
                                         <div>
-                                            <p className="text-xs font-bold text-emerald-800 dark:text-emerald-400 uppercase tracking-wide">Projected Savings</p>
+                                            <p className="text-xs font-bold text-emerald-800 dark:text-emerald-400 uppercase tracking-wide">Projected Cost</p>
                                             <div className="flex items-baseline gap-2">
-                                                <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
-                                                    ₹{savingsAnalysis.savings.toFixed(2)}
+                                                <p className="text-2xl font-black text-slate-800 dark:text-white">
+                                                    ₹{savingsAnalysis.projectedCost.toFixed(2)}
                                                 </p>
-                                                <span className="text-sm font-bold text-emerald-600">
-                                                    ({savingsAnalysis.savingsPct.toFixed(1)}%)
-                                                </span>
+                                                {savingsAnalysis.savings > 0 && (
+                                                    <span className="text-sm font-bold text-emerald-600">
+                                                        (Saved {savingsAnalysis.savingsPct.toFixed(1)}%)
+                                                    </span>
+                                                )}
                                             </div>
                                             <p className="text-xs text-slate-500 mt-1">
-                                                New Food Cost: <span className="font-bold text-slate-700 dark:text-slate-300">₹{savingsAnalysis.projectedCost.toFixed(2)}</span>
+                                                Based on user rates & waste adjustments
                                             </p>
                                         </div>
                                         <div className="text-right">
                                              <p className="text-xs text-slate-500">Margin Impact</p>
-                                             <p className="text-lg font-bold text-emerald-600">
-                                                 +₹{savingsAnalysis.savings.toFixed(2)} / plate
+                                             <p className={`text-lg font-bold ${savingsAnalysis.savings > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                                                 {savingsAnalysis.savings > 0 ? '+' : ''}₹{savingsAnalysis.savings.toFixed(2)} / plate
                                              </p>
                                         </div>
                                     </div>
@@ -975,6 +1020,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                                     <th className="px-4 py-3">Qty / Portion</th>
                                                     <th className="px-4 py-3">Market Rate</th>
                                                     <th className="px-4 py-3 bg-emerald-50/50 dark:bg-emerald-900/10">Your Rate</th>
+                                                    <th className="px-4 py-3 bg-red-50/50 dark:bg-red-900/10 text-red-700 dark:text-red-400">Waste %</th>
                                                     <th className="px-4 py-3 text-right">Cost</th>
                                                 </tr>
                                             </thead>
@@ -983,11 +1029,28 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                                     const marketRate = ing.cost_per_unit || 0;
                                                     const userRateStr = altPrices[idx];
                                                     const userRate = userRateStr ? parseFloat(userRateStr) : marketRate;
+                                                    
+                                                    const userWasteStr = wasteValues[idx];
+                                                    const userWaste = userWasteStr ? parseFloat(userWasteStr) : (ing.waste_pct || 0);
+                                                    
                                                     const isVariance = userRate !== marketRate;
                                                     const variancePct = marketRate > 0 ? ((userRate - marketRate) / marketRate) * 100 : 0;
                                                     
-                                                    // Calculate cost based on user rate or market rate
-                                                    const displayCost = marketRate > 0 ? (ing.cost_per_serving || 0) * (userRate / marketRate) : (ing.cost_per_serving || 0);
+                                                    // Calculate cost based on user rate and waste
+                                                    // Waste Factor = 1 / (1 - waste%)
+                                                    const wasteFactor = 100 / (100 - Math.min(userWaste, 99.9));
+                                                    
+                                                    // Base cost per serving (AI provided)
+                                                    let displayCost = ing.cost_per_serving || 0;
+                                                    
+                                                    if (marketRate > 0) {
+                                                        // Adjust for user rate vs market rate
+                                                        // Qty used is roughly (cost_per_serving / market_rate)
+                                                        // New Cost = Qty * UserRate * WasteFactor
+                                                        displayCost = (displayCost / marketRate) * userRate * wasteFactor;
+                                                    } else {
+                                                        displayCost = displayCost * wasteFactor;
+                                                    }
 
                                                     return (
                                                         <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 group odd:bg-slate-50/30 dark:odd:bg-slate-800/20 transition-colors">
@@ -1022,6 +1085,17 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                                                         </span>
                                                                     )}
                                                                 </div>
+                                                            </td>
+                                                            <td className="px-4 py-4 bg-red-50/30 dark:bg-red-900/5 border-l border-slate-100 dark:border-slate-800/50">
+                                                                <input 
+                                                                    type="number"
+                                                                    placeholder="0"
+                                                                    min="0"
+                                                                    max="99"
+                                                                    value={wasteValues[idx] || (ing.waste_pct ? ing.waste_pct.toString() : '')}
+                                                                    onChange={(e) => setWasteValues({...wasteValues, [idx]: e.target.value})}
+                                                                    className="w-16 px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-red-500 outline-none bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-white text-red-600 dark:text-red-400"
+                                                                />
                                                             </td>
                                                             <td className="px-4 py-4 text-right font-bold text-slate-700 dark:text-slate-300 border-l border-slate-100 dark:border-slate-800/50">
                                                                 ₹{displayCost.toFixed(2)}

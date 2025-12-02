@@ -7,6 +7,7 @@ export interface Ingredient {
   cost_per_unit?: number;
   unit?: string;
   cost_per_serving?: number;
+  waste_pct?: number;
 }
 
 export interface MenuItem {
@@ -214,6 +215,7 @@ export interface User {
 export enum AppView {
   DASHBOARD = 'DASHBOARD',
   RECIPES = 'RECIPES',
+  INVENTORY = 'INVENTORY',
   SOP = 'SOP',
   STRATEGY = 'STRATEGY',
   VIDEO = 'VIDEO',
@@ -244,6 +246,29 @@ export interface POSChangeRequest {
     requested_date: string;
     targetRestaurantId?: string;
     targetRestaurantName?: string;
+}
+
+// Inventory Types
+export interface InventoryItem {
+    id: string;
+    name: string;
+    category: string;
+    currentStock: number;
+    unit: string;
+    costPerUnit: number;
+    parLevel: number; // Minimum stock before reorder
+    supplier: string;
+    lastUpdated: string;
+}
+
+export interface PurchaseOrder {
+    id: string;
+    supplier: string;
+    items: { name: string; qty: number; unit: string; estimatedCost: number }[];
+    totalEstimatedCost: number;
+    status: 'draft' | 'sent';
+    generatedDate: string;
+    emailBody?: string;
 }
 
 // Razorpay Types

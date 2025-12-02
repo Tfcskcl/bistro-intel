@@ -1,7 +1,7 @@
 
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { SYSTEM_INSTRUCTION, MARKDOWN_INSTRUCTION, APP_CONTEXT } from "../constants";
-import { RecipeCard, SOP, StrategyReport, ImplementationGuide, MenuItem, MenuGenerationRequest, User } from "../types";
+import { RecipeCard, SOP, StrategyReport, ImplementationGuide, MenuItem, MenuGenerationRequest, User, PurchaseOrder, InventoryItem } from "../types";
 
 // Development Key for Live Preview 
 // SECURITY NOTE: We have removed the hardcoded key to prevent exposure.
@@ -11,6 +11,7 @@ const PREVIEW_KEY = "";
 // --- MOCK GENERATORS (DYNAMIC) ---
 
 const generateMockRecipe = (item: MenuItem, requirements: string): RecipeCard => {
+    // ... (Existing mock recipe logic remains unchanged)
     const isDrink = item.category === 'beverage';
     const baseName = item.name || "Custom Dish";
     const nameLower = baseName.toLowerCase();
@@ -196,6 +197,18 @@ const generateMockStrategy = (user: User, query: string): StrategyReport => {
     };
 };
 
+const generateMockPurchaseOrder = (supplier: string, items: {name: string, parLevel: number, currentStock: number}[]): PurchaseOrder => {
+    return {
+        id: `PO-${Date.now()}`,
+        supplier,
+        items: items.map(i => ({ name: i.name, qty: Math.ceil(i.parLevel - i.currentStock + 1), unit: 'units', estimatedCost: 100 })),
+        totalEstimatedCost: items.length * 100,
+        status: 'draft',
+        generatedDate: new Date().toISOString(),
+        emailBody: `Dear ${supplier},\n\nPlease fulfill the attached order for:\n\n` + items.map(i => `- ${i.name}: ${Math.ceil(i.parLevel - i.currentStock + 1)} units`).join('\n')
+    };
+};
+
 // --- API HANDLING ---
 
 const getApiKey = (): string => {
@@ -292,6 +305,8 @@ const RECIPE_SCHEMA: Schema = {
   },
   required: ["name", "ingredients", "preparation_steps", "food_cost_per_serving", "suggested_selling_price"]
 };
+
+// ... (Rest of existing functions verifyLocationWithMaps, estimateMarketRates, generateRecipeCard, generateRecipeVariation, substituteIngredient, generateSOP, generateStrategy, generateImplementationPlan, generateMarketingVideo, generateMarketingImage, generateKitchenWorkflow, generateMenu, getChatResponse remain unchanged)
 
 export const verifyLocationWithMaps = async (locationQuery: string): Promise<string> => {
   const ai = createAIClient();
@@ -710,12 +725,72 @@ export const generateMenu = async (request: MenuGenerationRequest): Promise<stri
     try {
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
-            contents: `Generate menu for ${request.restaurantName}. Style: ${request.cuisineType}.`,
+            contents: `Generate menu for ${request.restaurantName}. Style: ${request.cuisineType}. Target: ${request.targetAudience}. Budget: ${request.budgetRange}.`,
             config: { systemInstruction: MARKDOWN_INSTRUCTION }
         });
         return response.text || "";
     } catch (e) {
         return "# Menu Generation Failed\n\nPlease try again later.";
+    }
+};
+
+export const generatePurchaseOrder = async (supplier: string, items: InventoryItem[]): Promise<PurchaseOrder> => {
+    const ai = createAIClient();
+    if (!ai) {
+        await new Promise(r => setTimeout(r, 1500));
+        const needed = items.filter(i => i.currentStock < i.parLevel);
+        return generateMockPurchaseOrder(supplier, needed);
+    }
+
+    try {
+        const lowStockItems = items
+            .filter(i => i.currentStock < i.parLevel)
+            .map(i => `${i.name}: Stock ${i.currentStock} ${i.unit}, Par ${i.parLevel} ${i.unit}`);
+
+        if (lowStockItems.length === 0) {
+            throw new Error("No low stock items found.");
+        }
+
+        const prompt = `
+        Task: Create a professional purchase order email for Supplier "${supplier}".
+        Items Needed: ${lowStockItems.join(', ')}.
+        
+        Requirements:
+        1. Calculate quantity needed (Par - Stock). Round up.
+        2. Estimate cost assuming standard market rates.
+        3. Write a polite, professional email body requesting delivery by tomorrow.
+        
+        Return JSON structure:
+        {
+            "supplier": "${supplier}",
+            "items": [{"name": "string", "qty": number, "unit": "string", "estimatedCost": number}],
+            "totalEstimatedCost": number,
+            "emailBody": "string"
+        }
+        `;
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+            config: { responseMimeType: 'application/json' }
+        });
+        
+        const parsed = cleanAndParseJSON<Partial<PurchaseOrder>>(response.text);
+        
+        return {
+            id: `PO-${Date.now()}`,
+            status: 'draft',
+            generatedDate: new Date().toISOString(),
+            supplier: supplier,
+            items: parsed.items || [],
+            totalEstimatedCost: parsed.totalEstimatedCost || 0,
+            emailBody: parsed.emailBody || ""
+        };
+
+    } catch (e) {
+        console.error("PO Gen Error", e);
+        const needed = items.filter(i => i.currentStock < i.parLevel);
+        return generateMockPurchaseOrder(supplier, needed);
     }
 };
 
