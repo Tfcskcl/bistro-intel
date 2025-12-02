@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { generateStrategy, generateImplementationPlan } from '../services/geminiService';
-import { StrategyReport, UserRole, User, ImplementationGuide } from '../types';
-import { Send, Loader2, User as UserIcon, Briefcase, TrendingUp, HelpCircle, Play, LifeBuoy, X, BookOpen, UserCheck, Calendar, Sparkles, Target, AlertTriangle, ArrowUpRight, ArrowDownRight, Map, PieChart as PieChartIcon, ScatterChart as ScatterChartIcon, Wallet, TrendingDown, Users, Star, CheckCircle2, Phone, Award } from 'lucide-react';
+import { StrategyReport, UserRole, User, ImplementationGuide, PlanType } from '../types';
+import { Send, Loader2, User as UserIcon, Briefcase, TrendingUp, HelpCircle, Play, LifeBuoy, X, BookOpen, UserCheck, Calendar, Sparkles, Target, AlertTriangle, ArrowUpRight, ArrowDownRight, Map, PieChart as PieChartIcon, ScatterChart as ScatterChartIcon, Wallet, TrendingDown, Users, Star, CheckCircle2, Phone, Award, Video, Building2 } from 'lucide-react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend, ScatterChart, Scatter, ZAxis } from 'recharts';
 import { storageService } from '../services/storageService';
+import { paymentService } from '../services/paymentService';
 import { CREDIT_COSTS } from '../constants';
 
 interface StrategyProps { user: User; onUserUpdate?: (user: User) => void; }
@@ -25,6 +26,9 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [actionStates, setActionStates] = useState<ActionState>({});
+  
+  // Payment State
+  const [processingService, setProcessingService] = useState<'call' | 'onsite' | null>(null);
   
   const checkCredits = (): boolean => {
       if (user.role === UserRole.SUPER_ADMIN) return true;
@@ -66,8 +70,35 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
     }
   };
 
-  const handleBookExpert = () => {
-      alert("Consultation request sent! A Bistro Specialist will contact you within 24 hours to discuss the implementation package.");
+  const handleServicePayment = async (type: 'call' | 'onsite') => {
+      const amount = type === 'call' ? 99 : 5000;
+      setProcessingService(type);
+
+      await paymentService.initiatePayment(
+          user,
+          PlanType.PRO, // Using PlanType generic for service payment
+          amount,
+          (paymentId) => {
+              const serviceName = type === 'call' ? "Expert Consultation Call" : "On-site Implementation";
+              alert(`✅ Booking Confirmed! \n\nService: ${serviceName}\nTransaction ID: ${paymentId}\n\nA Bistro Specialist will contact you at ${user.email} within 2 hours.`);
+              
+              // Record transaction
+              storageService.addInvoice(user.id, {
+                  id: paymentId,
+                  date: new Date().toISOString(),
+                  amount: amount,
+                  plan: serviceName,
+                  status: 'Paid',
+                  period: 'One-time'
+              });
+              
+              setProcessingService(null);
+          },
+          (err) => {
+              if (err !== "Payment process cancelled") alert(`Booking Failed: ${err}`);
+              setProcessingService(null);
+          }
+      );
   };
 
   return (
@@ -202,31 +233,84 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                 </div>
             </div>
 
-            {/* Expert Implementation Service Card */}
-            <div className="bg-gradient-to-r from-slate-900 to-slate-800 dark:from-emerald-900 dark:to-slate-900 rounded-xl p-8 flex flex-col md:flex-row items-center justify-between text-white shadow-lg">
-                <div className="mb-6 md:mb-0 md:mr-8">
-                    <div className="flex items-center gap-2 mb-2">
-                        <Award className="text-yellow-400" />
-                        <h3 className="text-xl font-bold">Bistro Expert Implementation</h3>
+            {/* Expert Implementation Services */}
+            <div className="space-y-4">
+                <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                    <Award className="text-yellow-500" /> Bistro Expert Connect
+                </h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Consultation Option */}
+                    <div className="bg-gradient-to-br from-indigo-900 to-indigo-800 rounded-xl p-6 text-white shadow-lg flex flex-col justify-between relative overflow-hidden">
+                        <div className="relative z-10">
+                            <div className="flex justify-between items-start mb-4">
+                                <div className="p-3 bg-white/10 rounded-lg backdrop-blur-sm">
+                                    <Video size={24} className="text-indigo-300" />
+                                </div>
+                                <span className="bg-indigo-500/30 border border-indigo-400/30 text-xs font-bold px-2 py-1 rounded-full text-indigo-100">Most Popular</span>
+                            </div>
+                            <h4 className="text-xl font-bold mb-2">Speak to an Expert</h4>
+                            <p className="text-indigo-200 text-sm mb-6 leading-relaxed">
+                                Get a 15-minute strategy call with a verified F&B consultant to refine this plan.
+                            </p>
+                            <div className="flex items-center gap-3 text-sm text-indigo-100 mb-6">
+                                <span className="flex items-center gap-1"><CheckCircle2 size={14}/> Instant Review</span>
+                                <span className="flex items-center gap-1"><CheckCircle2 size={14}/> Q&A Session</span>
+                            </div>
+                        </div>
+                        
+                        <div className="flex items-center justify-between mt-auto relative z-10 border-t border-white/10 pt-4">
+                            <div>
+                                <p className="text-xs text-indigo-300 font-bold uppercase">One-time Fee</p>
+                                <p className="text-2xl font-bold text-white">₹99</p>
+                            </div>
+                            <button 
+                                onClick={() => handleServicePayment('call')}
+                                disabled={processingService === 'call'}
+                                className="px-6 py-2.5 bg-white text-indigo-900 font-bold rounded-lg hover:bg-indigo-50 transition-colors flex items-center gap-2 disabled:opacity-70"
+                            >
+                                {processingService === 'call' ? <Loader2 size={16} className="animate-spin" /> : <Phone size={16} />}
+                                Book Call
+                            </button>
+                        </div>
+                        {/* Decorative Blob */}
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl -mr-10 -mt-10"></div>
                     </div>
-                    <p className="text-slate-300 text-sm max-w-lg leading-relaxed">
-                        Need help executing this strategy? Our specialists can handle the groundwork—from running the ads to training your staff on the new SOPs.
-                    </p>
-                    <div className="flex gap-4 mt-4 text-xs font-bold text-emerald-300">
-                        <span className="flex items-center gap-1"><CheckCircle2 size={12}/> Guaranteed ROI</span>
-                        <span className="flex items-center gap-1"><CheckCircle2 size={12}/> Weekly Reports</span>
-                        <span className="flex items-center gap-1"><CheckCircle2 size={12}/> On-site Support</span>
+
+                    {/* On-Site Option */}
+                    <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-xl p-6 text-white shadow-lg flex flex-col justify-between relative overflow-hidden">
+                        <div className="relative z-10">
+                            <div className="flex justify-between items-start mb-4">
+                                <div className="p-3 bg-white/10 rounded-lg backdrop-blur-sm">
+                                    <Building2 size={24} className="text-emerald-400" />
+                                </div>
+                                <span className="bg-emerald-500/30 border border-emerald-400/30 text-xs font-bold px-2 py-1 rounded-full text-emerald-100">Premium</span>
+                            </div>
+                            <h4 className="text-xl font-bold mb-2">On-site Implementation</h4>
+                            <p className="text-slate-300 text-sm mb-6 leading-relaxed">
+                                Our specialists will visit your location to execute this strategy, train staff, and setup campaigns.
+                            </p>
+                            <div className="flex items-center gap-3 text-sm text-slate-300 mb-6">
+                                <span className="flex items-center gap-1"><CheckCircle2 size={14}/> Full Execution</span>
+                                <span className="flex items-center gap-1"><CheckCircle2 size={14}/> Weekly Reports</span>
+                            </div>
+                        </div>
+                        
+                        <div className="flex items-center justify-between mt-auto relative z-10 border-t border-white/10 pt-4">
+                            <div>
+                                <p className="text-xs text-slate-400 font-bold uppercase">Starting At</p>
+                                <p className="text-2xl font-bold text-white">₹5,000</p>
+                            </div>
+                            <button 
+                                onClick={() => handleServicePayment('onsite')}
+                                disabled={processingService === 'onsite'}
+                                className="px-6 py-2.5 bg-emerald-500 text-white font-bold rounded-lg hover:bg-emerald-600 transition-colors flex items-center gap-2 disabled:opacity-70"
+                            >
+                                {processingService === 'onsite' ? <Loader2 size={16} className="animate-spin" /> : <Briefcase size={16} />}
+                                Book Visit
+                            </button>
+                        </div>
                     </div>
-                </div>
-                <div className="text-center bg-white/10 p-6 rounded-xl border border-white/10 backdrop-blur-sm min-w-[200px]">
-                    <p className="text-xs text-slate-400 uppercase font-bold mb-1">Starting At</p>
-                    <p className="text-3xl font-bold text-white mb-4">₹5,000</p>
-                    <button 
-                        onClick={handleBookExpert}
-                        className="w-full py-2 bg-yellow-400 hover:bg-yellow-500 text-slate-900 font-bold rounded-lg transition-colors text-sm flex items-center justify-center gap-2"
-                    >
-                        <Phone size={14} /> Book Expert
-                    </button>
                 </div>
             </div>
 
