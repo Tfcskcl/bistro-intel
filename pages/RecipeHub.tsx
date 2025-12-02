@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { PLANS, CREDIT_COSTS } from '../constants';
 import { generateRecipeCard, generateRecipeVariation, hasValidApiKey } from '../services/geminiService';
@@ -534,15 +533,6 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
               setHasApiKey(true);
           } catch (e) {
               console.error(e);
-          }
-      } else {
-          // Manual Fallback for Live Site
-          const key = window.prompt("Enter your Google Gemini API Key (from https://aistudio.google.com):");
-          if (key && key.trim()) {
-              localStorage.setItem('gemini_api_key', key.trim());
-              setHasApiKey(true);
-              setError(null);
-              alert("API Key saved locally!");
           }
       }
   };

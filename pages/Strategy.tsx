@@ -78,12 +78,12 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
 
   const faqs = [
       {
-          question: "How do I reduce food cost?",
-          prompt: "Analyze my current food cost percentage and suggest 3 specific actionable ways to reduce it by 5% without compromising quality. Look at ingredient prices and waste."
+          question: "Boost Customer Footfall 🚀",
+          prompt: "Create a comprehensive marketing strategy to increase customer footfall. Include: 1. Social Media Campaigns (viral concepts). 2. Local Partnerships (gyms, offices). 3. Weekday Event Themes. 4. Smart Discounting ideas that protect margins."
       },
       {
-          question: "How do I plan a new menu?",
-          prompt: "Guide me through planning a new seasonal menu. Suggest a mix of high-margin items and popular comfort foods based on current trends. Include steps for testing and pricing."
+          question: "How do I reduce food cost?",
+          prompt: "Analyze my current food cost percentage and suggest 3 specific actionable ways to reduce it by 5% without compromising quality. Look at ingredient prices and waste."
       },
       {
           question: "Plan for growing sales by 12%",
@@ -137,14 +137,6 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
               setError(null);
           } catch (e) {
               console.error(e);
-          }
-      } else {
-          const key = window.prompt("Enter your Google Gemini API Key (from https://aistudio.google.com):");
-          if (key && key.trim()) {
-              localStorage.setItem('gemini_api_key', key.trim());
-              setHasApiKey(true);
-              setError(null);
-              alert("API Key saved locally!");
           }
       }
   };
@@ -545,7 +537,6 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
             </div>
         )}
 
-        {/* ... (Rest of Strategy Component - Render logic unchanged) ... */}
         {!report && !loading && (
           <div className="h-full flex flex-col items-center justify-center p-4">
             <div className="text-slate-400 dark:text-slate-500 opacity-60 mb-8 flex flex-col items-center animate-fade-in-up">
@@ -597,7 +588,6 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
 
         {report && (
           <div className="max-w-6xl mx-auto space-y-8 animate-fade-in pb-20">
-            {/* ... (Report visualization - unchanged) ... */}
             {/* Header */}
             <div className="flex items-center gap-3 mb-2">
                 <div className="p-2 bg-emerald-600 text-white rounded-lg shadow-lg shadow-emerald-500/30">
@@ -678,369 +668,199 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                                          Bar
                                      </button>
                                 </div>
-
-                                <ResponsiveContainer width="100%" height="100%">
-                                    {chartType === 'pie' ? (
-                                        <PieChart>
-                                            <Pie
-                                                data={getPriorityData()}
-                                                cx="50%"
-                                                cy="50%"
-                                                innerRadius={60}
-                                                outerRadius={80}
-                                                paddingAngle={5}
-                                                dataKey="value"
-                                            >
-                                                {getPriorityData().map((entry, index) => (
-                                                    <Cell key={`cell-${index}`} fill={entry.color} />
-                                                ))}
-                                            </Pie>
-                                            <RechartsTooltip 
-                                                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
-                                            />
-                                            <Legend verticalAlign="bottom" height={36}/>
-                                        </PieChart>
-                                    ) : (
-                                        <BarChart data={getPriorityData()}>
-                                            <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.3} />
-                                            <XAxis dataKey="name" tick={{fontSize: 10}} axisLine={false} tickLine={false} />
-                                            <YAxis tick={{fontSize: 10}} axisLine={false} tickLine={false} />
-                                            <RechartsTooltip cursor={{fill: 'transparent'}} contentStyle={{ borderRadius: '8px' }} />
-                                            <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                                                {getPriorityData().map((entry, index) => (
-                                                    <Cell key={`cell-${index}`} fill={entry.color} />
-                                                ))}
-                                            </Bar>
-                                        </BarChart>
-                                    )}
-                                </ResponsiveContainer>
-                                {chartType === 'pie' && (
-                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none pb-8">
-                                        <div className="text-center">
-                                            <span className="text-3xl font-bold text-slate-800 dark:text-white">{(report.action_plan || []).length}</span>
-                                            <p className="text-xs text-slate-400 dark:text-slate-500 font-bold uppercase">Actions</p>
-                                        </div>
-                                    </div>
-                                )}
                             </>
                         ) : (
-                            // Impact vs Effort Scatter Chart
-                            <div className="h-full w-full">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 0 }}>
-                                        <CartesianGrid strokeDasharray="3 3" opacity={0.3} />
-                                        <XAxis type="number" dataKey="x" name="Cost/Effort" tick={false} label={{ value: 'Cost/Effort', position: 'insideBottom', offset: -5, fontSize: 10 }} />
-                                        <YAxis type="number" dataKey="y" name="Impact" tick={false} label={{ value: 'Impact', angle: -90, position: 'insideLeft', fontSize: 10 }} />
-                                        <ZAxis type="number" dataKey="z" range={[60, 200]} />
-                                        <RechartsTooltip 
-                                            cursor={{ strokeDasharray: '3 3' }} 
-                                            content={({ active, payload }) => {
-                                                if (active && payload && payload.length) {
-                                                    const data = payload[0].payload;
-                                                    return (
-                                                        <div className="bg-white dark:bg-slate-800 p-2 border border-slate-200 dark:border-slate-700 shadow-lg rounded text-xs">
-                                                            <p className="font-bold text-slate-800 dark:text-white">{data.name}</p>
-                                                            <p className="text-slate-500 dark:text-slate-400">Priority: {data.priority}</p>
-                                                        </div>
-                                                    );
-                                                }
-                                                return null;
-                                            }}
-                                        />
-                                        <Scatter name="Initiatives" data={getImpactData()} fill="#10b981">
-                                             {getImpactData().map((entry, index) => (
-                                                <Cell key={`cell-${index}`} fill={entry.priority === 'High' ? COLORS.High : entry.priority === 'Medium' ? COLORS.Medium : COLORS.Low} />
-                                            ))}
-                                        </Scatter>
-                                    </ScatterChart>
-                                </ResponsiveContainer>
-                                <div className="text-center text-[10px] text-slate-400 dark:text-slate-500 mt-[-10px]">
-                                    Top-Right: High Impact, High Cost • Top-Left: High Impact, Low Cost (Quick Wins)
-                                </div>
+                            <div className="absolute top-2 right-4 z-10">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase">Impact Analysis</span>
                             </div>
                         )}
+
+                        <ResponsiveContainer width="100%" height="100%">
+                            {vizMode === 'priority' ? (
+                                chartType === 'pie' ? (
+                                    <PieChart>
+                                        <Pie
+                                            data={getPriorityData()}
+                                            cx="50%"
+                                            cy="50%"
+                                            innerRadius={60}
+                                            outerRadius={80}
+                                            paddingAngle={5}
+                                            dataKey="value"
+                                        >
+                                            {getPriorityData().map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={entry.color} />
+                                            ))}
+                                        </Pie>
+                                        <RechartsTooltip 
+                                            contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#fff' }}
+                                            itemStyle={{ color: '#fff' }}
+                                        />
+                                        <Legend verticalAlign="middle" align="right" layout="vertical" iconType="circle" />
+                                    </PieChart>
+                                ) : (
+                                    <BarChart data={getPriorityData()} layout="vertical" margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                                        <CartesianGrid strokeDasharray="3 3" horizontal={false} opacity={0.1} />
+                                        <XAxis type="number" hide />
+                                        <YAxis dataKey="name" type="category" width={60} tick={{fontSize: 12}} />
+                                        <RechartsTooltip cursor={{fill: 'transparent'}} contentStyle={{ borderRadius: '8px' }} />
+                                        <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={20}>
+                                            {getPriorityData().map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={entry.color} />
+                                            ))}
+                                        </Bar>
+                                    </BarChart>
+                                )
+                            ) : (
+                                <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                                    <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
+                                    <XAxis type="number" dataKey="x" name="Cost" unit="k" tick={{fontSize: 10}} label={{ value: 'Est. Cost', position: 'bottom', offset: 0, fontSize: 10 }} />
+                                    <YAxis type="number" dataKey="y" name="Impact" unit="pts" tick={{fontSize: 10}} label={{ value: 'Impact Score', angle: -90, position: 'insideLeft', fontSize: 10 }} />
+                                    <ZAxis type="number" dataKey="z" range={[50, 400]} />
+                                    <RechartsTooltip cursor={{ strokeDasharray: '3 3' }} contentStyle={{ borderRadius: '8px' }} />
+                                    <Scatter name="Initiatives" data={getImpactData()} fill="#10b981">
+                                        {getImpactData().map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={COLORS[entry.priority as keyof typeof COLORS]} />
+                                        ))}
+                                    </Scatter>
+                                </ScatterChart>
+                            )}
+                        </ResponsiveContainer>
                     </div>
                 </div>
             </div>
 
-            {/* Diagnosis: Root Causes */}
-            {report.causes && report.causes.length > 0 && (
-                <div className="bg-amber-50 dark:bg-amber-900/20 rounded-2xl border border-amber-100 dark:border-amber-800 p-6 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 p-4 opacity-10">
-                        <Activity size={120} className="text-amber-500" />
-                    </div>
-                    <div className="relative z-10">
-                        <h3 className="text-lg font-bold text-amber-900 dark:text-amber-400 mb-4 flex items-center gap-2">
-                           <Activity size={20} /> Diagnostic: Root Causes
-                        </h3>
-                        <div className="grid md:grid-cols-2 gap-4">
-                            {report.causes.map((cause, i) => (
-                                <div key={i} className="bg-white/80 dark:bg-slate-800/80 p-4 rounded-xl border border-amber-200/50 dark:border-amber-800/50 flex gap-3 items-start">
-                                    <AlertTriangle size={18} className="text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
-                                    <p className="text-sm text-amber-900 dark:text-amber-200 font-medium">{cause}</p>
+            {/* Action Plan */}
+            <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+                <div className="p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex items-center gap-2">
+                    <Briefcase className="text-blue-500" size={20} />
+                    <h3 className="text-lg font-bold text-slate-800 dark:text-white">Action Plan</h3>
+                </div>
+                <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {(report.action_plan || []).map((action, i) => (
+                        <div key={i} className="p-6 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
+                            <div className="flex justify-between items-start mb-2">
+                                <div className="flex items-center gap-3">
+                                    <span className={`px-2 py-1 text-xs font-bold rounded uppercase ${
+                                        action.priority === 'High' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 
+                                        action.priority === 'Medium' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' : 
+                                        'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                                    }`}>
+                                        {action.priority} Priority
+                                    </span>
+                                    <h4 className="font-bold text-slate-800 dark:text-white">{action.initiative}</h4>
                                 </div>
-                            ))}
+                                <div className="flex items-center gap-2">
+                                    {actionStates[i] === 'in_progress' ? (
+                                        <span className="text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded flex items-center gap-1">
+                                            <Loader2 size={12} className="animate-spin" /> In Progress
+                                        </span>
+                                    ) : actionStates[i] === 'help_requested' ? (
+                                        <span className="text-xs font-bold text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 px-2 py-1 rounded flex items-center gap-1">
+                                            <UserCheck size={12} /> Expert Requested
+                                        </span>
+                                    ) : (
+                                        <button 
+                                            onClick={() => handleStartImplementationClick(i, action.initiative)}
+                                            className="text-xs font-bold text-slate-500 hover:text-emerald-600 dark:text-slate-400 dark:hover:text-emerald-400 flex items-center gap-1 transition-colors"
+                                        >
+                                            <Play size={12} /> Start
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-4 mt-3 text-sm">
+                                <div>
+                                    <span className="text-slate-400 dark:text-slate-500 text-xs uppercase font-bold">Est. Impact</span>
+                                    <p className="text-emerald-600 dark:text-emerald-400 font-medium">{action.impact_estimate}</p>
+                                </div>
+                                <div>
+                                    <span className="text-slate-400 dark:text-slate-500 text-xs uppercase font-bold">Est. Cost</span>
+                                    <p className="text-slate-600 dark:text-slate-300 font-medium">{action.cost_estimate}</p>
+                                </div>
+                            </div>
+
+                            <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex gap-4">
+                                <button 
+                                    onClick={() => openAssistanceModal(i, action.initiative)}
+                                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                                >
+                                    <LifeBuoy size={12} /> Need help executing this?
+                                </button>
+                            </div>
                         </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* Menu Suggestions */}
+            {report.seasonal_menu_suggestions && report.seasonal_menu_suggestions.length > 0 && (
+                <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+                    <div className="p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex items-center gap-2">
+                        <Sparkles className="text-purple-500" size={20} />
+                        <h3 className="text-lg font-bold text-slate-800 dark:text-white">Seasonal Menu Engineering</h3>
+                    </div>
+                    <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {report.seasonal_menu_suggestions.map((item, i) => (
+                            <div key={i} className={`p-4 rounded-xl border ${item.type === 'add' ? 'border-emerald-100 bg-emerald-50 dark:border-emerald-900/50 dark:bg-emerald-900/10' : 'border-red-100 bg-red-50 dark:border-red-900/50 dark:bg-red-900/10'}`}>
+                                <div className="flex items-start gap-3">
+                                    <div className={`p-2 rounded-full ${item.type === 'add' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50 dark:text-emerald-400' : 'bg-red-100 text-red-600 dark:bg-red-900/50 dark:text-red-400'}`}>
+                                        {item.type === 'add' ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} />}
+                                    </div>
+                                    <div>
+                                        <h4 className="font-bold text-slate-800 dark:text-white text-sm">{item.item}</h4>
+                                        <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{item.reason}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 </div>
             )}
 
-            {/* Strategic Roadmap (12-Month) */}
+            {/* Roadmap */}
             {report.roadmap && report.roadmap.length > 0 && (
                 <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
-                    <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex items-center gap-2 bg-gradient-to-r from-slate-50 to-white dark:from-slate-800 dark:to-slate-700/50">
-                        <Map size={20} className="text-indigo-600 dark:text-indigo-400" />
-                        <h3 className="text-lg font-bold text-slate-900 dark:text-white">12-Month Strategic Roadmap</h3>
+                    <div className="p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex items-center gap-2">
+                        <Map className="text-slate-500" size={20} />
+                        <h3 className="text-lg font-bold text-slate-800 dark:text-white">Execution Roadmap</h3>
                     </div>
-                    <div className="p-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 relative">
-                            {/* Connector Line (Desktop) */}
-                            <div className="hidden lg:block absolute top-6 left-0 right-0 h-0.5 bg-indigo-100 dark:bg-indigo-900 z-0 mx-12"></div>
-                            
-                            {report.roadmap.map((phase, idx) => (
-                                <div key={idx} className="relative z-10 bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col h-full hover:border-indigo-300 dark:hover:border-indigo-600 transition-colors">
-                                    <div className="w-12 h-12 rounded-full bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-100 dark:border-indigo-800 flex items-center justify-center font-bold text-indigo-600 dark:text-indigo-400 mb-4 mx-auto lg:mx-0">
-                                        {idx + 1}
+                    <div className="p-6 relative">
+                        <div className="absolute left-9 top-6 bottom-6 w-0.5 bg-slate-200 dark:bg-slate-700"></div>
+                        <div className="space-y-8">
+                            {report.roadmap.map((phase, i) => (
+                                <div key={i} className="relative flex gap-6">
+                                    <div className="z-10 w-6 h-6 rounded-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 flex items-center justify-center text-xs font-bold shrink-0 mt-1 border-4 border-white dark:border-slate-800">
+                                        {i + 1}
                                     </div>
-                                    <div className="text-center lg:text-left mb-4">
-                                        <h4 className="text-lg font-bold text-slate-900 dark:text-white">{phase.phase_name}</h4>
-                                        <p className="text-sm font-semibold text-indigo-600 dark:text-indigo-400">{phase.duration}</p>
-                                    </div>
-                                    
-                                    <div className="flex-1 space-y-2 mb-4">
-                                        {phase.steps.slice(0, 3).map((step, sIdx) => (
-                                            <div key={sIdx} className="flex gap-2 items-start text-xs text-slate-600 dark:text-slate-300">
-                                                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 mt-1 shrink-0"></span>
-                                                {step}
+                                    <div className="flex-1">
+                                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-baseline mb-2">
+                                            <h4 className="font-bold text-slate-800 dark:text-white">{phase.phase_name}</h4>
+                                            <span className="text-xs font-bold text-slate-400 uppercase tracking-wide">{phase.duration}</span>
+                                        </div>
+                                        <div className="bg-slate-50 dark:bg-slate-900/50 rounded-lg p-4 border border-slate-100 dark:border-slate-700">
+                                            <ul className="space-y-2 mb-3">
+                                                {phase.steps.map((step, s) => (
+                                                    <li key={s} className="flex items-start gap-2 text-sm text-slate-600 dark:text-slate-300">
+                                                        <div className="mt-1.5 w-1 h-1 bg-slate-400 rounded-full shrink-0"></div>
+                                                        {step}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                            <div className="flex items-center gap-2 text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-1 rounded w-fit">
+                                                <Target size={12} /> Milestone: {phase.milestone}
                                             </div>
-                                        ))}
-                                    </div>
-                                    
-                                    <div className="pt-3 border-t border-slate-100 dark:border-slate-700 text-xs">
-                                        <span className="font-bold text-slate-500 dark:text-slate-400 uppercase">Milestone:</span>
-                                        <p className="text-slate-800 dark:text-slate-200 font-medium mt-1">{phase.milestone}</p>
+                                        </div>
                                     </div>
                                 </div>
                             ))}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Action Plan & Seasonal Menu ... (Same as original) */}
-            {/* Action Plan */}
-            <div>
-              <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    <Briefcase size={22} className="text-blue-600 dark:text-blue-400"/> Actionable Initiatives
-                  </h3>
-                  <span className="text-xs font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full">
-                      {(report.action_plan || []).length} Initiatives Identified
-                  </span>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {(report.action_plan || []).map((action, i) => (
-                  <div key={i} className={`flex flex-col rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transition-all hover:shadow-md bg-white dark:bg-slate-800 ${
-                        actionStates[i] === 'completed' ? 'opacity-60 grayscale' : ''
-                  }`}>
-                    {/* Card Header */}
-                    <div className="p-5 border-b border-slate-100 dark:border-slate-700 flex justify-between items-start gap-3">
-                        <h4 className={`font-bold text-slate-800 dark:text-white leading-snug ${actionStates[i] === 'completed' ? 'line-through' : ''}`}>
-                            {action.initiative}
-                        </h4>
-                        <span className={`shrink-0 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider border ${
-                            action.priority === 'High' ? 'bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800' :
-                            action.priority === 'Medium' ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800' :
-                            'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800'
-                        }`}>
-                            {action.priority}
-                        </span>
-                    </div>
-
-                    {/* Card Metrics */}
-                    <div className="p-5 flex-1 space-y-4">
-                        <div className="grid grid-cols-2 gap-2">
-                            <div className="bg-slate-50 dark:bg-slate-700 p-2 rounded-lg border border-slate-100 dark:border-slate-600">
-                                <p className="text-[10px] text-slate-400 dark:text-slate-400 uppercase font-bold mb-1">Impact</p>
-                                <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400 leading-tight">{action.impact_estimate}</p>
-                            </div>
-                            <div className="bg-slate-50 dark:bg-slate-700 p-2 rounded-lg border border-slate-100 dark:border-slate-600">
-                                <p className="text-[10px] text-slate-400 dark:text-slate-400 uppercase font-bold mb-1">Cost</p>
-                                <p className="text-xs font-bold text-slate-700 dark:text-slate-300 leading-tight">{action.cost_estimate}</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    {/* Card Actions */}
-                    <div className="p-4 border-t border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 rounded-b-xl">
-                        <div className="flex flex-col gap-3">
-                            {/* Implementation Button */}
-                            {actionStates[i] === 'in_progress' ? (
-                                <button 
-                                    onClick={() => handleStartImplementationClick(i, action.initiative)}
-                                    className="w-full py-2 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs font-bold rounded-lg flex items-center justify-center gap-2 border border-emerald-200 dark:border-emerald-800"
-                                >
-                                    <Clock size={14} /> View Roadmap
-                                </button>
-                            ) : actionStates[i] === 'help_requested' ? (
-                                <div className="w-full py-2 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-xs font-bold rounded-lg flex items-center justify-center gap-2 border border-blue-200 dark:border-blue-800">
-                                    <CheckCircle2 size={14} /> Expert Assigned
-                                </div>
-                            ) : actionStates[i] === 'completed' ? (
-                                <div className="w-full py-2 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold rounded-lg flex items-center justify-center gap-2">
-                                    <CheckCircle2 size={14} /> Done
-                                </div>
-                            ) : (
-                                <div className="flex gap-2">
-                                    <button 
-                                        onClick={() => handleStartImplementationClick(i, action.initiative)}
-                                        className="flex-1 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold rounded-lg hover:bg-emerald-600 dark:hover:bg-slate-200 transition-colors flex items-center justify-center gap-1 shadow-sm"
-                                    >
-                                        <Play size={12} fill="currentColor" /> Start
-                                    </button>
-                                    <button 
-                                        onClick={() => openAssistanceModal(i, action.initiative)}
-                                        className="py-2 px-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-200 dark:hover:border-blue-800 rounded-lg transition-colors"
-                                        title="Ask Expert"
-                                    >
-                                        <LifeBuoy size={16} />
-                                    </button>
-                                </div>
-                            )}
-
-                            {/* Status Toggle */}
-                            <div className="flex items-center justify-between text-[10px] text-slate-400 dark:text-slate-500 font-medium pt-1">
-                                <span>Status:</span>
-                                <div className="flex gap-1">
-                                    {['idle', 'in_progress', 'completed'].map((s) => (
-                                        <button 
-                                            key={s}
-                                            onClick={() => updateActionStatus(i, s as any)}
-                                            className={`w-2 h-2 rounded-full transition-all ${actionStates[i] === s ? (s === 'completed' ? 'bg-slate-400 dark:bg-slate-500 scale-125' : s === 'in_progress' ? 'bg-emerald-500 scale-125' : 'bg-slate-300 dark:bg-slate-600 scale-125') : 'bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600'}`}
-                                            title={s.replace('_', ' ')}
-                                        />
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            
-            {/* Seasonal Menu Suggestions */}
-            {(report.seasonal_menu_suggestions || []).length > 0 && (
-                <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
-                    <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
-                        <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                            <Lightbulb size={20} className="text-yellow-500" /> Seasonal Menu Strategy
-                        </h3>
-                        {/* Legend */}
-                        <div className="flex gap-4 text-xs font-bold">
-                            <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-emerald-500"></div> Add</div>
-                            <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-red-500"></div> Remove</div>
-                        </div>
-                    </div>
-                    
-                    <div className="grid md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-100 dark:divide-slate-700">
-                        {/* Additions */}
-                        <div className="p-6">
-                            <h4 className="text-xs font-bold text-emerald-600 dark:text-emerald-400 uppercase mb-4 flex items-center gap-2">
-                                <ArrowUpRight size={16} /> Recommended Additions
-                            </h4>
-                            <div className="space-y-4">
-                                {(report.seasonal_menu_suggestions || []).filter(s => s.type === 'add').map((item, i) => (
-                                    <div key={i} className="flex gap-3 items-start">
-                                        <div className="mt-1 w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></div>
-                                        <div>
-                                            <p className="font-bold text-slate-800 dark:text-white text-sm">{item.item}</p>
-                                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{item.reason}</p>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Removals */}
-                        <div className="p-6">
-                             <h4 className="text-xs font-bold text-red-600 dark:text-red-400 uppercase mb-4 flex items-center gap-2">
-                                <ArrowDownRight size={16} /> Suggested Removals
-                            </h4>
-                            <div className="space-y-4">
-                                {(report.seasonal_menu_suggestions || []).filter(s => s.type === 'remove').map((item, i) => (
-                                    <div key={i} className="flex gap-3 items-start">
-                                        <div className="mt-1 w-1.5 h-1.5 rounded-full bg-red-500 shrink-0"></div>
-                                        <div>
-                                            <p className="font-bold text-slate-800 dark:text-white text-sm">{item.item}</p>
-                                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{item.reason}</p>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
                         </div>
                     </div>
                 </div>
             )}
           </div>
         )}
-      </div>
-
-      {/* Input */}
-      <div className="p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 z-30">
-        <div className="max-w-4xl mx-auto space-y-3">
-            {/* Quick Chips */}
-            <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar mask-linear-fade">
-                {ROLE_SPECIFIC_PROMPTS[role].map((prompt, idx) => (
-                    <button
-                        key={idx}
-                        onClick={() => setQuery(prompt)}
-                        className="whitespace-nowrap px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 text-slate-600 dark:text-slate-300 hover:text-emerald-700 dark:hover:text-emerald-400 border border-slate-200 dark:border-slate-700 hover:border-emerald-200 dark:hover:border-emerald-800 rounded-full text-xs font-medium transition-colors flex items-center gap-1.5 shrink-0"
-                    >
-                        <Sparkles size={12} className="text-yellow-500" />
-                        {prompt}
-                    </button>
-                ))}
-            </div>
-
-            <div className="flex gap-2">
-                <input 
-                    type="text" 
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                    placeholder="Enter your business goal or challenge (e.g. 'Increase delivery revenue by 20%')..."
-                    className="flex-1 px-4 py-3 bg-slate-50 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none shadow-sm"
-                    autoFocus
-                />
-                <button 
-                    onClick={handleClear}
-                    title="Clear Chat"
-                    className="px-3 py-3 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors border border-transparent hover:border-red-100 dark:hover:border-red-900/50 flex items-center justify-center"
-                >
-                    <Trash2 size={20} />
-                </button>
-                
-                {hasApiKey ? (
-                    <button 
-                        onClick={() => handleSend()}
-                        disabled={loading || !query}
-                        className="px-6 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg hover:bg-emerald-600 dark:hover:bg-slate-200 disabled:opacity-50 transition-colors font-bold shadow-lg shadow-slate-900/20 flex items-center gap-2"
-                    >
-                        {loading ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />}
-                        {loading ? '' : `Ask (${CREDIT_COSTS.STRATEGY} CR)`}
-                    </button>
-                ) : (
-                    <button 
-                        onClick={handleConnectKey}
-                        className="px-6 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-bold transition-colors shadow-lg flex items-center gap-2"
-                    >
-                        <Key size={18} /> Connect Key
-                    </button>
-                )}
-            </div>
-        </div>
       </div>
     </div>
   );

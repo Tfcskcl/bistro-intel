@@ -92,15 +92,6 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
             console.error("Error selecting key:", e);
             // Revert if explicitly failed, but usually openSelectKey doesn't throw on close
           }
-      } else {
-          // Manual Fallback
-          const key = window.prompt("Enter your Google Cloud API Key (from https://aistudio.google.com):");
-          if (key && key.trim()) {
-              localStorage.setItem('gemini_api_key', key.trim());
-              setHasVeoKey(true);
-              setError(null);
-              alert("API Key saved locally!");
-          }
       }
   };
 

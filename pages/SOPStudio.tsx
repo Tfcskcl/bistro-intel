@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { User, SOP, SOPRequest, UserRole } from '../types';
 import { generateSOP, hasValidApiKey } from '../services/geminiService';
@@ -117,15 +116,6 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
               setError(null);
           } catch (e) {
               console.error(e);
-          }
-      } else {
-          // Fallback manual entry
-          const key = window.prompt("Enter your Google Gemini API Key (from https://aistudio.google.com):");
-          if (key && key.trim()) {
-              localStorage.setItem('gemini_api_key', key.trim());
-              setHasApiKey(true);
-              setError(null);
-              alert("API Key saved locally!");
           }
       }
   };

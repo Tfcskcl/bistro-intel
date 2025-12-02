@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, GenerateContentResponse, Type, Chat } from "@google/genai";
 import { SYSTEM_INSTRUCTION, MARKDOWN_INSTRUCTION, APP_CONTEXT } from "../constants";
 import { RecipeCard, SOP, StrategyReport, ImplementationGuide, MenuItem, MenuGenerationRequest } from "../types";
@@ -8,11 +7,6 @@ const getApiKey = (): string => {
   // 1. Check Environment Variable (Build time / AI Studio injection)
   if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
     return process.env.API_KEY;
-  }
-  // 2. Check Local Storage (Manual entry on live sites)
-  if (typeof localStorage !== 'undefined') {
-      const localKey = localStorage.getItem('gemini_api_key');
-      if (localKey) return localKey;
   }
   return '';
 };
@@ -485,25 +479,27 @@ export const generateMarketingImage = async (prompt: string, aspectRatio: string
     const ai = new GoogleGenAI({ apiKey });
 
     try {
-        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
-            model: 'gemini-3-pro-image-preview',
-            contents: { parts: [{ text: prompt }] },
-            config: { imageConfig: { aspectRatio: aspectRatio, imageSize: "1K" } }
-        }));
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-image',
+            contents: {
+                parts: [
+                    { text: prompt },
+                ],
+            },
+            config: {
+                // responseMimeType is not supported for nano banana series models
+            },
+        });
 
-        let base64Image = '';
-        if (response.candidates && response.candidates[0]?.content?.parts) {
+        if (response.candidates && response.candidates[0].content && response.candidates[0].content.parts) {
             for (const part of response.candidates[0].content.parts) {
                 if (part.inlineData) {
-                    base64Image = part.inlineData.data;
-                    break;
+                    const base64EncodeString: string = part.inlineData.data;
+                    return `data:image/png;base64,${base64EncodeString}`;
                 }
             }
         }
-
-        if (!base64Image) throw new Error("No image generated. Please try again.");
-        return `data:image/png;base64,${base64Image}`;
-
+        throw new Error("No image data returned.");
     } catch (error: any) {
         throw new Error(formatError(error));
     }
@@ -511,72 +507,64 @@ export const generateMarketingImage = async (prompt: string, aspectRatio: string
 
 export const generateKitchenWorkflow = async (description: string): Promise<string> => {
     const apiKey = getApiKey();
-    if (!apiKey) throw new Error("API Key is missing.");
+    if (!apiKey) throw new Error("API Key required.");
 
     const ai = new GoogleGenAI({ apiKey });
-    
     const prompt = `
-        Design an efficient kitchen workflow based on the following user requirements and context.
-        The user has uploaded media (images/videos) which imply the layout described below.
+        Act as an expert Restaurant Operations Consultant.
+        Design an optimized kitchen workflow based on this input: "${description}".
         
-        User Description: "${description}"
+        Provide the response in clear Markdown format with:
+        - **Problem Analysis**
+        - **Proposed Workflow Steps**
+        - **Station Layout Recommendations**
+        - **Staff Positioning**
         
-        Output a detailed Workflow Plan in Markdown format. Include:
-        1. **Zone Layout Strategy**: How to arrange prep, cooking, and plating areas.
-        2. **Process Flow**: Step-by-step movement of food and staff.
-        3. **Equipment Placement Recommendations**.
-        4. **Safety & Efficiency Checkpoints**.
-        
-        Keep it professional, operational, and easy to read.
+        Do not output JSON. Output Markdown text.
     `;
 
     try {
-        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
+        const response: GenerateContentResponse = await retryOperation(() => ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: [{ parts: [{ text: prompt }] }],
-            config: { systemInstruction: MARKDOWN_INSTRUCTION }
+            config: {
+                systemInstruction: MARKDOWN_INSTRUCTION,
+            }
         }));
-        
-        return response.text || "Failed to generate workflow content.";
+        return response.text || "Failed to generate workflow.";
     } catch (error: any) {
         throw new Error(formatError(error));
     }
 };
 
-export const generateMenu = async (req: MenuGenerationRequest): Promise<string> => {
+export const generateMenu = async (request: MenuGenerationRequest): Promise<string> => {
     const apiKey = getApiKey();
-    if (!apiKey) throw new Error("API Key is missing.");
+    if (!apiKey) throw new Error("API Key required.");
 
     const ai = new GoogleGenAI({ apiKey });
-
     const prompt = `
-        Design a complete restaurant menu based on these requirements:
-        
-        Restaurant Name: ${req.restaurantName}
-        Cuisine: ${req.cuisineType}
-        Target Audience: ${req.targetAudience}
-        Budget Range: ${req.budgetRange}
-        Must Include: ${req.mustIncludeItems}
-        Dietary Restrictions: ${req.dietaryRestrictions.join(', ')}
-        Number of Items to Generate: ${req.numberOfItems || 15}
-        
-        Output the menu in nicely formatted Markdown. Structure it by categories (Appetizers, Mains, Desserts, etc.).
-        For each item, include:
-        - Dish Name
-        - A mouth-watering description
-        - Estimated Selling Price (based on the budget range)
-        - Key Ingredients
-        
-        Also include a brief "Menu Strategy" section at the end explaining why these items fit the target audience.
+        Create a full menu for a restaurant with the following details:
+        Name: ${request.restaurantName}
+        Cuisine: ${request.cuisineType}
+        Target Audience: ${request.targetAudience}
+        Budget per Person: ${request.budgetRange}
+        Must Include: ${request.mustIncludeItems}
+        Dietary Restrictions: ${request.dietaryRestrictions.join(', ')}
+
+        Format the menu in Markdown.
+        Include sections like Starters, Mains, Desserts, Beverages.
+        For each item, provide a name, a short appetizing description, and a price within the budget.
+        Highlight "Chef's Special" or "Bestseller" for a few items.
     `;
 
     try {
-        const response = await retryOperation<GenerateContentResponse>(() => ai.models.generateContent({
+        const response: GenerateContentResponse = await retryOperation(() => ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: [{ parts: [{ text: prompt }] }],
-            config: { systemInstruction: MARKDOWN_INSTRUCTION }
+            config: {
+                systemInstruction: MARKDOWN_INSTRUCTION,
+            }
         }));
-        
         return response.text || "Failed to generate menu.";
     } catch (error: any) {
         throw new Error(formatError(error));
