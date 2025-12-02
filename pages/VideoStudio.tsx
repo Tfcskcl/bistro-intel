@@ -26,32 +26,9 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
   // History
   const [history, setHistory] = useState<MarketingRequest[]>([]);
   
-  // API Key Status
-  const [hasVeoKey, setHasVeoKey] = useState(() => hasValidApiKey());
-
   useEffect(() => {
       loadHistory();
-      
-      // Polling for key status
-      const checkKey = async () => {
-          if (hasValidApiKey()) {
-              setHasVeoKey(true);
-              if (error && (error.includes('API Key') || error.includes('entity was not found'))) setError(null);
-              return;
-          }
-          if ((window as any).aistudio) {
-              try {
-                  const has = await (window as any).aistudio.hasSelectedApiKey();
-                  setHasVeoKey(has);
-                  if (has && error && (error.includes('API Key') || error.includes('entity was not found'))) setError(null);
-              } catch(e) { console.error(e); }
-          }
-      };
-      
-      checkKey();
-      const interval = setInterval(checkKey, 3000);
-      return () => clearInterval(interval);
-  }, [user.id, error]);
+  }, [user.id]);
 
   const loadHistory = () => {
       const all = storageService.getAllMarketingRequests();
@@ -62,10 +39,8 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
   const handleGenerate = async () => {
       if (!prompt) return;
       
-      if (!hasVeoKey) {
-          handleSelectKey();
-          return;
-      }
+      // Note: We no longer block if no key is found. 
+      // The service will handle missing keys by returning a demo/mock response.
       
       const cost = mediaType === 'video' ? CREDIT_COSTS.VIDEO : CREDIT_COSTS.IMAGE;
       
@@ -113,36 +88,9 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
 
       } catch (err: any) {
           console.error(err);
-          // Handle specific Veo errors
-          if (err.message && err.message.includes('entity was not found')) {
-              setError("Access Denied. Please select a valid Project/API Key.");
-              setHasVeoKey(false);
-          } else {
-              setError(err.message || "Generation failed. Please try again.");
-          }
+          setError(err.message || "Generation failed. Please try again.");
       } finally {
           setIsGenerating(false);
-      }
-  };
-
-  const handleSelectKey = async () => {
-      if ((window as any).aistudio) {
-          try {
-              await (window as any).aistudio.openSelectKey();
-              // Optimistically set true, polling will correct if needed
-              setHasVeoKey(true);
-              setError(null);
-          } catch (e) {
-              console.error(e);
-          }
-      } else {
-          // Fallback if not in AI Studio
-          const key = prompt("Please enter your Google Gemini API Key:", "");
-          if (key) {
-              // Note: Ideally we don't use prompt, but this is a failsafe for the "Live Site" request
-              // This part would typically be handled by env vars in prod
-              console.log("Manual key entry not persisted in this demo mode.");
-          }
       }
   };
 
@@ -198,13 +146,13 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
                               onClick={() => setMediaType('video')}
                               className={`flex-1 py-2 text-sm font-bold rounded-md transition-all flex items-center justify-center gap-2 ${mediaType === 'video' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
                           >
-                              <Clapperboard size={16} /> Video (Veo)
+                              <Clapperboard size={16} /> Video
                           </button>
                           <button 
                               onClick={() => setMediaType('image')}
                               className={`flex-1 py-2 text-sm font-bold rounded-md transition-all flex items-center justify-center gap-2 ${mediaType === 'image' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
                           >
-                              <ImageIcon size={16} /> Image (Imagen)
+                              <ImageIcon size={16} /> Image
                           </button>
                       </div>
 
@@ -244,31 +192,19 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
                               <AlertCircle size={16} className="mt-0.5 shrink-0" />
                               <div className="flex-1">
                                   <p>{error}</p>
-                                  {error.includes('Access Denied') && (
-                                      <button onClick={handleSelectKey} className="text-xs underline font-bold mt-1">Re-authenticate</button>
-                                  )}
                               </div>
                           </div>
                       )}
 
                       {/* Generate Button */}
-                      {!hasVeoKey ? (
-                          <button 
-                              onClick={handleSelectKey}
-                              className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
-                          >
-                              <Key size={18} /> Connect API Key
-                          </button>
-                      ) : (
-                          <button 
-                              onClick={handleGenerate}
-                              disabled={isGenerating || !prompt}
-                              className="w-full py-3 bg-slate-900 dark:bg-emerald-600 text-white font-bold rounded-xl hover:opacity-90 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                          >
-                              {isGenerating ? <Loader2 className="animate-spin" size={18} /> : <Sparkles size={18} />}
-                              {isGenerating ? 'Generating...' : `Generate ${mediaType === 'video' ? 'Video' : 'Image'} (${mediaType === 'video' ? CREDIT_COSTS.VIDEO : CREDIT_COSTS.IMAGE} CR)`}
-                          </button>
-                      )}
+                      <button 
+                          onClick={handleGenerate}
+                          disabled={isGenerating || !prompt}
+                          className="w-full py-3 bg-slate-900 dark:bg-emerald-600 text-white font-bold rounded-xl hover:opacity-90 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                          {isGenerating ? <Loader2 className="animate-spin" size={18} /> : <Sparkles size={18} />}
+                          {isGenerating ? 'Generating...' : `Generate ${mediaType === 'video' ? 'Video' : 'Image'} (${mediaType === 'video' ? CREDIT_COSTS.VIDEO : CREDIT_COSTS.IMAGE} CR)`}
+                      </button>
                   </div>
               </div>
 

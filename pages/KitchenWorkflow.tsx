@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { User, KitchenWorkflowRequest, UserRole } from '../types';
 import { storageService } from '../services/storageService';
@@ -29,47 +30,10 @@ export const KitchenWorkflow: React.FC<KitchenWorkflowProps> = ({ user, onUserUp
     const [adminDraft, setAdminDraft] = useState('');
     const [isGenerating, setIsGenerating] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [hasApiKey, setHasApiKey] = useState(() => hasValidApiKey());
 
     useEffect(() => {
         refreshData();
     }, [user.id, isAdmin]);
-
-    // Poll for API Key Status
-    useEffect(() => {
-        const checkKey = async () => {
-            if (hasValidApiKey()) {
-                setHasApiKey(true);
-                if (error && error.includes('API Key')) setError(null);
-                return;
-            }
-
-            if ((window as any).aistudio) {
-                try {
-                    const has = await (window as any).aistudio.hasSelectedApiKey();
-                    setHasApiKey(has);
-                    if (has && error && error.includes('API Key')) setError(null);
-                } catch (e) {
-                    console.error("Error checking API key", e);
-                }
-            }
-        };
-        checkKey();
-        const interval = setInterval(checkKey, 2000);
-        return () => clearInterval(interval);
-    }, [error]);
-
-    const handleConnectKey = async () => {
-        if ((window as any).aistudio) {
-            try {
-                await (window as any).aistudio.openSelectKey();
-                setHasApiKey(true);
-                setError(null);
-            } catch (e) {
-                console.error(e);
-            }
-        }
-    };
 
     const refreshData = () => {
         const all = storageService.getAllKitchenWorkflowRequests();
@@ -151,10 +115,7 @@ export const KitchenWorkflow: React.FC<KitchenWorkflowProps> = ({ user, onUserUp
     const generateDraft = async () => {
         if (!selectedRequest) return;
         
-        if (!hasApiKey) {
-            handleConnectKey();
-            return;
-        }
+        // Note: No key check here. Service falls back to mock if needed.
 
         setIsGenerating(true);
         setError(null);
@@ -401,37 +362,20 @@ export const KitchenWorkflow: React.FC<KitchenWorkflowProps> = ({ user, onUserUp
                                     <div className="flex items-center gap-2">
                                         <AlertTriangle size={16} /> {error}
                                     </div>
-                                    {(error.includes('API Key') || error.includes('configure') || error.includes('unauthenticated')) && !hasApiKey && (
-                                        <button 
-                                            onClick={handleConnectKey}
-                                            className="px-3 py-1 bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-200 text-xs font-bold rounded hover:bg-red-200 dark:hover:bg-red-700 transition-colors"
-                                        >
-                                            Connect Key
-                                        </button>
-                                    )}
                                 </div>
                             )}
 
                             {isAdmin && selectedRequest.status === 'pending' ? (
                                 <>
                                     <div className="mb-4 flex justify-end">
-                                        {hasApiKey ? (
-                                            <button 
-                                                onClick={generateDraft}
-                                                disabled={isGenerating}
-                                                className="text-xs flex items-center gap-1 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 px-3 py-1.5 rounded-lg border border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/50 font-bold"
-                                            >
-                                                {isGenerating ? <Loader2 size={12} className="animate-spin"/> : <Sparkles size={12} />} 
-                                                Generate AI Draft
-                                            </button>
-                                        ) : (
-                                            <button 
-                                                onClick={handleConnectKey}
-                                                className="text-xs flex items-center gap-1 bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-3 py-1.5 rounded-lg border border-amber-200 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/50 font-bold"
-                                            >
-                                                <Key size={12} /> Connect Key for AI
-                                            </button>
-                                        )}
+                                        <button 
+                                            onClick={generateDraft}
+                                            disabled={isGenerating}
+                                            className="text-xs flex items-center gap-1 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 px-3 py-1.5 rounded-lg border border-purple-200 dark:border-purple-800 hover:bg-purple-100 dark:hover:bg-purple-900/50 font-bold"
+                                        >
+                                            {isGenerating ? <Loader2 size={12} className="animate-spin"/> : <Sparkles size={12} />} 
+                                            Generate AI Draft
+                                        </button>
                                     </div>
                                     <textarea 
                                         value={adminDraft}
