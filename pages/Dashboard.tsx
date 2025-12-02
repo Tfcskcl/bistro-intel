@@ -1,12 +1,12 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { DollarSign, ShoppingBag, Utensils, AlertTriangle, Users, Clock, TrendingUp, Activity, MapPin, Globe, Eye, UserX, UserPlus, Zap, Edit, Save, Brain, Database, ArrowRight, X, ChevronRight, Search, Mail, Phone, Calendar, Shield, ShieldCheck, Trash2, Terminal, UploadCloud, FileText, CheckCircle2, Sliders, Cpu, Layers, Loader2, BarChart3, PlusCircle, Wallet, RefreshCw, Instagram, Facebook, Megaphone, Sparkles } from 'lucide-react';
 import { StatCard } from '../components/StatCard';
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ComposedChart, Line } from 'recharts';
 import { User, UserRole, PlanType, VisitorSession, PlanConfig, SocialStats, AppView } from '../types';
 import { authService } from '../services/authService';
 import { storageService } from '../services/storageService';
 import { trackingService } from '../services/trackingService';
+import { MOCK_SALES_DATA } from '../constants';
 
 interface DashboardProps {
     user: User;
@@ -200,205 +200,77 @@ const SuperAdminDashboard: React.FC = () => {
 
             if (step >= maxSteps) {
                 if (trainingIntervalRef.current) clearInterval(trainingIntervalRef.current);
-                setTrainingLogs(prev => [...prev, 'Training Completed Successfully.', 'Model v2.4.1 deployed to inference engine.']);
                 setIsTraining(false);
+                setTrainingLogs(prev => [...prev, 'Training Complete. Model Saved v2.4.1']);
             }
         }, 800);
     };
 
     return (
-        <div className="space-y-6 animate-fade-in">
-             {selectedVisitor && (
-                <JourneyModal visitor={selectedVisitor} onClose={() => setSelectedVisitor(null)} />
-            )}
-
-            {showCreateUserModal && (
-                <div className="fixed inset-0 bg-slate-900/80 z-50 flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-slate-900 rounded-xl max-w-md w-full p-6 shadow-2xl">
-                        <h3 className="text-xl font-bold mb-4 dark:text-white">Create New User</h3>
-                        <form onSubmit={handleCreateUser} className="space-y-3">
-                            <input 
-                                placeholder="Full Name" 
-                                required
-                                value={newUserForm.name} 
-                                onChange={e => setNewUserForm({...newUserForm, name: e.target.value})}
-                                className="w-full p-2 border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white"
-                            />
-                            <input 
-                                placeholder="Email" 
-                                required type="email"
-                                value={newUserForm.email} 
-                                onChange={e => setNewUserForm({...newUserForm, email: e.target.value})}
-                                className="w-full p-2 border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white"
-                            />
-                            <input 
-                                placeholder="Password" 
-                                required type="password"
-                                value={newUserForm.password} 
-                                onChange={e => setNewUserForm({...newUserForm, password: e.target.value})}
-                                className="w-full p-2 border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white"
-                            />
-                            <select 
-                                value={newUserForm.role}
-                                onChange={e => setNewUserForm({...newUserForm, role: e.target.value as UserRole})}
-                                className="w-full p-2 border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white"
-                            >
-                                <option value={UserRole.ADMIN}>Admin</option>
-                                <option value={UserRole.OWNER}>Owner</option>
-                                <option value={UserRole.SUPER_ADMIN}>Super Admin</option>
-                            </select>
-                            <input 
-                                placeholder="Restaurant Name" 
-                                value={newUserForm.restaurantName} 
-                                onChange={e => setNewUserForm({...newUserForm, restaurantName: e.target.value})}
-                                className="w-full p-2 border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white"
-                            />
-                            <input 
-                                placeholder="Location" 
-                                value={newUserForm.location} 
-                                onChange={e => setNewUserForm({...newUserForm, location: e.target.value})}
-                                className="w-full p-2 border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white"
-                            />
-                            <div className="flex gap-2 mt-4">
-                                <button type="button" onClick={() => setShowCreateUserModal(false)} className="flex-1 py-2 bg-slate-100 dark:bg-slate-800 rounded">Cancel</button>
-                                <button type="submit" className="flex-1 py-2 bg-emerald-600 text-white rounded font-bold">Create User</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            <div className="flex justify-between items-center">
-                <div>
-                    <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Super Admin Console</h2>
-                    <p className="text-slate-500 dark:text-slate-400">System overview and user management.</p>
-                </div>
-                <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
-                    {['overview', 'users', 'credits', 'training'].map(tab => (
-                        <button
-                            key={tab}
-                            onClick={() => setActiveTab(tab as any)}
-                            className={`px-4 py-2 text-sm font-bold rounded-md transition-all capitalize ${activeTab === tab ? 'bg-white dark:bg-slate-700 shadow text-emerald-600 dark:text-emerald-400' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'}`}
-                        >
-                            {tab}
-                        </button>
-                    ))}
-                </div>
+        <div className="space-y-6">
+            <h1 className="text-2xl font-bold text-slate-800 dark:text-white">Super Admin Console</h1>
+            
+            {/* Tabs */}
+            <div className="flex border-b border-slate-200 dark:border-slate-800">
+                {['overview', 'users', 'credits', 'training'].map((tab) => (
+                    <button
+                        key={tab}
+                        onClick={() => setActiveTab(tab as any)}
+                        className={`px-6 py-3 text-sm font-bold capitalize transition-colors border-b-2 ${
+                            activeTab === tab 
+                            ? 'border-slate-900 dark:border-white text-slate-900 dark:text-white' 
+                            : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                        }`}
+                    >
+                        {tab}
+                    </button>
+                ))}
             </div>
 
             {activeTab === 'overview' && (
-                <div className="space-y-6">
-                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        <StatCard label="Active Now" value={stats.activeNow.toString()} icon={Eye} colorClass="bg-blue-500" isLive />
-                        <StatCard label="Visits Today" value={stats.totalVisitsToday.toString()} icon={Globe} colorClass="bg-emerald-500" />
-                        <StatCard label="Bounce Rate" value={stats.bounceRate} icon={TrendingUp} colorClass="bg-amber-500" trend="-2.1%" trendUp={true} />
-                        <StatCard label="Drop-offs" value={stats.checkoutDropoff.toString()} icon={AlertTriangle} colorClass="bg-red-500" />
-                    </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col items-center justify-center">
-                            <h3 className="font-bold text-slate-800 dark:text-white mb-4 self-start">Traffic Overview</h3>
-                            <div className="text-center text-slate-400 py-12">
-                                <Activity size={48} className="mx-auto mb-4 opacity-50" />
-                                <p>No real-time traffic data available.</p>
-                                <p className="text-xs mt-1">Connect tracking pixel to view analytics.</p>
-                            </div>
-                        </div>
-                        
-                        <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col">
-                             <div className="flex justify-between items-center mb-4">
-                                <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                                    <span className="relative flex h-2 w-2">
-                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                                    </span>
-                                    Live Users
-                                </h3>
-                                <span className="text-xs font-mono text-slate-400">{liveVisitors.length} online</span>
-                             </div>
-                             
-                             <div className="flex-1 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
-                                {liveVisitors.length === 0 ? (
-                                    <p className="text-sm text-slate-500 text-center py-8">No active sessions.</p>
-                                ) : (
-                                    liveVisitors.map(visitor => (
-                                        <div 
-                                            key={visitor.sessionId} 
-                                            onClick={() => setSelectedVisitor(visitor)}
-                                            className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-100 dark:border-slate-700 cursor-pointer hover:border-emerald-400 transition-colors group"
-                                        >
-                                            <div className="flex justify-between items-start">
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
-                                                    <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{visitor.userName || 'Guest'}</p>
-                                                </div>
-                                                <span className="text-[10px] text-slate-400">{new Date(visitor.lastActive).toLocaleTimeString()}</span>
-                                            </div>
-                                            <div className="flex justify-between items-center mt-2">
-                                                <p className="text-xs text-slate-500 flex items-center gap-1"><MapPin size={10}/> {visitor.location}</p>
-                                                <ArrowRight size={12} className="text-slate-300 group-hover:text-emerald-500 transition-colors" />
-                                            </div>
-                                        </div>
-                                    ))
-                                )}
-                             </div>
-                        </div>
-                    </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <StatCard label="Total Users" value={subscribers.length.toString()} icon={Users} colorClass="bg-blue-500" />
+                    <StatCard label="Live Visitors" value={liveVisitors.length.toString()} icon={Eye} colorClass="bg-emerald-500" isLive />
+                    <StatCard label="System Load" value="12%" icon={Cpu} colorClass="bg-purple-500" />
+                    <StatCard label="Total Credits" value={subscribers.reduce((acc, u) => acc + (u.credits || 0), 0).toLocaleString()} icon={Wallet} colorClass="bg-yellow-500" />
                 </div>
             )}
 
             {activeTab === 'users' && (
-                <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-                    <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
-                        <h3 className="font-bold text-slate-800 dark:text-white">Registered Users</h3>
-                        <button 
-                            onClick={() => setShowCreateUserModal(true)}
-                            className="px-4 py-2 bg-slate-900 dark:bg-emerald-600 text-white text-sm font-bold rounded-lg hover:opacity-90 flex items-center gap-2"
-                        >
-                            <UserPlus size={16} /> Create User
+                <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-6">
+                    <div className="flex justify-between items-center mb-6">
+                        <h3 className="text-lg font-bold text-slate-800 dark:text-white">User Management</h3>
+                        <button onClick={() => setShowCreateUserModal(true)} className="px-4 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg text-sm font-bold flex items-center gap-2">
+                            <PlusCircle size={16} /> Add User
                         </button>
                     </div>
+                    
                     <div className="overflow-x-auto">
                         <table className="w-full text-sm text-left">
                             <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-bold uppercase text-xs">
                                 <tr>
-                                    <th className="px-6 py-3">User / Restaurant</th>
-                                    <th className="px-6 py-3">Role</th>
-                                    <th className="px-6 py-3">Plan</th>
-                                    <th className="px-6 py-3">Credits</th>
-                                    <th className="px-6 py-3">Location</th>
-                                    <th className="px-6 py-3">Joined</th>
-                                    <th className="px-6 py-3 text-right">Actions</th>
+                                    <th className="px-4 py-3 rounded-l-lg">User</th>
+                                    <th className="px-4 py-3">Role</th>
+                                    <th className="px-4 py-3">Plan</th>
+                                    <th className="px-4 py-3">Credits</th>
+                                    <th className="px-4 py-3 rounded-r-lg">Joined</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                                {subscribers.map((sub, i) => (
-                                    <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                                        <td className="px-6 py-4">
-                                            <p className="font-bold text-slate-800 dark:text-white">{sub.name}</p>
-                                            <p className="text-xs text-slate-500">{sub.email}</p>
-                                            <p className="text-xs text-emerald-600 mt-1">{sub.restaurantName}</p>
+                                {subscribers.map((user) => (
+                                    <tr key={user.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                                        <td className="px-4 py-3">
+                                            <p className="font-bold text-slate-800 dark:text-white">{user.name}</p>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400">{user.email}</p>
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <span className="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded text-xs font-bold text-slate-600 dark:text-slate-300 uppercase">
-                                                {sub.role}
+                                        <td className="px-4 py-3 text-xs uppercase font-bold text-slate-500">{user.role}</td>
+                                        <td className="px-4 py-3">
+                                            <span className="px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 text-xs font-bold rounded-full">
+                                                {user.plan}
                                             </span>
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <span className={`px-2 py-1 rounded text-xs font-bold ${sub.plan === PlanType.PRO_PLUS ? 'bg-purple-100 text-purple-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                                                {sub.plan}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 font-mono text-slate-700 dark:text-slate-300">
-                                            {sub.credits}
-                                        </td>
-                                        <td className="px-6 py-4 text-slate-600 dark:text-slate-400">{sub.location || 'N/A'}</td>
-                                        <td className="px-6 py-4 text-slate-600 dark:text-slate-400">{sub.joinedDate}</td>
-                                        <td className="px-6 py-4 text-right">
-                                            <button className="text-slate-400 hover:text-red-600 transition-colors" title="Delete User">
-                                                <Trash2 size={16} />
-                                            </button>
-                                        </td>
+                                        <td className="px-4 py-3 font-bold text-emerald-600 dark:text-emerald-400">{user.credits}</td>
+                                        <td className="px-4 py-3 text-slate-500">{new Date(user.joinedDate || '').toLocaleDateString()}</td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -407,481 +279,300 @@ const SuperAdminDashboard: React.FC = () => {
                 </div>
             )}
 
+            {/* Credit Management Tab */}
             {activeTab === 'credits' && (
-                <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden p-6">
-                    <h3 className="font-bold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
-                        <Wallet size={20} className="text-emerald-500" /> Credit Manager
-                    </h3>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-6">
+                    <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-6">Manual Credit Adjustment</h3>
+                    <div className="max-w-md space-y-4">
                         <div>
-                            <h4 className="text-sm font-bold text-slate-500 uppercase mb-4">Manual Adjustment</h4>
-                            <div className="space-y-4 max-w-sm">
-                                <div>
-                                    <label className="block text-xs text-slate-400 mb-1">Select User</label>
-                                    <select 
-                                        className="w-full p-2 border rounded dark:bg-slate-800 dark:border-slate-700"
-                                        value={creditUpdateUser}
-                                        onChange={(e) => setCreditUpdateUser(e.target.value)}
-                                    >
-                                        <option value="">-- Select User --</option>
-                                        {subscribers.map(s => (
-                                            <option key={s.id} value={s.id}>{s.name} ({s.credits} CR)</option>
-                                        ))}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-xs text-slate-400 mb-1">Amount (+ to add, - to deduct)</label>
-                                    <input 
-                                        type="number" 
-                                        className="w-full p-2 border rounded dark:bg-slate-800 dark:border-slate-700"
-                                        value={creditAmount}
-                                        onChange={(e) => setCreditAmount(parseInt(e.target.value))}
-                                    />
-                                </div>
-                                <button 
-                                    onClick={() => handleCreditUpdate(creditUpdateUser, creditAmount)}
-                                    disabled={!creditUpdateUser || creditAmount === 0}
-                                    className="w-full py-2 bg-slate-900 text-white rounded font-bold disabled:opacity-50"
-                                >
-                                    Update Balance
-                                </button>
-                            </div>
+                            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Select User</label>
+                            <select 
+                                value={creditUpdateUser}
+                                onChange={(e) => setCreditUpdateUser(e.target.value)}
+                                className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none"
+                            >
+                                <option value="">Select a user...</option>
+                                {subscribers.map(u => <option key={u.id} value={u.id}>{u.name} ({u.email})</option>)}
+                            </select>
                         </div>
-                        
                         <div>
-                            <h4 className="text-sm font-bold text-slate-500 uppercase mb-4">Credit Usage Overview</h4>
-                            <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg">
-                                <p className="text-xs text-slate-400">Total System Credits</p>
-                                <p className="text-2xl font-bold text-slate-800 dark:text-white">
-                                    {subscribers.reduce((acc, u) => acc + (u.credits || 0), 0).toLocaleString()}
-                                </p>
-                            </div>
+                            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Amount (Positive to Add, Negative to Deduct)</label>
+                            <input 
+                                type="number" 
+                                value={creditAmount}
+                                onChange={(e) => setCreditAmount(parseInt(e.target.value))}
+                                className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none"
+                            />
                         </div>
-                    </div>
-                </div>
-            )}
-            
-            {activeTab === 'training' && (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Controls */}
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm h-fit">
-                        <div className="flex items-center gap-3 mb-6">
-                            <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 rounded-lg">
-                                <Brain size={24} />
-                            </div>
-                            <div>
-                                <h3 className="font-bold text-slate-800 dark:text-white">Model Retraining</h3>
-                                <p className="text-xs text-slate-500">Fine-tune logic with new data</p>
-                            </div>
-                        </div>
-
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Training Epochs</label>
-                                <div className="flex items-center gap-3">
-                                    <Sliders size={16} className="text-slate-400" />
-                                    <input 
-                                        type="range" min="10" max="100" step="10"
-                                        value={trainingParams.epochs}
-                                        onChange={(e) => setTrainingParams({...trainingParams, epochs: parseInt(e.target.value)})}
-                                        className="flex-1 accent-emerald-500"
-                                    />
-                                    <span className="font-mono text-sm font-bold w-8">{trainingParams.epochs}</span>
-                                </div>
-                            </div>
-                            
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Learning Rate</label>
-                                <div className="flex items-center gap-3">
-                                    <Activity size={16} className="text-slate-400" />
-                                    <input 
-                                        type="range" min="0.0001" max="0.01" step="0.0001"
-                                        value={trainingParams.learningRate}
-                                        onChange={(e) => setTrainingParams({...trainingParams, learningRate: parseFloat(e.target.value)})}
-                                        className="flex-1 accent-emerald-500"
-                                    />
-                                    <span className="font-mono text-sm font-bold w-12">{trainingParams.learningRate}</span>
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Creativity (Temp)</label>
-                                <div className="flex items-center gap-3">
-                                    <Zap size={16} className="text-slate-400" />
-                                    <input 
-                                        type="range" min="0.1" max="1.0" step="0.1"
-                                        value={trainingParams.creativity}
-                                        onChange={(e) => setTrainingParams({...trainingParams, creativity: parseFloat(e.target.value)})}
-                                        className="flex-1 accent-emerald-500"
-                                    />
-                                    <span className="font-mono text-sm font-bold w-8">{trainingParams.creativity}</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800">
-                             <h4 className="text-xs font-bold text-slate-500 uppercase mb-3">Dataset Selection</h4>
-                             <div className="space-y-2">
-                                 {['Sales History (Vectorized)', 'Global Recipe Database', 'User Interactions'].map((ds, i) => (
-                                     <label key={i} className="flex items-center gap-2 cursor-pointer p-2 hover:bg-slate-50 dark:hover:bg-slate-800 rounded">
-                                         <input type="checkbox" defaultChecked className="rounded text-emerald-500 focus:ring-emerald-500" />
-                                         <span className="text-sm text-slate-700 dark:text-slate-300">{ds}</span>
-                                     </label>
-                                 ))}
-                             </div>
-                        </div>
-
                         <button 
-                            onClick={startTraining}
-                            disabled={isTraining}
-                            className="w-full mt-6 py-3 bg-slate-900 dark:bg-white dark:text-slate-900 text-white font-bold rounded-xl hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-2"
+                            onClick={() => handleCreditUpdate(creditUpdateUser, creditAmount)}
+                            disabled={!creditUpdateUser || creditAmount === 0}
+                            className="w-full py-3 bg-emerald-600 text-white font-bold rounded-lg hover:bg-emerald-700 disabled:opacity-50"
                         >
-                            {isTraining ? <Loader2 className="animate-spin" size={18} /> : <Cpu size={18} />}
-                            {isTraining ? 'Training in Progress...' : 'Start Training Job'}
+                            Update Balance
                         </button>
                     </div>
+                </div>
+            )}
 
-                    {/* Console Output */}
-                    <div className="lg:col-span-2 bg-slate-950 rounded-xl p-6 font-mono text-xs overflow-hidden flex flex-col h-[500px] border border-slate-800 shadow-2xl">
-                        <div className="flex items-center gap-2 text-slate-500 border-b border-slate-800 pb-2 mb-2">
-                            <Terminal size={14} />
-                            <span>root@bistro-ai-engine:~#</span>
-                        </div>
-                        <div className="flex-1 overflow-y-auto space-y-1 custom-scrollbar">
-                            <p className="text-emerald-500">System Ready.</p>
-                            {trainingLogs.map((log, i) => (
-                                <p key={i} className="text-slate-300 border-l-2 border-slate-800 pl-2">
-                                    <span className="text-slate-500 mr-2">[{new Date().toLocaleTimeString()}]</span>
-                                    {log}
-                                </p>
-                            ))}
-                            <div ref={logsEndRef}></div>
+            {/* AI Training Tab */}
+            {activeTab === 'training' && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-6">
+                        <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
+                            <Brain className="text-purple-500" /> Fine-Tune AI Models
+                        </h3>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Epochs</label>
+                                <input type="number" value={trainingParams.epochs} onChange={(e) => setTrainingParams({...trainingParams, epochs: +e.target.value})} className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Learning Rate</label>
+                                <input type="number" step="0.0001" value={trainingParams.learningRate} onChange={(e) => setTrainingParams({...trainingParams, learningRate: +e.target.value})} className="w-full px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white" />
+                            </div>
+                            <button 
+                                onClick={startTraining}
+                                disabled={isTraining}
+                                className="w-full py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold rounded-lg flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50"
+                            >
+                                {isTraining ? <Loader2 className="animate-spin" size={20} /> : <Terminal size={20} />}
+                                {isTraining ? 'Training in Progress...' : 'Start Training Run'}
+                            </button>
                         </div>
                     </div>
+                    
+                    <div className="bg-slate-950 rounded-xl shadow-sm border border-slate-800 p-6 font-mono text-xs text-green-400 h-[400px] overflow-y-auto">
+                        {trainingLogs.length === 0 ? (
+                            <p className="text-slate-600 opacity-50">// System Idle. Ready for commands.</p>
+                        ) : (
+                            trainingLogs.map((log, i) => (
+                                <p key={i} className="mb-1 border-l-2 border-slate-800 pl-2">{log}</p>
+                            ))
+                        )}
+                        <div ref={logsEndRef} />
+                    </div>
                 </div>
+            )}
+
+            {/* Modals */}
+            {showCreateUserModal && (
+                <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-white dark:bg-slate-900 rounded-xl w-full max-w-md p-6 shadow-2xl">
+                        <h3 className="text-lg font-bold mb-4 dark:text-white">Create New User</h3>
+                        <form onSubmit={handleCreateUser} className="space-y-4">
+                            <input type="text" placeholder="Name" required value={newUserForm.name} onChange={e => setNewUserForm({...newUserForm, name: e.target.value})} className="w-full p-2 border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
+                            <input type="email" placeholder="Email" required value={newUserForm.email} onChange={e => setNewUserForm({...newUserForm, email: e.target.value})} className="w-full p-2 border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
+                            <input type="password" placeholder="Password" required value={newUserForm.password} onChange={e => setNewUserForm({...newUserForm, password: e.target.value})} className="w-full p-2 border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
+                            <select value={newUserForm.role} onChange={e => setNewUserForm({...newUserForm, role: e.target.value as UserRole})} className="w-full p-2 border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white">
+                                <option value={UserRole.ADMIN}>Admin</option>
+                                <option value={UserRole.OWNER}>Owner</option>
+                                <option value={UserRole.SUPER_ADMIN}>Super Admin</option>
+                            </select>
+                            <div className="flex gap-2 justify-end pt-4">
+                                <button type="button" onClick={() => setShowCreateUserModal(false)} className="px-4 py-2 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white">Cancel</button>
+                                <button type="submit" className="px-4 py-2 bg-emerald-600 text-white rounded font-bold hover:bg-emerald-700">Create</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {selectedVisitor && (
+                <JourneyModal visitor={selectedVisitor} onClose={() => setSelectedVisitor(null)} />
             )}
         </div>
     );
 };
 
-const OwnerDashboard: React.FC<{ user: User, onChangeView: (view: AppView) => void }> = ({ user, onChangeView }) => {
-    // Basic stats derived from dynamic storage instead of mock data
-    const [salesData, setSalesData] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [timeRange, setTimeRange] = useState<'7' | '30'>('7');
-    const [socialStats, setSocialStats] = useState<SocialStats[]>([]);
-
-    useEffect(() => {
-        const data = storageService.getSalesData(user.id);
-        const social = storageService.getSocialStats(user.id);
-        setSalesData(data);
-        setSocialStats(social);
-        setLoading(false);
-    }, [user.id]);
-
-    const totalRevenue = salesData.reduce((acc, curr) => acc + (curr.revenue || 0), 0);
-    const totalItems = salesData.reduce((acc, curr) => acc + (curr.items_sold || 0), 0);
-    const hasData = salesData.length > 0;
-
-    const chartData = React.useMemo(() => {
-        if (!salesData.length) return [];
-        // Ensure sorted by date
-        const sorted = [...salesData].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-        const days = parseInt(timeRange);
-        return sorted.slice(-days);
-    }, [salesData, timeRange]);
-
-    // Mock Projection Data for Strategy Impact
-    const impactData = [
-        { name: 'Wk 1', baseline: 42000, optimized: 43500 },
-        { name: 'Wk 2', baseline: 43000, optimized: 48000 },
-        { name: 'Wk 3', baseline: 41500, optimized: 52000 },
-        { name: 'Wk 4', baseline: 44000, optimized: 59000 },
-    ];
-
-    return (
-        <div className="space-y-6 animate-fade-in">
-            <div className="flex justify-between items-end">
-                <div>
-                    <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Welcome back, {user.name.split(' ')[0]} 👋</h1>
-                    <p className="text-slate-500 dark:text-slate-400 mt-1">Here's what's happening at <span className="font-semibold text-emerald-600">{user.restaurantName || 'your restaurant'}</span> today.</p>
-                </div>
-                <div className="hidden sm:block text-right">
-                    <p className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Current Plan</p>
-                    <span className={`inline-block mt-1 px-3 py-1 rounded-full text-xs font-bold ${
-                        user.plan === PlanType.PRO_PLUS ? 'bg-purple-100 text-purple-700' :
-                        user.plan === PlanType.PRO ? 'bg-emerald-100 text-emerald-700' :
-                        'bg-slate-100 text-slate-700'
-                    }`}>
-                        {user.plan.replace('_', ' ')}
-                    </span>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatCard 
-                    label="Total Revenue" 
-                    value={`₹${totalRevenue.toLocaleString()}`} 
-                    trend={hasData ? "+0%" : undefined} 
-                    trendUp={true} 
-                    icon={DollarSign} 
-                    colorClass="bg-emerald-500" 
-                />
-                <StatCard 
-                    label="Items Sold" 
-                    value={totalItems.toString()} 
-                    trend={hasData ? "+0%" : undefined} 
-                    trendUp={true} 
-                    icon={ShoppingBag} 
-                    colorClass="bg-blue-500" 
-                />
-                <StatCard 
-                    label="Food Cost" 
-                    value={hasData ? "32%" : "N/A"} 
-                    trend={hasData ? "-1.5%" : undefined} 
-                    trendUp={true} 
-                    icon={Utensils} 
-                    colorClass="bg-amber-500" 
-                />
-                <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                    <div className="flex justify-between items-start">
-                        <div>
-                            <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Available Credits</p>
-                            <h3 className="text-2xl font-bold text-slate-900 dark:text-white mt-1">{user.credits}</h3>
-                        </div>
-                        <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400">
-                            <Wallet size={24} />
-                        </div>
-                    </div>
-                    <div className="mt-4 flex items-center gap-2">
-                        <span className="text-xs text-slate-400">Use for AI Tasks</span>
-                    </div>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                    <div className="flex justify-between items-center mb-6">
-                        <h3 className="font-bold text-slate-800 dark:text-white">Revenue Trend</h3>
-                        <select 
-                            disabled={!hasData} 
-                            value={timeRange}
-                            onChange={(e) => setTimeRange(e.target.value as '7' | '30')}
-                            className="text-sm border-none bg-slate-50 dark:bg-slate-800 rounded-lg px-2 py-1 text-slate-600 dark:text-slate-300 focus:ring-0 cursor-pointer disabled:opacity-50"
-                        >
-                            <option value="7">Last 7 Days</option>
-                            <option value="30">Last 30 Days</option>
-                        </select>
-                    </div>
-                    <div className="h-[300px] w-full flex items-center justify-center">
-                        {!hasData ? (
-                            <div className="text-center text-slate-400">
-                                <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
-                                    <Sparkles size={32} className="text-emerald-500" />
-                                </div>
-                                <h4 className="text-lg font-bold text-slate-600 dark:text-slate-300">Let's Get Started!</h4>
-                                <p className="text-sm mt-2 max-w-sm mx-auto mb-6">Your dashboard is waiting for data. Connect your POS or upload a sales report to unlock AI insights.</p>
-                                <button 
-                                    onClick={() => onChangeView(AppView.INTEGRATIONS)}
-                                    className="px-6 py-3 bg-emerald-600 text-white text-sm font-bold rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-500/20"
-                                >
-                                    Connect Data Source
-                                </button>
-                            </div>
-                        ) : (
-                            <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={chartData}>
-                                    <defs>
-                                        <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/>
-                                            <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                                        </linearGradient>
-                                    </defs>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.1} />
-                                    <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} />
-                                    <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} />
-                                    <Tooltip 
-                                        contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                    />
-                                    <Area type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorRevenue)" />
-                                </AreaChart>
-                            </ResponsiveContainer>
-                        )}
-                    </div>
-                </div>
-
-                <div className="space-y-6">
-                    {/* Social Media Pulse */}
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col">
-                        <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
-                            <Megaphone size={18} className="text-pink-500" /> Social Pulse
-                        </h3>
-                        
-                        <div className="flex-1 overflow-y-auto space-y-3 max-h-[300px] custom-scrollbar pr-1">
-                            {socialStats.length === 0 ? (
-                                <div className="text-center text-slate-400 py-8 border border-dashed border-slate-100 dark:border-slate-700 rounded-lg">
-                                    <p className="text-sm">No accounts connected.</p>
-                                    <p className="text-xs mt-1 mb-3">Add profiles in Integrations.</p>
-                                    <button 
-                                        onClick={() => onChangeView(AppView.INTEGRATIONS)}
-                                        className="text-[10px] font-bold text-pink-600 hover:underline"
-                                    >
-                                        Connect Accounts
-                                    </button>
-                                </div>
-                            ) : (
-                                socialStats.map((stat, i) => (
-                                    <div key={i} className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-100 dark:border-slate-700">
-                                        <div className="flex items-center gap-2 mb-3">
-                                            {stat.platform === 'instagram' ? <Instagram size={16} className="text-pink-600"/> : 
-                                             stat.platform === 'facebook' ? <Facebook size={16} className="text-blue-600"/> :
-                                             <MapPin size={16} className="text-blue-500"/>}
-                                            <p className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate">{stat.handle}</p>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            {stat.metrics.slice(0, 2).map((m, j) => (
-                                                <div key={j}>
-                                                    <p className="text-[10px] text-slate-400 uppercase">{m.label}</p>
-                                                    <p className="text-sm font-bold text-slate-800 dark:text-white flex items-center gap-1">
-                                                        {m.value}
-                                                        {m.trend !== undefined && (
-                                                            <span className={`text-[8px] ${m.trend >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                                                                {m.trend >= 0 ? '↑' : '↓'}{Math.abs(m.trend)}%
-                                                            </span>
-                                                        )}
-                                                    </p>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                    </div>
-
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                        <h3 className="font-bold text-slate-800 dark:text-white mb-4">Quick Actions</h3>
-                        <div className="grid grid-cols-2 gap-3">
-                            <button 
-                                onClick={() => onChangeView(AppView.RECIPES)}
-                                className="p-3 bg-slate-50 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg border border-slate-100 dark:border-slate-700 transition-colors group text-left"
-                            >
-                                <div className="p-2 bg-white dark:bg-slate-700 rounded-full w-fit mb-2 group-hover:text-emerald-500 shadow-sm">
-                                    <Utensils size={18} />
-                                </div>
-                                <span className="text-xs font-bold text-slate-600 dark:text-slate-300">New Recipe</span>
-                            </button>
-                            <button 
-                                onClick={() => onChangeView(AppView.SOP)}
-                                className="p-3 bg-slate-50 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg border border-slate-100 dark:border-slate-700 transition-colors group text-left"
-                            >
-                                <div className="p-2 bg-white dark:bg-slate-700 rounded-full w-fit mb-2 group-hover:text-blue-500 shadow-sm">
-                                    <FileText size={18} />
-                                </div>
-                                <span className="text-xs font-bold text-slate-600 dark:text-slate-300">Create SOP</span>
-                            </button>
-                            {!hasData && (
-                                <button 
-                                    onClick={() => onChangeView(AppView.INTEGRATIONS)}
-                                    className="col-span-2 p-3 bg-slate-50 dark:bg-slate-800 hover:bg-purple-50 dark:hover:bg-purple-900/20 rounded-lg border border-slate-100 dark:border-slate-700 transition-colors group text-left flex items-center gap-3"
-                                >
-                                    <div className="p-2 bg-white dark:bg-slate-700 rounded-full w-fit group-hover:text-purple-500 shadow-sm">
-                                        <UploadCloud size={18} />
-                                    </div>
-                                    <div>
-                                        <span className="block text-xs font-bold text-slate-600 dark:text-slate-300">Upload Data</span>
-                                        <span className="text-[10px] text-slate-400">CSV, Excel, or PDF</span>
-                                    </div>
-                                </button>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* AI Strategy Impact Section */}
-            <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm mt-6">
-                <div className="flex items-center gap-3 mb-6">
-                    <div className="p-2 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-lg">
-                        <TrendingUp size={24} />
-                    </div>
-                    <div>
-                        <h3 className="font-bold text-slate-800 dark:text-white">AI Strategy Impact Forecast</h3>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">Projected outcomes based on active strategies</p>
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    <div className="lg:col-span-2 h-[300px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={impactData}>
-                                <defs>
-                                    <linearGradient id="colorOptimized" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
-                                        <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.1} />
-                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} />
-                                <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} />
-                                <Tooltip 
-                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                />
-                                <Legend />
-                                <Area type="monotone" dataKey="baseline" name="Baseline Trend" stroke="#94a3b8" strokeWidth={2} fill="transparent" strokeDasharray="5 5" />
-                                <Area type="monotone" dataKey="optimized" name="AI Optimized" stroke="#10b981" strokeWidth={3} fill="url(#colorOptimized)" />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    </div>
-
-                    <div className="space-y-4">
-                        {/* Metric Cards */}
-                        <div className="p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-                            <p className="text-xs font-bold text-slate-400 uppercase mb-2">Food Cost Optimization</p>
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <span className="text-2xl font-bold text-slate-700 dark:text-slate-300">32%</span>
-                                    <span className="mx-2 text-slate-400">→</span>
-                                    <span className="text-2xl font-bold text-emerald-500">28%</span>
-                                </div>
-                                <div className="text-xs font-bold text-emerald-600 bg-emerald-100 dark:bg-emerald-900/30 px-2 py-1 rounded">
-                                    -4%
-                                </div>
-                            </div>
-                            <div className="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full mt-3 overflow-hidden">
-                                <div className="bg-emerald-500 h-full w-[85%]"></div>
-                            </div>
-                        </div>
-
-                        <div className="p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-                            <p className="text-xs font-bold text-slate-400 uppercase mb-2">Projected Footfall</p>
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <span className="text-2xl font-bold text-slate-700 dark:text-slate-300">85</span>
-                                    <span className="mx-2 text-slate-400">→</span>
-                                    <span className="text-2xl font-bold text-blue-500">115</span>
-                                </div>
-                                <div className="text-xs font-bold text-blue-600 bg-blue-100 dark:bg-blue-900/30 px-2 py-1 rounded">
-                                    +35%
-                                </div>
-                            </div>
-                            <div className="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full mt-3 overflow-hidden">
-                                <div className="bg-blue-500 h-full w-[70%]"></div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-};
-
+// --- OWNER/ADMIN DASHBOARD ---
 export const Dashboard: React.FC<DashboardProps> = ({ user, onChangeView }) => {
-    // Role-based Dashboard Switching
     if (user.role === UserRole.SUPER_ADMIN) {
         return <SuperAdminDashboard />;
     }
 
-    return <OwnerDashboard user={user} onChangeView={onChangeView} />;
+    // --- OWNER / ADMIN VIEW LOGIC ---
+    const salesData = storageService.getSalesData(user.id).length > 0 ? storageService.getSalesData(user.id) : MOCK_SALES_DATA;
+    const socialStats = storageService.getSocialStats(user.id);
+    
+    // Derived Stats
+    const totalRevenue = salesData.reduce((acc: number, curr: any) => acc + curr.revenue, 0);
+    const totalOrders = salesData.reduce((acc: number, curr: any) => acc + curr.items_sold, 0);
+    const avgOrderValue = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
+    
+    // Alerts (using Notifications)
+    const notifications = storageService.getNotifications(user.id, user.role);
+    const recentAlerts = notifications.filter(n => !n.read && n.type === 'warning').slice(0, 3);
+
+    return (
+        <div className="space-y-8 animate-fade-in">
+            {/* Welcome Header */}
+            <div className="flex justify-between items-center">
+                <div>
+                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+                        Good {new Date().getHours() < 12 ? 'Morning' : new Date().getHours() < 18 ? 'Afternoon' : 'Evening'}, {user.name.split(' ')[0]}
+                    </h1>
+                    <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Here's what's happening in your restaurant today.</p>
+                </div>
+                <button 
+                    onClick={() => onChangeView(AppView.RECIPES)}
+                    className="flex items-center gap-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-4 py-2 rounded-lg font-bold text-sm hover:bg-slate-800 dark:hover:bg-slate-200 transition-colors shadow-lg shadow-slate-900/10"
+                >
+                    <PlusCircle size={16} /> New Recipe
+                </button>
+            </div>
+
+            {/* Key Metrics */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <StatCard 
+                    label="Total Revenue (7d)" 
+                    value={`₹${totalRevenue.toLocaleString()}`} 
+                    trend="+12.5%" 
+                    trendUp={true} 
+                    icon={DollarSign} 
+                    colorClass="text-emerald-600 bg-emerald-100" 
+                />
+                <StatCard 
+                    label="Total Orders" 
+                    value={totalOrders.toString()} 
+                    trend="+5.2%" 
+                    trendUp={true} 
+                    icon={ShoppingBag} 
+                    colorClass="text-blue-600 bg-blue-100" 
+                />
+                <StatCard 
+                    label="Avg. Order Value" 
+                    value={`₹${avgOrderValue}`} 
+                    trend="-2.1%" 
+                    trendUp={false} 
+                    icon={TrendingUp} 
+                    colorClass="text-purple-600 bg-purple-100" 
+                />
+                <StatCard 
+                    label="Food Cost" 
+                    value="32%" 
+                    trend="-1.5%" 
+                    trendUp={true} // Lower is better for cost
+                    icon={Utensils} 
+                    colorClass="text-orange-600 bg-orange-100" 
+                />
+            </div>
+
+            {/* Charts & Activity */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Main Chart */}
+                <div className="lg:col-span-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm p-6">
+                    <div className="flex justify-between items-center mb-6">
+                        <h3 className="font-bold text-slate-800 dark:text-white text-lg">Sales Overview</h3>
+                        <select className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs rounded-lg px-3 py-1 outline-none">
+                            <option>Last 7 Days</option>
+                            <option>Last 30 Days</option>
+                        </select>
+                    </div>
+                    <div className="h-[300px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={salesData}>
+                                <defs>
+                                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/>
+                                        <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.5} />
+                                <XAxis 
+                                    dataKey="date" 
+                                    tickFormatter={(str) => new Date(str).getDate().toString()} 
+                                    stroke="#94a3b8" 
+                                    tick={{fontSize: 12}} 
+                                    axisLine={false} 
+                                    tickLine={false} 
+                                    dy={10} 
+                                />
+                                <YAxis 
+                                    stroke="#94a3b8" 
+                                    tick={{fontSize: 12}} 
+                                    axisLine={false} 
+                                    tickLine={false} 
+                                    tickFormatter={(val) => `₹${val/1000}k`} 
+                                />
+                                <Tooltip 
+                                    contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#fff' }}
+                                    itemStyle={{ color: '#fff' }}
+                                    formatter={(val: number) => [`₹${val}`, 'Revenue']}
+                                    labelFormatter={(label) => new Date(label).toLocaleDateString()}
+                                />
+                                <Area 
+                                    type="monotone" 
+                                    dataKey="revenue" 
+                                    stroke="#10b981" 
+                                    strokeWidth={3} 
+                                    fillOpacity={1} 
+                                    fill="url(#colorRevenue)" 
+                                />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                {/* Side Panel: Alerts & Social */}
+                <div className="space-y-6">
+                    {/* Action Needed */}
+                    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm p-6">
+                        <h3 className="font-bold text-slate-800 dark:text-white text-lg mb-4 flex items-center gap-2">
+                            <AlertTriangle size={20} className="text-amber-500" /> Action Needed
+                        </h3>
+                        <div className="space-y-3">
+                            {recentAlerts.length > 0 ? recentAlerts.map(alert => (
+                                <div key={alert.id} className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-900/30 rounded-lg">
+                                    <p className="text-sm font-semibold text-slate-800 dark:text-white">{alert.title}</p>
+                                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-1 line-clamp-2">{alert.message}</p>
+                                </div>
+                            )) : (
+                                <div className="text-center py-6 text-slate-400">
+                                    <CheckCircle2 size={32} className="mx-auto mb-2 opacity-50 text-emerald-500" />
+                                    <p className="text-sm">All systems normal</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Social Snapshot */}
+                    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm p-6">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="font-bold text-slate-800 dark:text-white text-lg">Social Reach</h3>
+                            <button onClick={() => onChangeView(AppView.INTEGRATIONS)} className="text-xs text-blue-600 hover:underline">Manage</button>
+                        </div>
+                        
+                        {socialStats.length > 0 ? (
+                            <div className="space-y-4">
+                                {socialStats.map(stat => (
+                                    <div key={stat.platform} className="flex items-center gap-3">
+                                        <div className={`p-2 rounded-full text-white ${stat.platform === 'instagram' ? 'bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600' : stat.platform === 'facebook' ? 'bg-blue-600' : 'bg-green-600'}`}>
+                                            {stat.platform === 'instagram' ? <Instagram size={16}/> : stat.platform === 'facebook' ? <Facebook size={16}/> : <MapPin size={16}/>}
+                                        </div>
+                                        <div className="flex-1">
+                                            <p className="text-sm font-bold text-slate-700 dark:text-slate-200 capitalize">{stat.platform.replace('_', ' ')}</p>
+                                            <p className="text-xs text-slate-500">{stat.handle}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-sm font-bold text-slate-800 dark:text-white">{stat.metrics[0].value}</p>
+                                            <p className={`text-[10px] font-bold ${stat.metrics[0].trend && stat.metrics[0].trend > 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                                                {stat.metrics[0].trend && stat.metrics[0].trend > 0 ? '+' : ''}{stat.metrics[0].trend}%
+                                            </p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="text-center py-6">
+                                <Megaphone size={32} className="mx-auto mb-2 text-slate-300" />
+                                <p className="text-sm text-slate-500 mb-2">No accounts linked</p>
+                                <button onClick={() => onChangeView(AppView.INTEGRATIONS)} className="text-xs bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-3 py-1.5 rounded-lg font-bold">Connect Now</button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
 };
