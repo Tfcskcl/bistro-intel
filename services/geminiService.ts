@@ -346,7 +346,20 @@ export const generateRecipeVariation = async (userId: string, original: RecipeCa
     }
 
     try {
-        const prompt = `Task: Create a "${variationType}" variation of the following recipe. Include reasoning for changes. Maintain JSON structure. Update Costing and Selling Price accurately. Ensure preparation steps are detailed with specific cooking techniques relevant to the variation. Original JSON: ${JSON.stringify(original)}.`;
+        const prompt = `
+        Role: Expert Chef.
+        Task: Create a "${variationType}" variation of the existing recipe below.
+        
+        Guidelines:
+        1. Maintain the core identity of the dish (e.g. if it's a burger, keep it a burger but modify ingredients).
+        2. Reasoning: Explain specifically what was changed to meet the "${variationType}" requirement in the 'reasoning' field.
+        3. Costing: Recalculate 'food_cost_per_serving' and 'suggested_selling_price' based on new ingredients.
+        4. Steps: Adjust preparation steps to reflect ingredient changes (e.g. cooking time for tofu vs chicken).
+        
+        Original Recipe JSON: ${JSON.stringify(original)}
+        
+        Return valid JSON matching the schema.
+        `;
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,

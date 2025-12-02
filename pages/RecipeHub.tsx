@@ -1019,10 +1019,12 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                   
                   {generatedRecipe && (
                       <div className="p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center shrink-0">
-                          <div className="flex gap-2">
-                              <button onClick={() => handleVariation('Vegan')} className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-300">Make Vegan</button>
-                              <button onClick={() => handleVariation('Gluten-Free')} className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-300">Make Gluten-Free</button>
-                              <button onClick={() => handleVariation('Budget')} className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-300">Optimize Cost</button>
+                          <div className="flex gap-2 overflow-x-auto pb-1 max-w-[60%] custom-scrollbar">
+                              <button onClick={() => handleVariation('Vegan')} className="whitespace-nowrap px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-300">Vegan</button>
+                              <button onClick={() => handleVariation('Low-Calorie')} className="whitespace-nowrap px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-300">Low-Cal</button>
+                              <button onClick={() => handleVariation('Spicy')} className="whitespace-nowrap px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-300">Spicy</button>
+                              <button onClick={() => handleVariation('Budget-Friendly')} className="whitespace-nowrap px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-300">Budget</button>
+                              <button onClick={() => handleVariation('Gluten-Free')} className="whitespace-nowrap px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-300">GF</button>
                           </div>
                           <div className="flex gap-2">
                               <button onClick={handleDownloadPDF} className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
