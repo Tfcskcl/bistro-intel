@@ -4,7 +4,7 @@ import { PLANS, CREDIT_COSTS } from '../constants';
 import { generateRecipeCard, generateRecipeVariation, substituteIngredient } from '../services/geminiService';
 import { ingredientService } from '../services/ingredientService';
 import { RecipeCard, MenuItem, User, UserRole, POSChangeRequest, RecipeRequest, Ingredient } from '../types';
-import { Loader2, ChefHat, Scale, Clock, AlertCircle, Upload, Lock, Sparkles, Check, Save, RefreshCw, Search, Plus, Store, Zap, Trash2, Building2, FileSignature, X, AlignLeft, UtensilsCrossed, Inbox, UserCheck, CheckCircle2, Clock3, Carrot, Type, Wallet, Filter, Tag, Eye, Flame, Wand2, Eraser, FileDown, TrendingDown, ArrowRight, Key, Coins, Leaf, TestTube, ArrowLeftRight, PenTool } from 'lucide-react';
+import { Loader2, ChefHat, Scale, Clock, AlertCircle, Upload, Lock, Sparkles, Check, Save, RefreshCw, Search, Plus, Store, Zap, Trash2, Building2, FileSignature, X, AlignLeft, UtensilsCrossed, Inbox, UserCheck, CheckCircle2, Clock3, Carrot, Type, Wallet, Filter, Tag, Eye, Flame, Wand2, Eraser, FileDown, TrendingDown, ArrowRight, Key, Coins, Leaf, TestTube, ArrowLeftRight, PenTool, Lightbulb } from 'lucide-react';
 import { storageService } from '../services/storageService';
 import { authService } from '../services/authService';
 
@@ -790,6 +790,18 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                       {generatedRecipe.preparation_steps.map((step, i) => <li key={i}>{step}</li>)}
                                   </ol>
                               </div>
+
+                              {/* New Reasoning Section */}
+                              {generatedRecipe.reasoning && (
+                                  <div className="p-8 border-t border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-900/50">
+                                      <h3 className="font-bold text-slate-800 dark:text-white mb-2 flex items-center gap-2 text-sm uppercase tracking-wide">
+                                          <Lightbulb size={16} className="text-yellow-500" /> Chef's Insight
+                                      </h3>
+                                      <p className="text-sm text-slate-600 dark:text-slate-400 italic leading-relaxed">
+                                          "{generatedRecipe.reasoning}"
+                                      </p>
+                                  </div>
+                              )}
 
                               <div className="p-6 flex flex-col sm:flex-row justify-center gap-4 border-t border-slate-100 dark:border-slate-800">
                                   <button 

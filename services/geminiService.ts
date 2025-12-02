@@ -64,7 +64,7 @@ const generateMockRecipe = (item: MenuItem, requirements: string): RecipeCard =>
         suggested_selling_price: Math.ceil(totalCost * 3.5),
         tags: ["Auto-Generated", "Draft"],
         human_summary: `A generated recipe card for ${baseName}. Ingredients and costs are estimated based on standard kitchen data.`,
-        reasoning: "Generated using BistroIntelligence Engine (Dev Mode).",
+        reasoning: "Generated using BistroIntelligence Engine (Dev Mode). Key ingredients selected for flavor balance and cost efficiency.",
         confidence: "Medium"
     };
 };
@@ -276,6 +276,7 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
     2. STEPS: Break down preparation into clear, detailed, actionable steps. Include cooking techniques, temperatures, and visual cues (e.g., "golden brown").
     3. COSTING: Estimate realistic ingredient costs for ${location || 'India'} in INR.
     4. SUMMARY: Write a compelling menu description.
+    5. REASONING: Explain the culinary logic behind key ingredient choices or techniques used (e.g. "Acid added to balance richness").
     
     IMPORTANT: Return ONLY valid JSON matching this structure:
     ${jsonTemplate}
@@ -308,7 +309,7 @@ export const generateRecipeVariation = async (userId: string, original: RecipeCa
     }
 
     try {
-        const prompt = `Task: Create a "${variationType}" variation of the following recipe. Maintain JSON structure. Original JSON: ${JSON.stringify(original)}.`;
+        const prompt = `Task: Create a "${variationType}" variation of the following recipe. Include reasoning for changes. Maintain JSON structure. Original JSON: ${JSON.stringify(original)}.`;
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
@@ -330,7 +331,7 @@ export const substituteIngredient = async (recipe: RecipeCard, ingredientName: s
     }
 
     try {
-        const prompt = `Task: Find a culinary substitute for "${ingredientName}" in this recipe. Update quantities and costs. Return full JSON. Recipe: ${JSON.stringify(recipe)}`;
+        const prompt = `Task: Find a culinary substitute for "${ingredientName}" in this recipe. Update quantities, costs, and explain reasoning. Return full JSON. Recipe: ${JSON.stringify(recipe)}`;
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
