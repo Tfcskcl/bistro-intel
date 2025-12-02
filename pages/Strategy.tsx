@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { generateStrategy, generateImplementationPlan } from '../services/geminiService';
 import { StrategyReport, UserRole, User, PlanType, ImplementationGuide } from '../types';
-import { Send, Loader2, User as UserIcon, Briefcase, TrendingUp, Lock, HelpCircle, ArrowRight, Play, LifeBuoy, CheckCircle2, Clock, X, BookOpen, UserCheck, Calendar, Zap, ChevronDown, Trash2, Sparkles, Activity, Target, AlertTriangle, ArrowUpRight, ArrowDownRight, Lightbulb, Map, BarChart2, PieChart as PieChartIcon, ScatterChart as ScatterChartIcon, Info, Wallet } from 'lucide-react';
+import { Send, Loader2, User as UserIcon, Briefcase, TrendingUp, Lock, HelpCircle, ArrowRight, Play, LifeBuoy, CheckCircle2, Clock, X, BookOpen, UserCheck, Calendar, Zap, ChevronDown, Trash2, Sparkles, Activity, Target, AlertTriangle, ArrowUpRight, ArrowDownRight, Lightbulb, Map, BarChart2, PieChart as PieChartIcon, ScatterChart as ScatterChartIcon, Info, Wallet, Key } from 'lucide-react';
 import { 
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend, ScatterChart, Scatter, ZAxis
 } from 'recharts';
@@ -56,6 +56,7 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
   const [report, setReport] = useState<StrategyReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasApiKey, setHasApiKey] = useState(true);
   
   // Track status of individual action items
   const [actionStates, setActionStates] = useState<ActionState>({});
@@ -103,6 +104,36 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
     }
   }, [role, user.role]);
 
+  // Poll for API Key Status
+  useEffect(() => {
+    const checkKey = async () => {
+        if ((window as any).aistudio) {
+            try {
+                const has = await (window as any).aistudio.hasSelectedApiKey();
+                setHasApiKey(has);
+                if (has && error && error.includes('API Key')) setError(null);
+            } catch (e) {
+                console.error("Error checking API key", e);
+            }
+        }
+    };
+    checkKey();
+    const interval = setInterval(checkKey, 2000);
+    return () => clearInterval(interval);
+  }, [error]);
+
+  const handleConnectKey = async () => {
+      if ((window as any).aistudio) {
+          try {
+              await (window as any).aistudio.openSelectKey();
+              setHasApiKey(true);
+              setError(null);
+          } catch (e) {
+              console.error(e);
+          }
+      }
+  };
+
   // Usage Logic
   const checkCredits = (): boolean => {
       if (user.role === UserRole.SUPER_ADMIN) return true;
@@ -127,6 +158,11 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
   };
 
   const handleSend = async (textOverride?: string) => {
+    if (!hasApiKey) {
+        handleConnectKey();
+        return;
+    }
+
     const textToSend = textOverride || query;
     if (!textToSend) return;
     if (!checkCredits()) return;
@@ -478,12 +514,7 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                 <div className="flex items-center gap-2">
                     {(error.includes('API Key') || error.includes('configure') || error.includes('unauthenticated')) && (
                         <button 
-                            onClick={async () => {
-                                if ((window as any).aistudio) {
-                                    await (window as any).aistudio.openSelectKey();
-                                    setError(null);
-                                }
-                            }}
+                            onClick={handleConnectKey}
                             className="px-3 py-1 bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-200 text-xs font-bold rounded hover:bg-red-200 dark:hover:bg-red-700 transition-colors"
                         >
                             Connect Key
@@ -974,14 +1005,24 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                 >
                     <Trash2 size={20} />
                 </button>
-                <button 
-                    onClick={() => handleSend()}
-                    disabled={loading || !query}
-                    className="px-6 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg hover:bg-emerald-600 dark:hover:bg-slate-200 disabled:opacity-50 transition-colors font-bold shadow-lg shadow-slate-900/20 flex items-center gap-2"
-                >
-                    {loading ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />}
-                    {loading ? '' : `Ask (${CREDIT_COSTS.STRATEGY} CR)`}
-                </button>
+                
+                {hasApiKey ? (
+                    <button 
+                        onClick={() => handleSend()}
+                        disabled={loading || !query}
+                        className="px-6 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-lg hover:bg-emerald-600 dark:hover:bg-slate-200 disabled:opacity-50 transition-colors font-bold shadow-lg shadow-slate-900/20 flex items-center gap-2"
+                    >
+                        {loading ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />}
+                        {loading ? '' : `Ask (${CREDIT_COSTS.STRATEGY} CR)`}
+                    </button>
+                ) : (
+                    <button 
+                        onClick={handleConnectKey}
+                        className="px-6 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-lg font-bold transition-colors shadow-lg flex items-center gap-2"
+                    >
+                        <Key size={18} /> Connect Key
+                    </button>
+                )}
             </div>
         </div>
       </div>

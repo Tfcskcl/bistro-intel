@@ -4,7 +4,7 @@ import { User, SOP, SOPRequest, UserRole } from '../types';
 import { generateSOP } from '../services/geminiService';
 import { storageService } from '../services/storageService';
 import { CREDIT_COSTS } from '../constants';
-import { FileText, Loader2, Sparkles, Save, Search, AlertCircle, CheckCircle2, Clock, Wallet, BookOpen, Printer, Share2, User as UserIcon, X, Copy, Mail } from 'lucide-react';
+import { FileText, Loader2, Sparkles, Save, Search, AlertCircle, CheckCircle2, Clock, Wallet, BookOpen, Printer, Share2, User as UserIcon, X, Copy, Mail, Key } from 'lucide-react';
 
 interface SOPStudioProps {
   user: User;
@@ -20,6 +20,7 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedSOP, setGeneratedSOP] = useState<SOP | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [hasApiKey, setHasApiKey] = useState(true);
 
   // Saved SOPs
   const [savedSOPs, setSavedSOPs] = useState<SOP[]>([]);
@@ -39,6 +40,24 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
     }
   }, [user.id, isAdmin]);
 
+  // Poll for API Key Status
+  useEffect(() => {
+    const checkKey = async () => {
+        if ((window as any).aistudio) {
+            try {
+                const has = await (window as any).aistudio.hasSelectedApiKey();
+                setHasApiKey(has);
+                if (has && error && error.includes("API Key")) setError(null);
+            } catch (e) {
+                console.error("Error checking API key", e);
+            }
+        }
+    };
+    checkKey();
+    const interval = setInterval(checkKey, 2000);
+    return () => clearInterval(interval);
+  }, [error]);
+
   const loadSavedSOPs = () => {
     setSavedSOPs(storageService.getSavedSOPs(user.id));
   };
@@ -50,6 +69,11 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
   const handleGenerate = async () => {
     if (!topic) return;
     
+    if (!hasApiKey) {
+        handleConnectKey();
+        return;
+    }
+
     if (!isAdmin) {
       if (user.credits < CREDIT_COSTS.SOP) {
         setError(`Insufficient credits. Required: ${CREDIT_COSTS.SOP}, Available: ${user.credits}`);
@@ -74,6 +98,18 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
     } finally {
       setIsGenerating(false);
     }
+  };
+
+  const handleConnectKey = async () => {
+      if ((window as any).aistudio) {
+          try {
+              await (window as any).aistudio.openSelectKey();
+              setHasApiKey(true);
+              setError(null);
+          } catch (e) {
+              console.error(e);
+          }
+      }
   };
 
   const handleSave = () => {
@@ -225,30 +261,27 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
                         <div className="flex items-center gap-2">
                             <AlertCircle size={16} /> {error}
                         </div>
-                        {(error.includes('API Key') || error.includes('configure') || error.includes('unauthenticated')) && (
-                             <button 
-                                onClick={async () => {
-                                    if ((window as any).aistudio) {
-                                        await (window as any).aistudio.openSelectKey();
-                                        setError(null);
-                                    }
-                                }}
-                                className="px-3 py-1 bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-200 text-xs font-bold rounded hover:bg-red-200 dark:hover:bg-red-700 transition-colors"
-                             >
-                                Connect Key
-                             </button>
-                        )}
+                        <button onClick={() => setError(null)} className="text-xs hover:underline">Dismiss</button>
                     </div>
                  )}
 
-                 <button 
-                   onClick={handleGenerate}
-                   disabled={isGenerating || !topic}
-                   className="w-full py-3 bg-slate-900 dark:bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-600 dark:hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                 >
-                   {isGenerating ? <Loader2 className="animate-spin" size={20} /> : <Sparkles size={20} />}
-                   Generate ({CREDIT_COSTS.SOP} CR)
-                 </button>
+                 {hasApiKey ? (
+                     <button 
+                       onClick={handleGenerate}
+                       disabled={isGenerating || !topic}
+                       className="w-full py-3 bg-slate-900 dark:bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-600 dark:hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                     >
+                       {isGenerating ? <Loader2 className="animate-spin" size={20} /> : <Sparkles size={20} />}
+                       Generate ({CREDIT_COSTS.SOP} CR)
+                     </button>
+                 ) : (
+                     <button 
+                       onClick={handleConnectKey}
+                       className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-2"
+                     >
+                       <Key size={20} /> Connect API Key
+                     </button>
+                 )}
                </div>
             </div>
 

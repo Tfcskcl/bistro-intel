@@ -37,6 +37,9 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
   const [error, setError] = useState<string | null>(null);
   const [importStatus, setImportStatus] = useState<string | null>(null);
   
+  // API Key State
+  const [hasApiKey, setHasApiKey] = useState(true);
+
   // Supplier Costing State
   const [altPrices, setAltPrices] = useState<Record<number, string>>({});
 
@@ -83,6 +86,24 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
     setMenuItems(storageService.getMenu(user.id));
     refreshRequests();
   }, [user.id, user.role]);
+
+  // Poll for API Key Status
+  useEffect(() => {
+    const checkKey = async () => {
+        if ((window as any).aistudio) {
+            try {
+                const has = await (window as any).aistudio.hasSelectedApiKey();
+                setHasApiKey(has);
+                if (has && error === 'API Key Missing') setError(null);
+            } catch (e) {
+                console.error("Error checking API key", e);
+            }
+        }
+    };
+    checkKey();
+    const interval = setInterval(checkKey, 2000);
+    return () => clearInterval(interval);
+  }, [error]);
 
   // Reset alt prices when recipe changes
   useEffect(() => {
@@ -491,6 +512,21 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       }, 1000);
   };
 
+  const handleConnectKey = async () => {
+      if ((window as any).aistudio) {
+          try {
+              await (window as any).aistudio.openSelectKey();
+              setError(null);
+              // Optimistically update
+              setHasApiKey(true);
+          } catch (e) {
+              console.error(e);
+          }
+      } else {
+          alert("API Key configuration is only available in the AI Studio environment.");
+      }
+  };
+
   // --- DOWNLOAD PDF LOGIC ---
   const handleDownloadPDF = () => {
       if (!generatedRecipe) return;
@@ -606,20 +642,6 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       if (printWindow) {
           printWindow.document.write(content);
           printWindow.document.close();
-      }
-  };
-
-  const handleConnectKey = async () => {
-      if ((window as any).aistudio) {
-          try {
-              await (window as any).aistudio.openSelectKey();
-              // Clear error to allow retry
-              setError(null);
-          } catch (e) {
-              console.error(e);
-          }
-      } else {
-          alert("API Key configuration is only available in the AI Studio environment.");
       }
   };
 
@@ -1271,6 +1293,26 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                         <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
                             <div className="max-w-2xl mx-auto space-y-6">
                                 
+                                {!hasApiKey && (
+                                    <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl flex items-center justify-between gap-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-400 rounded-lg">
+                                                <Key size={20} />
+                                            </div>
+                                            <div>
+                                                <h4 className="font-bold text-slate-800 dark:text-white text-sm">API Key Required</h4>
+                                                <p className="text-xs text-slate-500 dark:text-slate-400">Connect your Google Cloud API key to generate recipes.</p>
+                                            </div>
+                                        </div>
+                                        <button 
+                                            onClick={handleConnectKey}
+                                            className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-xs transition-colors shadow-sm"
+                                        >
+                                            Connect Key
+                                        </button>
+                                    </div>
+                                )}
+
                                 {/* Dish Name */}
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Dish Name</label>
@@ -1356,31 +1398,34 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                         <div className="flex items-center gap-2">
                                             <AlertCircle size={16} /> {error}
                                         </div>
-                                        {(error.includes('API Key') || error.includes('configure') || error.includes('unauthenticated')) && (
-                                             <button 
-                                                onClick={async () => {
-                                                    if ((window as any).aistudio) {
-                                                        await (window as any).aistudio.openSelectKey();
-                                                        setError(null);
-                                                    }
-                                                }}
-                                                className="px-3 py-1 bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-200 text-xs font-bold rounded hover:bg-red-200 dark:hover:bg-red-700 transition-colors"
-                                             >
-                                                Connect Key
-                                             </button>
-                                        )}
+                                        <button 
+                                            onClick={() => setError(null)}
+                                            className="text-xs underline hover:text-red-800 dark:hover:text-red-300"
+                                        >
+                                            Dismiss
+                                        </button>
                                     </div>
                                 )}
 
                                 <div className="pt-4">
-                                    <button 
-                                        onClick={(e) => handleFormSubmit(e)}
-                                        disabled={loading || !dishName}
-                                        className="w-full py-3.5 bg-slate-900 dark:bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-600 dark:hover:bg-emerald-700 transition-all shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
-                                    >
-                                        <Sparkles size={18} fill="currentColor" />
-                                        {isAdmin ? 'Generate Recipe Card' : `Request Generation (${CREDIT_COSTS.RECIPE} CR)`}
-                                    </button>
+                                    {hasApiKey ? (
+                                        <button 
+                                            onClick={(e) => handleFormSubmit(e)}
+                                            disabled={loading || !dishName}
+                                            className="w-full py-3.5 bg-slate-900 dark:bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-600 dark:hover:bg-emerald-700 transition-all shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
+                                        >
+                                            <Sparkles size={18} fill="currentColor" />
+                                            {isAdmin ? 'Generate Recipe Card' : `Request Generation (${CREDIT_COSTS.RECIPE} CR)`}
+                                        </button>
+                                    ) : (
+                                        <button 
+                                            onClick={handleConnectKey}
+                                            className="w-full py-3.5 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl transition-all shadow-lg flex items-center justify-center gap-2"
+                                        >
+                                            <Key size={18} fill="currentColor" />
+                                            Connect API Key to Generate
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         </div>

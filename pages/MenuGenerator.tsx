@@ -4,7 +4,7 @@ import { User, MenuGenerationRequest, UserRole } from '../types';
 import { storageService } from '../services/storageService';
 import { generateMenu } from '../services/geminiService';
 import { CREDIT_COSTS } from '../constants';
-import { Sparkles, Loader2, Wallet, ArrowRight, History, ChefHat, DollarSign, Users, UtensilsCrossed, AlertCircle, BookOpen } from 'lucide-react';
+import { Sparkles, Loader2, Wallet, ArrowRight, History, ChefHat, DollarSign, Users, UtensilsCrossed, AlertCircle, BookOpen, Key } from 'lucide-react';
 
 interface MenuGeneratorProps {
     user: User;
@@ -30,10 +30,41 @@ export const MenuGenerator: React.FC<MenuGeneratorProps> = ({ user, onUserUpdate
     const [generatedResult, setGeneratedResult] = useState<MenuGenerationRequest | null>(null);
     const [history, setHistory] = useState<MenuGenerationRequest[]>([]);
     const [selectedRequest, setSelectedRequest] = useState<MenuGenerationRequest | null>(null);
+    const [hasApiKey, setHasApiKey] = useState(true);
 
     useEffect(() => {
         refreshHistory();
     }, [user.id, isAdmin]);
+
+    // Poll for API Key Status
+    useEffect(() => {
+        const checkKey = async () => {
+            if ((window as any).aistudio) {
+                try {
+                    const has = await (window as any).aistudio.hasSelectedApiKey();
+                    setHasApiKey(has);
+                    if (has && error && error.includes('API Key')) setError(null);
+                } catch (e) {
+                    console.error("Error checking API key", e);
+                }
+            }
+        };
+        checkKey();
+        const interval = setInterval(checkKey, 2000);
+        return () => clearInterval(interval);
+    }, [error]);
+
+    const handleConnectKey = async () => {
+        if ((window as any).aistudio) {
+            try {
+                await (window as any).aistudio.openSelectKey();
+                setHasApiKey(true);
+                setError(null);
+            } catch (e) {
+                console.error(e);
+            }
+        }
+    };
 
     const refreshHistory = () => {
         const all = storageService.getAllMenuGenerationRequests();
@@ -58,6 +89,12 @@ export const MenuGenerator: React.FC<MenuGeneratorProps> = ({ user, onUserUpdate
 
     const handleGenerate = async (e: React.FormEvent) => {
         e.preventDefault();
+        
+        if (!hasApiKey) {
+            handleConnectKey();
+            return;
+        }
+
         setError(null);
 
         // Validation
@@ -151,6 +188,21 @@ export const MenuGenerator: React.FC<MenuGeneratorProps> = ({ user, onUserUpdate
                     {/* Form */}
                     <div className="w-full lg:w-1/3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm p-6 overflow-y-auto transition-colors">
                         <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-6">Menu Configuration</h2>
+                        
+                        {!hasApiKey && (
+                            <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg flex flex-col gap-2">
+                                <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 font-bold text-sm">
+                                    <AlertCircle size={16} /> API Key Required
+                                </div>
+                                <button 
+                                    onClick={handleConnectKey}
+                                    className="w-full py-2 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg text-xs transition-colors flex items-center justify-center gap-2"
+                                >
+                                    <Key size={14} /> Connect API Key
+                                </button>
+                            </div>
+                        )}
+
                         <form onSubmit={handleGenerate} className="space-y-5">
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Restaurant Name</label>
@@ -241,12 +293,7 @@ export const MenuGenerator: React.FC<MenuGeneratorProps> = ({ user, onUserUpdate
                                     {(error.includes('API Key') || error.includes('configure') || error.includes('unauthenticated')) && (
                                         <button 
                                             type="button"
-                                            onClick={async () => {
-                                                if ((window as any).aistudio) {
-                                                    await (window as any).aistudio.openSelectKey();
-                                                    setError(null);
-                                                }
-                                            }}
+                                            onClick={handleConnectKey}
                                             className="self-start px-3 py-1 bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-200 text-xs font-bold rounded hover:bg-red-200 dark:hover:bg-red-700 transition-colors"
                                         >
                                             Connect Key
@@ -255,14 +302,24 @@ export const MenuGenerator: React.FC<MenuGeneratorProps> = ({ user, onUserUpdate
                                 </div>
                             )}
 
-                            <button 
-                                type="submit" 
-                                disabled={loading}
-                                className="w-full py-3 bg-slate-900 dark:bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-600 dark:hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-                            >
-                                {loading ? <Loader2 className="animate-spin" size={18} /> : <Sparkles size={18} fill="currentColor" />}
-                                {loading ? 'Generating Menu...' : `Generate Menu (${CREDIT_COSTS.MENU_GEN} CR)`}
-                            </button>
+                            {hasApiKey ? (
+                                <button 
+                                    type="submit" 
+                                    disabled={loading}
+                                    className="w-full py-3 bg-slate-900 dark:bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-600 dark:hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                                >
+                                    {loading ? <Loader2 className="animate-spin" size={18} /> : <Sparkles size={18} fill="currentColor" />}
+                                    {loading ? 'Generating Menu...' : `Generate Menu (${CREDIT_COSTS.MENU_GEN} CR)`}
+                                </button>
+                            ) : (
+                                <button 
+                                    type="button"
+                                    onClick={handleConnectKey}
+                                    className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2"
+                                >
+                                    <Key size={18} fill="currentColor" /> Connect Key to Generate
+                                </button>
+                            )}
                         </form>
                     </div>
 
