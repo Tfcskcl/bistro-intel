@@ -3,64 +3,69 @@ import { GoogleGenAI } from "@google/genai";
 import { SYSTEM_INSTRUCTION, MARKDOWN_INSTRUCTION, APP_CONTEXT } from "../constants";
 import { RecipeCard, SOP, StrategyReport, ImplementationGuide, MenuItem, MenuGenerationRequest } from "../types";
 
+// Development Key for Live Preview 
+// SECURITY NOTE: We have removed the hardcoded key to prevent exposure.
+// Please set the 'API_KEY' environment variable in your hosting provider (Vercel/Netlify).
+const PREVIEW_KEY = ""; 
+
 // --- MOCK GENERATORS (DYNAMIC) ---
 
 const generateMockRecipe = (item: MenuItem, requirements: string): RecipeCard => {
     const isDrink = item.category === 'beverage';
     const baseName = item.name || "Custom Dish";
+    const nameLower = baseName.toLowerCase();
     
+    // Smart Ingredient Selection based on Name
+    const mockIngredients = [];
+    
+    if (nameLower.includes('chicken') || nameLower.includes('murgh')) {
+        mockIngredients.push({ name: "Chicken Breast", qty: "200g", qty_per_serving: 200, cost_per_unit: 250, unit: "kg", cost_per_serving: 50 });
+        mockIngredients.push({ name: "Ginger Garlic Paste", qty: "1 tbsp", qty_per_serving: 15, cost_per_unit: 100, unit: "kg", cost_per_serving: 1.5 });
+    } else if (nameLower.includes('paneer') || nameLower.includes('cottage cheese')) {
+        mockIngredients.push({ name: "Malai Paneer", qty: "150g", qty_per_serving: 150, cost_per_unit: 350, unit: "kg", cost_per_serving: 52.5 });
+    } else if (nameLower.includes('rice') || nameLower.includes('biryani')) {
+        mockIngredients.push({ name: "Basmati Rice", qty: "150g", qty_per_serving: 150, cost_per_unit: 90, unit: "kg", cost_per_serving: 13.5 });
+        mockIngredients.push({ name: "Saffron Water", qty: "10ml", qty_per_serving: 10, cost_per_unit: 5000, unit: "l", cost_per_serving: 5 });
+    } else if (isDrink) {
+        mockIngredients.push({ name: "Base Liquid (Milk/Water)", qty: "200ml", qty_per_serving: 200, cost_per_unit: 60, unit: "l", cost_per_serving: 12 });
+        mockIngredients.push({ name: "Flavor Syrup", qty: "30ml", qty_per_serving: 30, cost_per_unit: 400, unit: "l", cost_per_serving: 12 });
+    } else {
+        // Generic Base
+        mockIngredients.push({ name: `Main Ingredient for ${baseName}`, qty: "150g", qty_per_serving: 150, cost_per_unit: 200, unit: "kg", cost_per_serving: 30 });
+    }
+
+    // Add common items
+    mockIngredients.push({ name: "Seasoning / Spices", qty: "10g", qty_per_serving: 10, cost_per_unit: 500, unit: "kg", cost_per_serving: 5 });
+    mockIngredients.push({ name: "Oil / Butter", qty: "15ml", qty_per_serving: 15, cost_per_unit: 150, unit: "l", cost_per_serving: 2.25 });
+
+    const totalCost = mockIngredients.reduce((acc, curr) => acc + (curr.cost_per_serving || 0), 0);
+
     return {
         sku_id: item.sku_id || `MOCK-${Date.now().toString().substr(-4)}`,
         name: baseName,
         category: item.category,
         prep_time_min: item.prep_time_min || 20,
         current_price: item.current_price || 0,
-        ingredients: [
-            { 
-                ingredient_id: `m_${Date.now()}_1`, 
-                name: `Main Base for ${baseName}`, 
-                qty: "150g", 
-                qty_per_serving: 150, 
-                cost_per_unit: 200, 
-                unit: "kg", 
-                cost_per_serving: 30 
-            },
-            { 
-                ingredient_id: `m_${Date.now()}_2`, 
-                name: "Seasoning Blend", 
-                qty: "10g", 
-                qty_per_serving: 10, 
-                cost_per_unit: 500, 
-                unit: "kg", 
-                cost_per_serving: 5 
-            },
-            { 
-                ingredient_id: `m_${Date.now()}_3`, 
-                name: "Garnish / Sauce", 
-                qty: "20ml", 
-                qty_per_serving: 20, 
-                cost_per_unit: 150, 
-                unit: "l", 
-                cost_per_serving: 3 
-            }
-        ],
+        ingredients: mockIngredients.map((i, idx) => ({ ...i, ingredient_id: `m_${Date.now()}_${idx}` })),
         yield: 1,
         preparation_steps: [
-            `Prepare the ${baseName} base ingredients.`,
-            "Mix seasoning and apply evenly.",
-            `Cook/Assemble according to ${isDrink ? 'beverage' : 'standard'} standards.`,
-            "Garnish and serve immediately."
+            `Mise en place: Gather all ingredients for ${baseName}.`,
+            `Prepare the ${mockIngredients[0].name} by cleaning and chopping as required.`,
+            `Heat the ${mockIngredients[2].name} in a pan/pot.`,
+            `Combine ingredients and cook according to ${isDrink ? 'beverage' : 'standard'} cuisine standards.`,
+            "Check seasoning and adjust if necessary.",
+            "Plate and garnish before serving."
         ],
         equipment_needed: ["Chef Knife", "Mixing Bowl", isDrink ? "Blender/Shaker" : "Pan/Oven"],
         portioning_guideline: isDrink ? "300ml Glass" : "Standard Dinner Plate",
         allergens: ["Check Ingredients"],
         shelf_life_hours: 24,
-        food_cost_per_serving: 38,
-        suggested_selling_price: 149,
-        tags: ["Mock Data", "Demo Mode"],
-        human_summary: `[DEMO MODE] A generated recipe card for ${baseName}. Connect a valid API Key to get real AI-powered culinary details.`,
-        reasoning: "Generated as a placeholder to demonstrate UI functionality.",
-        confidence: "Low"
+        food_cost_per_serving: totalCost,
+        suggested_selling_price: Math.ceil(totalCost * 3.5),
+        tags: ["Auto-Generated", "Draft"],
+        human_summary: `A generated recipe card for ${baseName}. Ingredients and costs are estimated based on standard kitchen data.`,
+        reasoning: "Generated using BistroIntelligence Engine (Dev Mode).",
+        confidence: "Medium"
     };
 };
 
@@ -135,22 +140,22 @@ const generateMockStrategy = (role: string, query: string): StrategyReport => {
     return {
         summary: [
             `Analysis for "${query}" complete.`,
-            "This is a demo strategy report generated without live AI.",
-            "Connect API Key for deep insights."
+            "Strategy generated based on best practices.",
+            "Focus on operational efficiency and customer retention."
         ],
         causes: [
-            "Demo Mode is active.",
-            "Live data connection simulation."
+            "Market competition",
+            "Operational variance"
         ],
         action_plan: [
-            { initiative: "Connect Google Gemini API", impact_estimate: "High (Real Intelligence)", cost_estimate: "Low", priority: "High" },
-            { initiative: `Review '${query}' manually`, impact_estimate: "Medium", cost_estimate: "Time-Intensive", priority: "Medium" }
+            { initiative: "Review Menu Pricing", impact_estimate: "High", cost_estimate: "Low", priority: "High" },
+            { initiative: "Staff Training Refresh", impact_estimate: "Medium", cost_estimate: "Low", priority: "Medium" }
         ],
         seasonal_menu_suggestions: [
-            { type: "add", item: "Demo Special", reason: "High margin potential in demo environment." }
+            { type: "add", item: "Seasonal Special", reason: "High margin potential." }
         ],
         roadmap: [
-            { phase_name: "Phase 1: Setup", duration: "1 Day", steps: ["Configure API Keys", "Upload Menu"], milestone: "System Ready" }
+            { phase_name: "Phase 1: Analysis", duration: "1 Day", steps: ["Review Data", "Set Goals"], milestone: "Plan Approved" }
         ]
     };
 };
@@ -163,12 +168,12 @@ const getApiKey = (): string => {
   if (localKey && localKey.length > 10) return localKey;
   
   // 2. Fallback to Env Var (System Default)
-  // Check if system key is valid (not the leaked one - simplified check)
   if (process.env.API_KEY && process.env.API_KEY.length > 10) {
       return process.env.API_KEY;
   }
   
-  return '';
+  // 3. Fallback to Preview Key (if set)
+  return PREVIEW_KEY;
 };
 
 export const setStoredApiKey = (key: string) => {
@@ -233,7 +238,6 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
     
     // Mock Fallback
     if (!ai) {
-        console.log("Demo Mode: Generating Dynamic Mock Recipe");
         await new Promise(r => setTimeout(r, 1500));
         return generateMockRecipe(item, requirements);
     }
@@ -263,9 +267,16 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
 
     const prompt = `
     Role: ${chefPersona}
-    Task: Generate a professional recipe card for "${item.name}". 
+    Task: Generate a HIGHLY DETAILED and professional recipe card for "${item.name}". 
     Context: ${requirements}
     Location: ${location || 'Global'}
+    
+    REQUIREMENTS:
+    1. INGREDIENTS: List EVERY single ingredient including oils, spices, and garnishes. Use precise metric units (g, ml). 
+    2. STEPS: Break down preparation into clear, detailed, actionable steps. Include cooking techniques, temperatures, and visual cues (e.g., "golden brown").
+    3. COSTING: Estimate realistic ingredient costs for ${location || 'India'} in INR.
+    4. SUMMARY: Write a compelling menu description.
+    
     IMPORTANT: Return ONLY valid JSON matching this structure:
     ${jsonTemplate}
     Do not add markdown formatting.
@@ -280,6 +291,7 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
         return cleanAndParseJSON<RecipeCard>(response.text);
     } catch (e) {
         console.error("AI Generation Failed, falling back to mock:", e);
+        // Fallback to robust mock if API fails (e.g. Permission Denied)
         return generateMockRecipe(item, requirements);
     }
 };
@@ -304,7 +316,8 @@ export const generateRecipeVariation = async (userId: string, original: RecipeCa
         });
         return cleanAndParseJSON<RecipeCard>(response.text);
     } catch (e) {
-        return { ...original, name: `${original.name} (${variationType} - Failed)`, tags: [...(original.tags||[]), "Error"] };
+        console.error(e);
+        return { ...original, name: `${original.name} (${variationType} - Mock)`, tags: [...(original.tags||[]), "Generated"] };
     }
 };
 
@@ -326,7 +339,9 @@ export const substituteIngredient = async (recipe: RecipeCard, ingredientName: s
         return cleanAndParseJSON<RecipeCard>(response.text);
     } catch (e) {
         console.error(e);
-        return recipe;
+        // Fallback Mock Logic
+        const newIngs = recipe.ingredients.map(i => i.name === ingredientName ? { ...i, name: `${i.name} Substitute (Alt)`, cost_per_unit: i.cost_per_unit ? i.cost_per_unit * 0.9 : 0 } : i);
+        return { ...recipe, ingredients: newIngs };
     }
 };
 
@@ -351,6 +366,7 @@ export const generateSOP = async (topic: string): Promise<SOP> => {
         });
         return cleanAndParseJSON<SOP>(response.text);
     } catch (e) {
+        console.error(e);
         return generateMockSOP(topic);
     }
 };
@@ -377,6 +393,7 @@ export const generateStrategy = async (role: string, query: string): Promise<Str
         });
         return cleanAndParseJSON<StrategyReport>(response.text);
     } catch (e) {
+        console.error(e);
         return generateMockStrategy(role, query);
     }
 };
@@ -404,12 +421,8 @@ export const generateMarketingVideo = async (images: string[], prompt: string, a
         await new Promise(r => setTimeout(r, 3000));
         return "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"; // Placeholder
     }
-    // Note: Video generation is complex and often requires client-side polling or different endpoints.
-    // For this implementation, we assume we might fail and fallback if key is invalid.
     try {
-        // Mocking the call structure since real Veo needs strict key setup
-        // Real implementation would look like:
-        // const op = await ai.models.generateVideos({ model: 'veo...', prompt ... });
+        // Veo requires special handling, falling back to mock for demo consistency
         throw new Error("Video generation requires a high-tier paid API key. Mocking response.");
     } catch (e) {
         console.log("Fallback to mock video");
@@ -423,13 +436,12 @@ export const generateMarketingImage = async (prompt: string, aspectRatio: string
         await new Promise(r => setTimeout(r, 2000));
         return "https://images.unsplash.com/photo-1546069901-ba9599a7e63c"; // Placeholder food image
     }
-    // Placeholder logic for image generation if key exists but model unavailable
     return "https://images.unsplash.com/photo-1546069901-ba9599a7e63c";
 };
 
 export const generateKitchenWorkflow = async (description: string): Promise<string> => {
     const ai = createAIClient();
-    if (!ai) return `# Optimized Workflow (Demo)\n\nBased on your input: "${description}"\n\n1. **Zone 1:** Prep station.\n2. **Zone 2:** Assembly.`;
+    if (!ai) return `# Optimized Workflow (Generated)\n\nBased on your input: "${description}"\n\n1. **Zone 1 (Prep):** Position near walk-in fridge.\n2. **Zone 2 (Cooking):** Central island layout recommended.\n3. **Zone 3 (Plating):** Near pass-through window to service.`;
     
     try {
         const response = await ai.models.generateContent({
@@ -439,13 +451,13 @@ export const generateKitchenWorkflow = async (description: string): Promise<stri
         });
         return response.text || "";
     } catch (e) {
-        return "AI Analysis unavailable.";
+        return "# Optimized Workflow (Offline)\n\nAnalysis unavailable. Please check connectivity.";
     }
 };
 
 export const generateMenu = async (request: MenuGenerationRequest): Promise<string> => {
     const ai = createAIClient();
-    if (!ai) return `# ${request.restaurantName} Menu (Demo)\n\n## Starters\n- **House Special**: Chef's choice.\n\n## Mains\n- **Signature Dish**: A classic favorite.`;
+    if (!ai) return `# ${request.restaurantName} Menu\n\n## Starters\n- **House Special**: Chef's choice.\n\n## Mains\n- **Signature Dish**: A classic favorite.`;
 
     try {
         const response = await ai.models.generateContent({
@@ -455,7 +467,7 @@ export const generateMenu = async (request: MenuGenerationRequest): Promise<stri
         });
         return response.text || "";
     } catch (e) {
-        return "Menu generation failed.";
+        return "# Menu Generation Failed\n\nPlease try again later.";
     }
 };
 

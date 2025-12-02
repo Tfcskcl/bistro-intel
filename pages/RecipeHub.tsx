@@ -308,14 +308,6 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       const ingredients: Ingredient[] = manualIngredients.map((ing, idx) => {
           const qtyNum = parseFloat(ing.qty) || 0;
           const costNum = parseFloat(ing.costPerUnit) || 0;
-          // Total cost for line is assumed to be costPerUnit (if user enters price for that qty) or calculated
-          // Let's assume user enters UNIT cost.
-          // actually for manual simplicity, let's assume they enter Price for the specific Quantity they used.
-          // Or let's assume standard Unit Cost (per 1 unit).
-          // Let's stick to "Cost Per Unit" and multiply by Qty? No, parsing units is hard manually.
-          // Simplest: "Total Cost of Ingredient used in Recipe".
-          // Let's assume user enters "Cost for this Qty".
-          // Then cost_per_serving = Cost / Yield.
           
           return {
               ingredient_id: `man_${Date.now()}_${idx}`,
@@ -745,10 +737,21 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                           <div className="bg-white dark:bg-slate-900 shadow-xl rounded-2xl overflow-hidden border border-slate-100 dark:border-slate-800 mb-8">
                               <div className="bg-slate-900 dark:bg-black text-white p-8">
                                   <div className="flex justify-between items-start">
-                                      <h1 className="text-3xl font-bold">{generatedRecipe.name}</h1>
-                                      <div className="text-right"><p className="text-3xl font-black">₹{generatedRecipe.suggested_selling_price.toFixed(0)}</p></div>
+                                      <div className="flex-1 mr-4">
+                                          <h1 className="text-3xl font-bold">{generatedRecipe.name}</h1>
+                                          <p className="text-slate-300 text-sm mt-2">{generatedRecipe.human_summary}</p>
+                                      </div>
+                                      <div className="text-right flex flex-col items-end gap-2 shrink-0">
+                                          <p className="text-3xl font-black">₹{generatedRecipe.suggested_selling_price.toFixed(0)}</p>
+                                          <button 
+                                            onClick={handleSaveRecipe}
+                                            className={`text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg transition-colors border ${isRecipeSaved ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50' : 'bg-white/10 hover:bg-white/20 text-white border-white/10'}`}
+                                          >
+                                            {isRecipeSaved ? <Check size={14} /> : <Save size={14} />}
+                                            {isRecipeSaved ? 'Saved' : 'Save'}
+                                          </button>
+                                      </div>
                                   </div>
-                                  <p className="text-slate-300 text-sm mt-2">{generatedRecipe.human_summary}</p>
                               </div>
                               
                               <div className="p-8 border-b border-slate-100 dark:border-slate-700">
