@@ -355,12 +355,16 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
     
     CRITICAL INSTRUCTION:
     You have access to Google Search. USE IT to research the authentic and complete ingredient list for this dish. 
-    Ensure NO ingredients are missing (e.g. water, oil, salt, base spices, garnishes).
+    
+    DETAILED COSTING RULES:
+    1. LIST EVERY INGREDIENT: You must include "Hidden Costs" like Oil, Salt, Water, Spices, Garnishes. 
+    2. MICRO-COSTING: Do not set cost to 0. Even 5g of salt has a cost (e.g., 0.10). Estimate market rates for ${location || 'India'}.
+    3. ACCURACY: The 'food_cost_per_serving' MUST be the strict mathematical sum of all 'cost_per_serving' values of ingredients.
     
     REQUIREMENTS:
     1. INGREDIENTS: List EVERY single ingredient found in your research. Use precise metric units (g, ml).
     2. PREPARATION STEPS: Granular steps using professional culinary terms (brunoise, sweat, deglaze). Include temps and times.
-    3. COSTING: Estimate realistic ingredient costs for ${location || 'India'} in local currency based on search data.
+    3. COSTING: Estimate realistic ingredient costs based on search data.
     4. PRICING: Suggested Selling Price based on 30% Food Cost.
     5. TIME: Estimate Prep vs Cook time.
     
@@ -427,9 +431,11 @@ export const generateRecipeVariation = async (userId: string, original: RecipeCa
         Task: Create a "${variationType}" variation of the existing recipe below.
         
         Guidelines:
-        1. Maintain the core identity of the dish.
-        2. Reasoning: Explain what changed in the 'reasoning' field.
-        3. Costing: Recalculate costs.
+        1. Maintain the core identity of the dish, but adapt for ${variationType}.
+        2. INGREDIENTS: Swap or remove ingredients as needed. 
+        3. STRICT RE-COSTING: You MUST recalculate 'cost_per_serving', 'food_cost_per_serving', and 'suggested_selling_price' based on the NEW ingredients. Do not just copy the old prices.
+           Example: If replacing expensive meat with vegetables, the cost SHOULD go down.
+        4. Reasoning: Explain what changed in the 'reasoning' field.
         
         Original Recipe JSON: ${JSON.stringify(original)}
         
