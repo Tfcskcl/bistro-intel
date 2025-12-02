@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { User, SOP, SOPRequest, UserRole } from '../types';
-import { generateSOP, hasValidApiKey } from '../services/geminiService';
+import { generateSOP } from '../services/geminiService';
 import { storageService } from '../services/storageService';
 import { CREDIT_COSTS } from '../constants';
 import { FileText, Loader2, Sparkles, Save, Search, AlertCircle, CheckCircle2, Clock, Wallet, BookOpen, Printer, Share2, User as UserIcon, X, Copy, Mail, Key, Link } from 'lucide-react';
@@ -14,137 +14,43 @@ interface SOPStudioProps {
 export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
   const isAdmin = [UserRole.ADMIN, UserRole.SUPER_ADMIN].includes(user.role);
   const [viewMode, setViewMode] = useState<'create' | 'saved' | 'requests'>('create');
-  
-  // Generator State
   const [topic, setTopic] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedSOP, setGeneratedSOP] = useState<SOP | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [hasApiKey, setHasApiKey] = useState(() => hasValidApiKey());
-
-  // Saved SOPs
   const [savedSOPs, setSavedSOPs] = useState<SOP[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-
-  // Requests
   const [requests, setRequests] = useState<SOPRequest[]>([]);
-
-  // Sharing Modal
-  const [shareSOP, setShareSOP] = useState<SOP | null>(null);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
 
   useEffect(() => {
     loadSavedSOPs();
-    if (isAdmin) {
-      loadRequests();
-    }
+    if (isAdmin) loadRequests();
   }, [user.id, isAdmin]);
 
-  // Poll for API Key Status & Handle Leaks
-  useEffect(() => {
-    const checkKey = async () => {
-        if (hasValidApiKey()) {
-            setHasApiKey(true);
-            if (error && (error.includes('API Key') || error.includes('missing') || error.includes('Access Denied'))) setError(null);
-            return;
-        } else {
-            setHasApiKey(false);
-        }
-
-        if ((window as any).aistudio) {
-            try {
-                const has = await (window as any).aistudio.hasSelectedApiKey();
-                setHasApiKey(has);
-                if (has && error && (error.includes('API Key') || error.includes('missing'))) {
-                    setError(null);
-                }
-            } catch (e) {
-                console.error("Error checking API key", e);
-            }
-        }
-    };
-    checkKey();
-    const interval = setInterval(checkKey, 2000);
-    return () => clearInterval(interval);
-  }, [error]);
-
-  // Force Reset on Leaked/Denied Errors
-  useEffect(() => {
-      if (error && (error.includes('leaked') || error.includes('Access Denied') || error.includes('403'))) {
-          setHasApiKey(false);
-          localStorage.removeItem('gemini_api_key');
-      }
-  }, [error]);
-
-  const loadSavedSOPs = () => {
-    setSavedSOPs(storageService.getSavedSOPs(user.id));
-  };
-
-  const loadRequests = () => {
-    setRequests(storageService.getAllSOPRequests().filter(r => r.status === 'pending'));
-  };
+  const loadSavedSOPs = () => setSavedSOPs(storageService.getSavedSOPs(user.id));
+  const loadRequests = () => setRequests(storageService.getAllSOPRequests().filter(r => r.status === 'pending'));
 
   const handleGenerate = async () => {
     if (!topic) return;
-    
-    if (!hasApiKey) {
-        handleConnectKey();
+    if (!isAdmin && user.credits < CREDIT_COSTS.SOP) {
+        setError(`Insufficient credits.`);
         return;
     }
-
-    if (!isAdmin) {
-      if (user.credits < CREDIT_COSTS.SOP) {
-        setError(`Insufficient credits. Required: ${CREDIT_COSTS.SOP}, Available: ${user.credits}`);
-        return;
-      }
-    }
-
     setIsGenerating(true);
     setError(null);
-
     try {
       if (!isAdmin && onUserUpdate) {
-        const success = storageService.deductCredits(user.id, CREDIT_COSTS.SOP, `SOP Generation: ${topic}`);
-        if (!success) throw new Error("Credit deduction failed");
+        storageService.deductCredits(user.id, CREDIT_COSTS.SOP, `SOP Gen: ${topic}`);
         onUserUpdate({ ...user, credits: user.credits - CREDIT_COSTS.SOP });
       }
-
       const sop = await generateSOP(topic);
       setGeneratedSOP(sop);
     } catch (err: any) {
-      const msg = err.message || JSON.stringify(err);
-      if (msg.includes('leaked') || msg.includes('403')) {
-          setError("Your API Key was blocked. Please connect a new one.");
-          setHasApiKey(false);
-      } else {
-          setError(msg || "Failed to generate SOP");
-      }
+      setError(err.message || "Failed to generate SOP");
     } finally {
       setIsGenerating(false);
     }
-  };
-
-  const handleConnectKey = async () => {
-      // 1. Try AI Studio
-      if ((window as any).aistudio) {
-          try {
-              await (window as any).aistudio.openSelectKey();
-              setHasApiKey(true);
-              setError(null);
-              return;
-          } catch (e) {
-              console.error(e);
-          }
-      }
-      
-      // 2. Fallback to manual entry
-      const key = prompt("Please enter your Google Gemini API Key:", "");
-      if (key) {
-          // Import dynamically or pass setter via props if needed, but local storage works
-          // Assuming setStoredApiKey is available via side-effect of setting LS
-          localStorage.setItem('gemini_api_key', key);
-          window.location.reload(); 
-      }
   };
 
   const handleSave = () => {
@@ -157,352 +63,135 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
     }
   };
 
-  const handleFulfillRequest = async (req: SOPRequest) => {
-    setIsGenerating(true);
-    try {
-        const sop = await generateSOP(req.topic);
-        storageService.updateSOPRequest({
-            ...req,
-            status: 'completed',
-            completedDate: new Date().toISOString()
-        });
-        loadRequests();
-    } catch (err: any) {
-        alert("Failed to generate SOP for request: " + err.message);
-    } finally {
-        setIsGenerating(false);
-    }
-  };
-
-  const openShareModal = (e: React.MouseEvent, sop: SOP) => {
-      e.stopPropagation();
-      setShareSOP(sop);
-      setCopyStatus(null);
-  };
-
-  const handleCopyLink = () => {
-      if (!shareSOP) return;
-      const dummyLink = `https://bistroconnect.in/sop/view/${shareSOP.sop_id}`;
-      navigator.clipboard.writeText(dummyLink);
-      setCopyStatus("Link copied!");
-      setTimeout(() => setCopyStatus(null), 2000);
-  };
-
-  const handleShareFromDetail = () => {
-      if (!generatedSOP) return;
-      const dummyLink = `https://bistroconnect.in/sop/view/${generatedSOP.sop_id}`;
-      navigator.clipboard.writeText(dummyLink);
-      setCopyStatus("Link copied!");
-      setTimeout(() => setCopyStatus(null), 2000);
-  };
-
-  const handleEmailShare = () => {
-      if (!shareSOP) return;
-      const subject = `SOP: ${shareSOP.title}`;
-      const body = `Hi,\n\nHere is the Standard Operating Procedure for ${shareSOP.title}.\n\nScope: ${shareSOP.scope}\n\nView full details here: https://bistroconnect.in/sop/view/${shareSOP.sop_id}\n\nRegards,\n${user.name}`;
-      window.open(`mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
+  const handleCopyLink = (sop: SOP) => {
+      const link = `${window.location.origin}/sop/share/${sop.sop_id}`;
+      navigator.clipboard.writeText(link);
+      setCopyStatus("Shareable link copied to clipboard!");
+      setTimeout(() => setCopyStatus(null), 3000);
   };
 
   return (
     <div className="h-[calc(100vh-6rem)] flex flex-col gap-6 relative">
-      
-      {/* Share Modal */}
-      {shareSOP && (
-          <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
-              <div className="bg-white dark:bg-slate-900 rounded-xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-700 animate-scale-in">
-                  <div className="flex justify-between items-center mb-4">
-                      <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                          <Share2 size={18} className="text-blue-500" /> Share SOP
-                      </h3>
-                      <button onClick={() => setShareSOP(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
-                          <X size={20} />
-                      </button>
-                  </div>
-                  <p className="text-sm text-slate-600 dark:text-slate-300 mb-6 truncate font-medium">"{shareSOP.title}"</p>
-                  
-                  <div className="space-y-3">
-                      <button 
-                        onClick={handleCopyLink}
-                        className="w-full flex items-center justify-between p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors group"
-                      >
-                          <div className="flex items-center gap-3">
-                              <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-lg">
-                                  <Copy size={18} />
-                              </div>
-                              <span className="text-sm font-bold text-slate-700 dark:text-slate-200">Copy Link</span>
-                          </div>
-                          {copyStatus ? <span className="text-xs text-emerald-600 font-bold">{copyStatus}</span> : null}
-                      </button>
-
-                      <button 
-                        onClick={handleEmailShare}
-                        className="w-full flex items-center justify-between p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors group"
-                      >
-                          <div className="flex items-center gap-3">
-                              <div className="p-2 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg">
-                                  <Mail size={18} />
-                              </div>
-                              <span className="text-sm font-bold text-slate-700 dark:text-slate-200">Send via Email</span>
-                          </div>
-                      </button>
-                  </div>
-              </div>
-          </div>
-      )}
-
       <div className="flex justify-between items-center">
         <div className="flex gap-2">
-          <button 
-             onClick={() => setViewMode('create')}
-             className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${viewMode === 'create' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
-           >
-             Create SOP
-           </button>
-           <button 
-             onClick={() => setViewMode('saved')}
-             className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${viewMode === 'saved' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
-           >
-             Saved Library
-           </button>
-           {isAdmin && (
-             <button 
-               onClick={() => setViewMode('requests')}
-               className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${viewMode === 'requests' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
-             >
-               User Requests
-             </button>
-           )}
+          <button onClick={() => setViewMode('create')} className={`px-4 py-2 rounded-lg text-sm font-bold ${viewMode === 'create' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600'}`}>Create SOP</button>
+          <button onClick={() => setViewMode('saved')} className={`px-4 py-2 rounded-lg text-sm font-bold ${viewMode === 'saved' ? 'bg-slate-900 text-white' : 'bg-white text-slate-600'}`}>Saved Library</button>
         </div>
-        <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-400 rounded-full text-xs font-bold">
-            <Wallet size={12} fill="currentColor" />
-            Credits: {user.credits}
-        </div>
+        <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-800 rounded-full text-xs font-bold"><Wallet size={12}/> Credits: {user.credits}</div>
       </div>
 
       <div className="flex-1 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col transition-colors">
         {viewMode === 'create' && (
           <div className="flex h-full">
             <div className="w-1/3 border-r border-slate-200 dark:border-slate-800 p-6 bg-slate-50 dark:bg-slate-800/50 overflow-y-auto">
-               <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-6 flex items-center gap-2">
-                 <FileText className="text-blue-600 dark:text-blue-400" /> Standard Operating Procedure
-               </h3>
-               
+               <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-6 flex items-center gap-2"><FileText className="text-blue-600" /> Standard Operating Procedure</h3>
                <div className="space-y-4">
                  <div>
-                   <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">SOP Topic / Title</label>
-                   <input 
-                     type="text" 
-                     value={topic}
-                     onChange={(e) => setTopic(e.target.value)}
-                     placeholder="e.g. Daily Kitchen Opening Checklist"
-                     className="w-full px-4 py-3 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
-                   />
+                   <label className="block text-xs font-bold text-slate-500 uppercase mb-2">SOP Topic</label>
+                   <input type="text" value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="e.g. Closing Checklist" className="w-full px-4 py-3 rounded-lg border border-slate-300 dark:bg-slate-800 dark:text-white" />
                  </div>
-
-                 {error && (
-                    <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm rounded-lg flex flex-col gap-2 border border-red-100 dark:border-red-900/50">
-                        <div className="flex items-center gap-2">
-                            <AlertCircle size={16} /> {error}
-                        </div>
-                        <div className="flex items-center gap-2 mt-1">
-                            {(!hasApiKey || error.includes('API Key') || error.includes('Access Denied')) && (
-                                <button 
-                                    onClick={handleConnectKey}
-                                    className="px-3 py-1 bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-200 text-xs font-bold rounded hover:bg-red-200 dark:hover:bg-red-700 transition-colors"
-                                >
-                                    Update API Key
-                                </button>
-                            )}
-                            <button onClick={() => setError(null)} className="text-xs hover:underline ml-auto">Dismiss</button>
-                        </div>
-                    </div>
-                 )}
-
-                 {hasApiKey ? (
-                     <button 
-                       onClick={handleGenerate}
-                       disabled={isGenerating || !topic}
-                       className="w-full py-3 bg-slate-900 dark:bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-600 dark:hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                     >
-                       {isGenerating ? <Loader2 className="animate-spin" size={20} /> : <Sparkles size={20} />}
-                       Generate ({CREDIT_COSTS.SOP} CR)
-                     </button>
-                 ) : (
-                     <button 
-                       onClick={handleConnectKey}
-                       className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-lg transition-colors flex items-center justify-center gap-2"
-                     >
-                       <Key size={20} /> Connect API Key
-                     </button>
-                 )}
+                 {error && <div className="p-3 bg-red-50 text-red-600 text-sm rounded-lg">{error}</div>}
+                 <button onClick={handleGenerate} disabled={isGenerating || !topic} className="w-full py-3 bg-slate-900 text-white font-bold rounded-lg flex items-center justify-center gap-2 hover:opacity-90">
+                   {isGenerating ? <Loader2 className="animate-spin" size={20} /> : <Sparkles size={20} />} Generate ({CREDIT_COSTS.SOP} CR)
+                 </button>
                </div>
             </div>
-
             <div className="flex-1 p-8 overflow-y-auto bg-slate-50/50 dark:bg-slate-950/50">
                {generatedSOP ? (
-                 <div className="max-w-4xl mx-auto bg-white dark:bg-slate-900 p-8 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 animate-fade-in">
-                    <div className="flex justify-between items-start mb-8 border-b border-slate-100 dark:border-slate-800 pb-4">
-                       <div>
-                         <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{generatedSOP.title}</h1>
-                         <p className="text-slate-500 dark:text-slate-400 mt-1">ID: {generatedSOP.sop_id} • Scope: {generatedSOP.scope}</p>
-                       </div>
+                 <div className="max-w-4xl mx-auto bg-white dark:bg-slate-900 p-8 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
+                    <div className="flex justify-between items-start mb-8 border-b pb-4">
+                       <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{generatedSOP.title}</h1>
                        <div className="flex gap-2">
-                           <button 
-                             onClick={handleShareFromDetail}
-                             className="px-4 py-2 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 font-bold rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-2 transition-colors"
-                           >
-                             <Link size={18} /> {copyStatus || 'Copy Link'}
+                           <button onClick={() => handleCopyLink(generatedSOP)} className="px-4 py-2 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold rounded-lg flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-800">
+                               <Link size={18} /> Share
                            </button>
-                           <button 
-                             onClick={handleSave}
-                             className="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 flex items-center gap-2 shadow-lg shadow-blue-500/20"
-                           >
-                             <Save size={18} /> Save SOP
+                           <button onClick={handleSave} className="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg flex items-center gap-2 hover:bg-blue-700 transition-colors">
+                               <Save size={18} /> Save
                            </button>
                        </div>
                     </div>
-
-                    <div className="grid grid-cols-2 gap-8 mb-8">
-                       <div>
-                          <h3 className="font-bold text-slate-800 dark:text-white mb-2 uppercase text-xs tracking-wider">Prerequisites</h3>
-                          <p className="text-sm text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800 p-3 rounded border border-slate-100 dark:border-slate-700">{generatedSOP.prerequisites}</p>
-                       </div>
-                       <div>
-                          <h3 className="font-bold text-slate-800 dark:text-white mb-2 uppercase text-xs tracking-wider">Materials Needed</h3>
-                          <div className="flex flex-wrap gap-2">
-                             {generatedSOP.materials_equipment.map((item, i) => (
-                               <span key={i} className="px-2 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs rounded border border-slate-200 dark:border-slate-700">{item}</span>
-                             ))}
-                          </div>
-                       </div>
+                    {/* Render SOP Details */}
+                    <div className="space-y-6">
+                        <div>
+                            <h3 className="font-bold text-slate-800 dark:text-white mb-2">Scope & Prerequisites</h3>
+                            <p className="text-sm text-slate-600 dark:text-slate-300 mb-2"><strong>Scope:</strong> {generatedSOP.scope}</p>
+                            <p className="text-sm text-slate-600 dark:text-slate-300"><strong>Prerequisites:</strong> {generatedSOP.prerequisites}</p>
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-slate-800 dark:text-white mb-2">Procedure</h3>
+                            <div className="space-y-2">
+                                {generatedSOP.stepwise_procedure.map((s,i)=>(
+                                    <div key={i} className="flex gap-3 text-sm p-3 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700">
+                                        <span className="font-bold text-slate-400">{s.step_no}.</span>
+                                        <div className="flex-1">
+                                            <p className="text-slate-800 dark:text-slate-200 font-medium">{s.action}</p>
+                                            <div className="flex gap-2 mt-1 text-xs text-slate-500">
+                                                <span className="bg-white dark:bg-slate-700 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-600">{s.responsible_role}</span>
+                                                {s.time_limit && <span className="flex items-center gap-1"><Clock size={10}/> {s.time_limit}</span>}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-6">
+                            <div>
+                                <h3 className="font-bold text-slate-800 dark:text-white mb-2 text-sm uppercase">Equipment</h3>
+                                <ul className="list-disc pl-5 text-sm text-slate-600 dark:text-slate-300">{generatedSOP.materials_equipment.map((m,i)=><li key={i}>{m}</li>)}</ul>
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-slate-800 dark:text-white mb-2 text-sm uppercase">KPIs</h3>
+                                <ul className="list-disc pl-5 text-sm text-slate-600 dark:text-slate-300">{generatedSOP.kpis.map((k,i)=><li key={i}>{k}</li>)}</ul>
+                            </div>
+                        </div>
                     </div>
-
-                    <div className="mb-8">
-                       <h3 className="font-bold text-slate-800 dark:text-white mb-4 uppercase text-xs tracking-wider">Step-by-Step Procedure</h3>
-                       <div className="space-y-3">
-                          {generatedSOP.stepwise_procedure.map((step, i) => (
-                             <div key={i} className="flex gap-4 p-4 border border-slate-100 dark:border-slate-700 rounded-lg hover:border-blue-200 dark:hover:border-blue-700 transition-colors bg-white dark:bg-slate-800">
-                                <div className="w-8 h-8 rounded-full bg-slate-900 dark:bg-white dark:text-slate-900 text-white flex items-center justify-center font-bold shrink-0">
-                                   {step.step_no}
-                                </div>
-                                <div className="flex-1">
-                                   <p className="font-bold text-slate-800 dark:text-white text-sm">{step.action}</p>
-                                   <div className="flex gap-4 mt-2 text-xs text-slate-500 dark:text-slate-400">
-                                      <span className="flex items-center gap-1"><UserIcon size={12} className="inline"/> {step.responsible_role}</span>
-                                      {step.time_limit && <span className="flex items-center gap-1"><Clock size={12} className="inline"/> {step.time_limit}</span>}
-                                   </div>
-                                </div>
-                             </div>
-                          ))}
-                       </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-8">
-                       <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg border border-red-100 dark:border-red-900/50">
-                          <h3 className="font-bold text-red-800 dark:text-red-400 mb-2 text-sm">Critical Control Points</h3>
-                          <ul className="list-disc pl-4 space-y-1 text-sm text-red-700 dark:text-red-300">
-                             {generatedSOP.critical_control_points.map((pt, i) => (
-                               <li key={i}>{pt}</li>
-                             ))}
-                          </ul>
-                       </div>
-                       <div className="bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-lg border border-emerald-100 dark:border-emerald-900/50">
-                          <h3 className="font-bold text-emerald-800 dark:text-emerald-400 mb-2 text-sm">KPIs & Monitoring</h3>
-                          <ul className="list-disc pl-4 space-y-1 text-sm text-emerald-700 dark:text-emerald-300">
-                             {generatedSOP.kpis.map((kpi, i) => (
-                               <li key={i}>{kpi}</li>
-                             ))}
-                          </ul>
-                       </div>
-                    </div>
-
                  </div>
                ) : (
-                 <div className="h-full flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 opacity-60">
-                    <div className="w-24 h-24 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-6">
-                      <BookOpen size={48} />
-                    </div>
-                    <p className="text-lg font-medium">Standardize your operations</p>
-                    <p className="text-sm">Generate checklists, training manuals, and procedures instantly.</p>
+                 <div className="h-full flex flex-col items-center justify-center text-slate-400 opacity-60">
+                    <BookOpen size={48} className="mb-4" />
+                    <p>Standardize your operations</p>
                  </div>
                )}
             </div>
           </div>
         )}
-
         {viewMode === 'saved' && (
            <div className="p-6 h-full flex flex-col">
-              <div className="flex gap-4 mb-6">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
-                  <input 
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search SOPs..."
-                    className="w-full pl-10 pr-4 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 overflow-y-auto">
-                 {savedSOPs
-                   .filter(s => s.title.toLowerCase().includes(searchQuery.toLowerCase()))
-                   .map((sop, idx) => (
-                     <div key={idx} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-5 hover:border-blue-500 dark:hover:border-blue-500 transition-colors shadow-sm group cursor-pointer" onClick={() => setGeneratedSOP(sop)}>
-                        <h4 className="font-bold text-lg text-slate-800 dark:text-white group-hover:text-blue-700 dark:group-hover:text-blue-400 mb-2">{sop.title}</h4>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mb-4">{sop.scope}</p>
-                        <div className="flex justify-between items-center pt-4 border-t border-slate-100 dark:border-slate-800">
-                           <span className="text-xs font-bold text-slate-400 dark:text-slate-500">{sop.stepwise_procedure.length} Steps</span>
-                           <div className="flex gap-1">
-                                <button 
-                                    onClick={(e) => openShareModal(e, sop)}
-                                    className="p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors"
-                                    title="Share SOP"
-                                >
-                                    <Share2 size={16} />
-                                </button>
-                                <button className="p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-colors">
-                                    <Printer size={16} />
-                                </button>
-                           </div>
+                 {savedSOPs.map((sop, idx) => (
+                     <div key={idx} className="relative bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-xl p-5 hover:border-blue-500 dark:hover:border-blue-500 cursor-pointer group transition-all shadow-sm hover:shadow-md">
+                        <div onClick={() => {setGeneratedSOP(sop); setViewMode('create');}}>
+                            <h4 className="font-bold text-lg text-slate-800 dark:text-white mb-1">{sop.title}</h4>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">{sop.scope}</p>
+                            <div className="mt-3 flex gap-2">
+                                <span className="text-[10px] bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-1 rounded">{sop.stepwise_procedure.length} Steps</span>
+                            </div>
                         </div>
+                        <button 
+                            onClick={(e) => { e.stopPropagation(); handleCopyLink(sop); }}
+                            className="absolute top-4 right-4 p-2 bg-slate-100 dark:bg-slate-700 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                            title="Share Link"
+                        >
+                            <Share2 size={16} />
+                        </button>
                      </div>
-                   ))}
-              </div>
-           </div>
-        )}
-
-        {viewMode === 'requests' && isAdmin && (
-           <div className="p-6 h-full overflow-y-auto">
-              <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-6">Pending SOP Requests</h3>
-              <div className="space-y-4">
-                 {requests.length === 0 ? <p className="text-slate-500 dark:text-slate-400 text-center py-12">No requests pending.</p> : requests.map(req => (
-                    <div key={req.id} className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-4 flex items-center justify-between">
-                       <div>
-                          <h4 className="font-bold text-slate-800 dark:text-white">{req.topic}</h4>
-                          <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">{req.details}</p>
-                          <p className="text-xs text-slate-400 mt-2">Requested by: {req.userName}</p>
-                       </div>
-                       <div>
-                          {req.status === 'completed' ? (
-                             <span className="px-3 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs font-bold rounded-full">Completed</span>
-                          ) : (
-                             <button 
-                               onClick={() => handleFulfillRequest(req)}
-                               disabled={isGenerating}
-                               className="px-4 py-2 bg-slate-900 dark:bg-emerald-600 text-white text-xs font-bold rounded hover:bg-blue-600 dark:hover:bg-emerald-700 transition-colors flex items-center gap-2"
-                             >
-                               {isGenerating ? <Loader2 className="animate-spin" size={14} /> : <Sparkles size={14} />} Fulfill
-                             </button>
-                          )}
-                       </div>
-                    </div>
                  ))}
+                 {savedSOPs.length === 0 && (
+                     <div className="col-span-full text-center py-12 text-slate-400">
+                         <p>No SOPs saved yet.</p>
+                     </div>
+                 )}
               </div>
            </div>
         )}
       </div>
+
+      {copyStatus && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-6 py-3 rounded-full shadow-lg flex items-center gap-2 animate-fade-in-up">
+            <CheckCircle2 size={18} className="text-emerald-400" />
+            <span className="font-bold text-sm">{copyStatus}</span>
+        </div>
+      )}
     </div>
   );
 };
