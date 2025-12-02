@@ -4,7 +4,9 @@ import { SYSTEM_INSTRUCTION, MARKDOWN_INSTRUCTION, APP_CONTEXT } from "../consta
 import { RecipeCard, SOP, StrategyReport, ImplementationGuide, MenuItem, MenuGenerationRequest } from "../types";
 
 const getApiKey = (): string => {
-  return process.env.API_KEY || '';
+  // Priority: 1. Environment Variable (Cloud), 2. Hardcoded Fallback (Live Demo)
+  if (process.env.API_KEY) return process.env.API_KEY;
+  return 'AIzaSyB8BoSUqHHnmpkSIwpp2jI2xM2TW3IlIgA';
 };
 
 // Helper for UI components to check status

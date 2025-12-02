@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { DollarSign, ShoppingBag, Utensils, AlertTriangle, Users, Clock, TrendingUp, Activity, MapPin, Globe, Eye, UserX, UserPlus, Zap, Edit, Save, Brain, Database, ArrowRight, X, ChevronRight, Search, Mail, Phone, Calendar, Shield, ShieldCheck, Trash2, Terminal, UploadCloud, FileText, CheckCircle2, Sliders, Cpu, Layers, Loader2, BarChart3, PlusCircle, Wallet, RefreshCw, Instagram, Facebook, Megaphone, Sparkles } from 'lucide-react';
 import { StatCard } from '../components/StatCard';
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import { User, UserRole, PlanType, VisitorSession, PlanConfig, SocialStats, AppView } from '../types';
 import { authService } from '../services/authService';
 import { storageService } from '../services/storageService';
@@ -592,6 +592,14 @@ const OwnerDashboard: React.FC<{ user: User, onChangeView: (view: AppView) => vo
         return sorted.slice(-days);
     }, [salesData, timeRange]);
 
+    // Mock Projection Data for Strategy Impact
+    const impactData = [
+        { name: 'Wk 1', baseline: 42000, optimized: 43500 },
+        { name: 'Wk 2', baseline: 43000, optimized: 48000 },
+        { name: 'Wk 3', baseline: 41500, optimized: 52000 },
+        { name: 'Wk 4', baseline: 44000, optimized: 59000 },
+    ];
+
     return (
         <div className="space-y-6 animate-fade-in">
             <div className="flex justify-between items-end">
@@ -787,6 +795,80 @@ const OwnerDashboard: React.FC<{ user: User, onChangeView: (view: AppView) => vo
                                     </div>
                                 </button>
                             )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* AI Strategy Impact Section */}
+            <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm mt-6">
+                <div className="flex items-center gap-3 mb-6">
+                    <div className="p-2 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-lg">
+                        <TrendingUp size={24} />
+                    </div>
+                    <div>
+                        <h3 className="font-bold text-slate-800 dark:text-white">AI Strategy Impact Forecast</h3>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">Projected outcomes based on active strategies</p>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div className="lg:col-span-2 h-[300px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={impactData}>
+                                <defs>
+                                    <linearGradient id="colorOptimized" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
+                                        <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} opacity={0.1} />
+                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} />
+                                <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontSize: 12}} />
+                                <Tooltip 
+                                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                                />
+                                <Legend />
+                                <Area type="monotone" dataKey="baseline" name="Baseline Trend" stroke="#94a3b8" strokeWidth={2} fill="transparent" strokeDasharray="5 5" />
+                                <Area type="monotone" dataKey="optimized" name="AI Optimized" stroke="#10b981" strokeWidth={3} fill="url(#colorOptimized)" />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
+
+                    <div className="space-y-4">
+                        {/* Metric Cards */}
+                        <div className="p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
+                            <p className="text-xs font-bold text-slate-400 uppercase mb-2">Food Cost Optimization</p>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <span className="text-2xl font-bold text-slate-700 dark:text-slate-300">32%</span>
+                                    <span className="mx-2 text-slate-400">→</span>
+                                    <span className="text-2xl font-bold text-emerald-500">28%</span>
+                                </div>
+                                <div className="text-xs font-bold text-emerald-600 bg-emerald-100 dark:bg-emerald-900/30 px-2 py-1 rounded">
+                                    -4%
+                                </div>
+                            </div>
+                            <div className="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full mt-3 overflow-hidden">
+                                <div className="bg-emerald-500 h-full w-[85%]"></div>
+                            </div>
+                        </div>
+
+                        <div className="p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
+                            <p className="text-xs font-bold text-slate-400 uppercase mb-2">Projected Footfall</p>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <span className="text-2xl font-bold text-slate-700 dark:text-slate-300">85</span>
+                                    <span className="mx-2 text-slate-400">→</span>
+                                    <span className="text-2xl font-bold text-blue-500">115</span>
+                                </div>
+                                <div className="text-xs font-bold text-blue-600 bg-blue-100 dark:bg-blue-900/30 px-2 py-1 rounded">
+                                    +35%
+                                </div>
+                            </div>
+                            <div className="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full mt-3 overflow-hidden">
+                                <div className="bg-blue-500 h-full w-[70%]"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
