@@ -389,15 +389,11 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
 
     try {
         // Use Google Search Tool. 
-        // Note: When tools are used, responseSchema is NOT supported by the SDK/API rules.
-        // We must rely on the prompt to enforce JSON structure and parse it manually.
         const response = await ai.models.generateContent({
             model: 'gemini-3-pro-preview', 
             contents: prompt,
             config: { 
                 tools: [{ googleSearch: {} }],
-                // responseMimeType: 'application/json', // CANNOT USE WITH TOOLS
-                // responseSchema: RECIPE_SCHEMA,        // CANNOT USE WITH TOOLS
                 maxOutputTokens: 8192
             }
         });
@@ -581,26 +577,86 @@ export const generateImplementationPlan = async (title: string): Promise<Impleme
 
 export const generateMarketingVideo = async (images: string[], prompt: string, aspectRatio: string): Promise<string> => {
     const ai = createAIClient();
+    // Fallback if no key (Demo Mode)
     if (!ai) {
         await new Promise(r => setTimeout(r, 3000));
-        return "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"; // Placeholder
-    }
-    try {
-        // Veo requires special handling, falling back to mock for demo consistency
-        throw new Error("Video generation requires a high-tier paid API key. Mocking response.");
-    } catch (e) {
-        console.log("Fallback to mock video");
         return "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4";
+    }
+
+    try {
+        // Veo supports 16:9 or 9:16.
+        const validRatio = aspectRatio === '9:16' ? '9:16' : '16:9';
+        const key = getApiKey();
+
+        let operation = await ai.models.generateVideos({
+            model: 'veo-3.1-fast-generate-preview',
+            prompt: prompt,
+            config: {
+                numberOfVideos: 1,
+                aspectRatio: validRatio,
+                resolution: '720p'
+            }
+        });
+
+        // Poll for completion
+        let retries = 0;
+        while (!operation.done && retries < 60) { 
+            await new Promise(resolve => setTimeout(resolve, 2000)); // 2s polling
+            operation = await ai.operations.getVideosOperation({operation: operation});
+            retries++;
+        }
+
+        const uri = operation.response?.generatedVideos?.[0]?.video?.uri;
+        if (uri) {
+            // Append API Key for access as per docs
+            return `${uri}&key=${key}`;
+        }
+        throw new Error("Video generation failed to return a URI.");
+    } catch (e) {
+        console.error("Video Gen Error", e);
+        throw new Error("Failed to generate video. Note: Video generation requires a paid tier API key.");
     }
 };
 
 export const generateMarketingImage = async (prompt: string, aspectRatio: string): Promise<string> => {
     const ai = createAIClient();
+    
+    // Fallback if no key (Demo Mode)
     if (!ai) {
         await new Promise(r => setTimeout(r, 2000));
-        return "https://images.unsplash.com/photo-1546069901-ba9599a7e63c"; // Placeholder food image
+        // Return context-aware placeholders based on prompt keywords for a better demo experience
+        const p = prompt.toLowerCase();
+        if (p.includes('burger')) return "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=1000&q=80";
+        if (p.includes('pizza')) return "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=1000&q=80";
+        if (p.includes('salad')) return "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=1000&q=80";
+        if (p.includes('sushi')) return "https://images.unsplash.com/photo-1579871494447-9811cf80d66c?auto=format&fit=crop&w=1000&q=80";
+        return "https://images.unsplash.com/photo-1546069901-ba9599a7e63c"; 
     }
-    return "https://images.unsplash.com/photo-1546069901-ba9599a7e63c";
+
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-image',
+            contents: {
+                parts: [{ text: prompt }]
+            },
+            config: {
+                imageConfig: {
+                    aspectRatio: aspectRatio === '9:16' ? '9:16' : aspectRatio === '16:9' ? '16:9' : '1:1'
+                }
+            }
+        });
+
+        // Find the image part
+        for (const part of response.candidates?.[0]?.content?.parts || []) {
+            if (part.inlineData) {
+                return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+            }
+        }
+        throw new Error("No image data received from API.");
+    } catch (e) {
+        console.error("Image Gen Error", e);
+        throw new Error("Failed to generate image. Please try again or check your API key.");
+    }
 };
 
 export const generateKitchenWorkflow = async (description: string): Promise<string> => {
