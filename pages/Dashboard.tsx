@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { DollarSign, ShoppingBag, Utensils, AlertTriangle, Users, Clock, TrendingUp, Activity, MapPin, Globe, Eye, UserX, UserPlus, Zap, Edit, Save, Brain, Database, ArrowRight, X, ChevronRight, Search, Mail, Phone, Calendar, Shield, ShieldCheck, Trash2, Terminal, UploadCloud, FileText, CheckCircle2, Sliders, Cpu, Layers, Loader2, BarChart3, PlusCircle, Wallet, RefreshCw, Instagram, Facebook, Megaphone, Sparkles, Target, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { StatCard } from '../components/StatCard';
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ComposedChart, Line, Bar } from 'recharts';
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ComposedChart, Line, Bar, Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis } from 'recharts';
 import { User, UserRole, PlanType, VisitorSession, PlanConfig, SocialStats, AppView } from '../types';
 import { authService } from '../services/authService';
 import { storageService } from '../services/storageService';
@@ -19,6 +20,14 @@ const MOCK_STRATEGY_IMPACT = [
     { name: 'Week 2', revenue_base: 43000, revenue_ai: 49500, footfall_base: 125, footfall_ai: 148 },
     { name: 'Week 3', revenue_base: 41500, revenue_ai: 52000, footfall_base: 118, footfall_ai: 155 },
     { name: 'Week 4', revenue_base: 44000, revenue_ai: 58000, footfall_base: 130, footfall_ai: 175 },
+];
+
+const MOCK_RADAR_DATA = [
+    { subject: 'Revenue', A: 100, B: 135, fullMark: 150 },
+    { subject: 'Cost Efficiency', A: 90, B: 130, fullMark: 150 },
+    { subject: 'Footfall', A: 85, B: 125, fullMark: 150 },
+    { subject: 'Retention', A: 95, B: 110, fullMark: 150 },
+    { subject: 'Menu Health', A: 80, B: 140, fullMark: 150 },
 ];
 
 // Sub-component for Journey Visualization
@@ -624,7 +633,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onChangeView }) => {
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     {/* Forecast Chart */}
-                    <div className="lg:col-span-2 h-[300px]">
+                    <div className="lg:col-span-2 h-[350px]">
                         <ResponsiveContainer width="100%" height="100%">
                             <ComposedChart data={MOCK_STRATEGY_IMPACT}>
                                 <defs>
@@ -706,38 +715,42 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onChangeView }) => {
                     </div>
 
                     {/* Impact Metrics Side Panel */}
-                    <div className="space-y-4">
-                        <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl border border-emerald-100 dark:border-emerald-800">
-                            <p className="text-xs font-bold text-emerald-800 dark:text-emerald-400 uppercase tracking-wide mb-1">Projected Revenue Lift</p>
-                            <div className="flex items-end gap-2">
-                                <span className="text-2xl font-black text-emerald-700 dark:text-emerald-300">+₹58,500</span>
-                                <span className="text-sm font-bold text-emerald-600 mb-1 flex items-center">
-                                    <ArrowUpRight size={16} /> 12.4%
-                                </span>
-                            </div>
-                            <p className="text-xs text-emerald-600/80 dark:text-emerald-400/70 mt-2">vs. Baseline projection over 4 weeks</p>
+                    <div className="space-y-4 flex flex-col h-full">
+                        {/* Radar Chart for Health Score */}
+                        <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-2 border border-slate-100 dark:border-slate-700 flex-1 relative min-h-[200px]">
+                            <p className="absolute top-2 left-3 text-xs font-bold text-slate-500 uppercase tracking-wide z-10">Operational Health Score</p>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <RadarChart cx="50%" cy="50%" outerRadius="65%" data={MOCK_RADAR_DATA}>
+                                    <PolarGrid stroke="#e2e8f0" opacity={0.5} />
+                                    <PolarAngleAxis dataKey="subject" tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                                    <PolarRadiusAxis angle={30} domain={[0, 150]} tick={false} axisLine={false} />
+                                    <Radar name="Current" dataKey="A" stroke="#94a3b8" fill="#94a3b8" fillOpacity={0.3} />
+                                    <Radar name="AI Target" dataKey="B" stroke="#10b981" fill="#10b981" fillOpacity={0.4} />
+                                    <Legend wrapperStyle={{ fontSize: '10px', marginTop: '10px' }} />
+                                    <Tooltip 
+                                        contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#fff', fontSize: '12px' }}
+                                        itemStyle={{ color: '#fff' }}
+                                    />
+                                </RadarChart>
+                            </ResponsiveContainer>
                         </div>
 
-                        <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-800">
-                            <p className="text-xs font-bold text-blue-800 dark:text-blue-400 uppercase tracking-wide mb-1">Food Cost Optimization</p>
-                            <div className="flex items-end gap-2">
-                                <span className="text-2xl font-black text-blue-700 dark:text-blue-300">32% → 27%</span>
-                                <span className="text-sm font-bold text-blue-600 mb-1 flex items-center">
-                                    <ArrowDownRight size={16} /> 5%
-                                </span>
+                        {/* Quick Stats */}
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-100 dark:border-emerald-800">
+                                <p className="text-[10px] font-bold text-emerald-800 dark:text-emerald-400 uppercase mb-1">Rev Lift</p>
+                                <div className="flex items-center gap-1">
+                                    <span className="text-lg font-black text-emerald-700 dark:text-emerald-300">+12%</span>
+                                    <ArrowUpRight size={14} className="text-emerald-600" />
+                                </div>
                             </div>
-                            <p className="text-xs text-blue-600/80 dark:text-blue-400/70 mt-2">Reduction through smart sourcing</p>
-                        </div>
-
-                        <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-100 dark:border-amber-800">
-                            <p className="text-xs font-bold text-amber-800 dark:text-amber-400 uppercase tracking-wide mb-1">Footfall Increase</p>
-                            <div className="flex items-end gap-2">
-                                <span className="text-2xl font-black text-amber-700 dark:text-amber-300">+145</span>
-                                <span className="text-sm font-bold text-amber-600 mb-1 flex items-center">
-                                    <Target size={16} /> Visits
-                                </span>
+                            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800">
+                                <p className="text-[10px] font-bold text-blue-800 dark:text-blue-400 uppercase mb-1">Cost Save</p>
+                                <div className="flex items-center gap-1">
+                                    <span className="text-lg font-black text-blue-700 dark:text-blue-300">5%</span>
+                                    <ArrowDownRight size={14} className="text-blue-600" />
+                                </div>
                             </div>
-                            <p className="text-xs text-amber-600/80 dark:text-amber-400/70 mt-2">Driven by weekend marketing campaigns</p>
                         </div>
                     </div>
                 </div>

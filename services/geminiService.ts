@@ -1,5 +1,5 @@
 
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { SYSTEM_INSTRUCTION, MARKDOWN_INSTRUCTION, APP_CONTEXT } from "../constants";
 import { RecipeCard, SOP, StrategyReport, ImplementationGuide, MenuItem, MenuGenerationRequest } from "../types";
 
@@ -19,24 +19,31 @@ const generateMockRecipe = (item: MenuItem, requirements: string): RecipeCard =>
     const mockIngredients = [];
     
     if (nameLower.includes('chicken') || nameLower.includes('murgh')) {
-        mockIngredients.push({ name: "Chicken Breast", qty: "200g", qty_per_serving: 200, cost_per_unit: 250, unit: "kg", cost_per_serving: 50 });
-        mockIngredients.push({ name: "Ginger Garlic Paste", qty: "1 tbsp", qty_per_serving: 15, cost_per_unit: 100, unit: "kg", cost_per_serving: 1.5 });
+        mockIngredients.push({ name: "Chicken Breast (Boneless)", qty: "200g", qty_per_serving: 0.2, cost_per_unit: 250, unit: "kg", cost_per_serving: 50 });
+        mockIngredients.push({ name: "Ginger Garlic Paste", qty: "1 tbsp", qty_per_serving: 0.015, cost_per_unit: 100, unit: "kg", cost_per_serving: 1.5 });
+        mockIngredients.push({ name: "Greek Yogurt (Thick)", qty: "50g", qty_per_serving: 0.05, cost_per_unit: 120, unit: "kg", cost_per_serving: 6 });
+        mockIngredients.push({ name: "Lemon Juice", qty: "10ml", qty_per_serving: 0.01, cost_per_unit: 80, unit: "l", cost_per_serving: 0.8 });
     } else if (nameLower.includes('paneer') || nameLower.includes('cottage cheese')) {
-        mockIngredients.push({ name: "Malai Paneer", qty: "150g", qty_per_serving: 150, cost_per_unit: 350, unit: "kg", cost_per_serving: 52.5 });
+        mockIngredients.push({ name: "Malai Paneer", qty: "180g", qty_per_serving: 0.18, cost_per_unit: 350, unit: "kg", cost_per_serving: 63 });
+        mockIngredients.push({ name: "Cashew Paste", qty: "30g", qty_per_serving: 0.03, cost_per_unit: 800, unit: "kg", cost_per_serving: 24 });
+        mockIngredients.push({ name: "Fresh Cream", qty: "40ml", qty_per_serving: 0.04, cost_per_unit: 200, unit: "l", cost_per_serving: 8 });
     } else if (nameLower.includes('rice') || nameLower.includes('biryani')) {
-        mockIngredients.push({ name: "Basmati Rice", qty: "150g", qty_per_serving: 150, cost_per_unit: 90, unit: "kg", cost_per_serving: 13.5 });
-        mockIngredients.push({ name: "Saffron Water", qty: "10ml", qty_per_serving: 10, cost_per_unit: 5000, unit: "l", cost_per_serving: 5 });
+        mockIngredients.push({ name: "Basmati Rice (Aged)", qty: "150g", qty_per_serving: 0.15, cost_per_unit: 110, unit: "kg", cost_per_serving: 16.5 });
+        mockIngredients.push({ name: "Saffron Strands", qty: "0.1g", qty_per_serving: 0.0001, cost_per_unit: 250000, unit: "kg", cost_per_serving: 25 });
+        mockIngredients.push({ name: "Ghee", qty: "20g", qty_per_serving: 0.02, cost_per_unit: 600, unit: "kg", cost_per_serving: 12 });
     } else if (isDrink) {
-        mockIngredients.push({ name: "Base Liquid (Milk/Water)", qty: "200ml", qty_per_serving: 200, cost_per_unit: 60, unit: "l", cost_per_serving: 12 });
-        mockIngredients.push({ name: "Flavor Syrup", qty: "30ml", qty_per_serving: 30, cost_per_unit: 400, unit: "l", cost_per_serving: 12 });
+        mockIngredients.push({ name: "Base Liquid (Milk/Water)", qty: "200ml", qty_per_serving: 0.2, cost_per_unit: 60, unit: "l", cost_per_serving: 12 });
+        mockIngredients.push({ name: "Flavor Syrup", qty: "30ml", qty_per_serving: 0.03, cost_per_unit: 400, unit: "l", cost_per_serving: 12 });
+        mockIngredients.push({ name: "Ice Cubes", qty: "100g", qty_per_serving: 0.1, cost_per_unit: 5, unit: "kg", cost_per_serving: 0.5 });
     } else {
         // Generic Base
-        mockIngredients.push({ name: `Main Ingredient for ${baseName}`, qty: "150g", qty_per_serving: 150, cost_per_unit: 200, unit: "kg", cost_per_serving: 30 });
+        mockIngredients.push({ name: `Main Protein/Veg for ${baseName}`, qty: "150g", qty_per_serving: 0.15, cost_per_unit: 200, unit: "kg", cost_per_serving: 30 });
     }
 
-    // Add common items
-    mockIngredients.push({ name: "Seasoning / Spices", qty: "10g", qty_per_serving: 10, cost_per_unit: 500, unit: "kg", cost_per_serving: 5 });
-    mockIngredients.push({ name: "Oil / Butter", qty: "15ml", qty_per_serving: 15, cost_per_unit: 150, unit: "l", cost_per_serving: 2.25 });
+    // Add common complex items
+    mockIngredients.push({ name: "Special Spice Blend", qty: "10g", qty_per_serving: 0.01, cost_per_unit: 800, unit: "kg", cost_per_serving: 8 });
+    mockIngredients.push({ name: "Cooking Oil", qty: "20ml", qty_per_serving: 0.02, cost_per_unit: 160, unit: "l", cost_per_serving: 3.2 });
+    mockIngredients.push({ name: "Fresh Garnish (Cilantro/Microgreens)", qty: "5g", qty_per_serving: 0.005, cost_per_unit: 300, unit: "kg", cost_per_serving: 1.5 });
 
     const totalCost = mockIngredients.reduce((acc, curr) => acc + (curr.cost_per_serving || 0), 0);
 
@@ -44,27 +51,31 @@ const generateMockRecipe = (item: MenuItem, requirements: string): RecipeCard =>
         sku_id: item.sku_id || `MOCK-${Date.now().toString().substr(-4)}`,
         name: baseName,
         category: item.category,
-        prep_time_min: item.prep_time_min || 20,
+        prep_time_min: item.prep_time_min || 35,
         current_price: item.current_price || 0,
         ingredients: mockIngredients.map((i, idx) => ({ ...i, ingredient_id: `m_${Date.now()}_${idx}` })),
         yield: 1,
         preparation_steps: [
-            `Mise en place: Gather all ingredients for ${baseName}.`,
-            `Prepare the ${mockIngredients[0].name} by cleaning and chopping as required.`,
-            `Heat the ${mockIngredients[2].name} in a pan/pot.`,
-            `Combine ingredients and cook according to ${isDrink ? 'beverage' : 'standard'} cuisine standards.`,
-            "Check seasoning and adjust if necessary.",
-            "Plate and garnish before serving."
+            `Mise en place: Gather all ingredients for ${baseName}. Ensure work station is sanitized.`,
+            `Prepare the main ingredient by cleaning and cutting to uniform size. Marinate if required for 20 mins.`,
+            `Heat the cooking vessel to medium-high heat. Add oil/butter once hot.`,
+            `Sauté aromatics (onions, garlic, ginger) until golden brown and fragrant.`,
+            `Add the main ingredient and sear to lock in juices.`,
+            `Incorporate spices and liquids. Simmer on low heat to develop flavor depth.`,
+            `Check for doneness using a probe thermometer or visual cues.`,
+            `Adjust seasoning with salt, pepper, or acidity as needed.`,
+            `Rest the dish for 5 minutes before plating to allow flavors to settle.`,
+            "Garnish freshly and serve immediately at the correct temperature."
         ],
-        equipment_needed: ["Chef Knife", "Mixing Bowl", isDrink ? "Blender/Shaker" : "Pan/Oven"],
-        portioning_guideline: isDrink ? "300ml Glass" : "Standard Dinner Plate",
-        allergens: ["Check Ingredients"],
+        equipment_needed: ["Chef Knife", "Cutting Board", "Heavy Bottom Pan", "Mixing Bowls", "Tongs/Spatula", "Thermometer"],
+        portioning_guideline: isDrink ? "350ml Glass" : "Standard 28cm Dinner Plate, centered presentation",
+        allergens: ["Check Ingredients", "Dairy", "Nuts (if used)"],
         shelf_life_hours: 24,
         food_cost_per_serving: totalCost,
         suggested_selling_price: Math.ceil(totalCost / 0.30), // 30% Food Cost Model
-        tags: ["Auto-Generated", "Draft"],
-        human_summary: `A generated recipe card for ${baseName}. Ingredients and costs are estimated based on standard kitchen data.`,
-        reasoning: "Generated using BistroIntelligence Engine (Dev Mode). Key ingredients selected for flavor balance and cost efficiency.",
+        tags: ["Auto-Generated", "Draft", "Detailed"],
+        human_summary: `A comprehensive generated recipe for ${baseName}. This card includes detailed costing estimations and professional preparation steps suitable for kitchen staff training.`,
+        reasoning: "Generated using BistroIntelligence Mock Engine. Ingredients selected based on standard culinary pairings for this dish type.",
         confidence: "Medium"
     };
 };
@@ -217,6 +228,46 @@ const createAIClient = () => {
 
 // --- SERVICES ---
 
+const RECIPE_SCHEMA: Schema = {
+  type: Type.OBJECT,
+  properties: {
+    sku_id: { type: Type.STRING },
+    name: { type: Type.STRING },
+    category: { type: Type.STRING },
+    prep_time_min: { type: Type.NUMBER },
+    current_price: { type: Type.NUMBER },
+    ingredients: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          ingredient_id: { type: Type.STRING },
+          name: { type: Type.STRING },
+          qty: { type: Type.STRING },
+          qty_per_serving: { type: Type.NUMBER },
+          cost_per_unit: { type: Type.NUMBER },
+          unit: { type: Type.STRING },
+          cost_per_serving: { type: Type.NUMBER }
+        },
+        required: ["name", "qty", "unit"]
+      }
+    },
+    yield: { type: Type.NUMBER },
+    preparation_steps: { type: Type.ARRAY, items: { type: Type.STRING } },
+    equipment_needed: { type: Type.ARRAY, items: { type: Type.STRING } },
+    portioning_guideline: { type: Type.STRING },
+    allergens: { type: Type.ARRAY, items: { type: Type.STRING } },
+    shelf_life_hours: { type: Type.NUMBER },
+    food_cost_per_serving: { type: Type.NUMBER },
+    suggested_selling_price: { type: Type.NUMBER },
+    tags: { type: Type.ARRAY, items: { type: Type.STRING } },
+    human_summary: { type: Type.STRING },
+    reasoning: { type: Type.STRING },
+    confidence: { type: Type.STRING }
+  },
+  required: ["name", "ingredients", "preparation_steps", "food_cost_per_serving", "suggested_selling_price"]
+};
+
 export const verifyLocationWithMaps = async (locationQuery: string): Promise<string> => {
   const ai = createAIClient();
   if (!ai) return "Mock Verified: " + locationQuery; // Mock
@@ -272,29 +323,6 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
         return generateMockRecipe(item, requirements);
     }
 
-    const jsonTemplate = `{
-        "sku_id": "${item.sku_id || 'generated'}",
-        "name": "Dish Name",
-        "category": "main",
-        "prep_time_min": 15,
-        "current_price": 0,
-        "ingredients": [
-            { "name": "Ingredient Name", "qty": "100g", "qty_per_serving": 100, "cost_per_unit": 50, "unit": "g", "cost_per_serving": 5 }
-        ],
-        "yield": 1,
-        "preparation_steps": ["Step 1", "Step 2"],
-        "equipment_needed": ["Pan", "Knife"],
-        "portioning_guideline": "Serving size description",
-        "allergens": ["List allergens"],
-        "shelf_life_hours": 24,
-        "food_cost_per_serving": 0,
-        "suggested_selling_price": 0,
-        "tags": ["Tag1", "Tag2"],
-        "human_summary": "A brief description...",
-        "reasoning": "Why this recipe works...",
-        "confidence": "High"
-    }`;
-
     const prompt = `
     Role: ${chefPersona}
     Task: Generate a HIGHLY DETAILED and professional recipe card for "${item.name}". 
@@ -308,21 +336,29 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
     4. PRICING: Suggested Selling Price should be calculated based on a 30% Food Cost model (Cost * 3.3).
     5. REASONING: Explain the culinary logic behind key ingredient choices or techniques used (e.g. "Acid added to balance richness").
     
-    IMPORTANT: Return ONLY valid JSON matching this structure:
-    ${jsonTemplate}
-    Do not add markdown formatting.
+    IMPORTANT: Provide a complete JSON response matching the schema. Do not truncate.
     `;
 
     try {
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
-            config: { responseMimeType: 'application/json' }
+            config: { 
+                responseMimeType: 'application/json',
+                responseSchema: RECIPE_SCHEMA,
+                maxOutputTokens: 8192
+            }
         });
-        return cleanAndParseJSON<RecipeCard>(response.text);
+        
+        // When using responseSchema, response.text is already a valid JSON string
+        const parsed = JSON.parse(response.text || '{}');
+        // Ensure SKU if missing
+        if (!parsed.sku_id) parsed.sku_id = `AI-${Date.now().toString().slice(-6)}`;
+        return parsed as RecipeCard;
+
     } catch (e) {
         console.error("AI Generation Failed, falling back to mock:", e);
-        // Fallback to robust mock if API fails (e.g. Permission Denied)
+        // Fallback to robust mock if API fails (e.g. Permission Denied or Parse Error)
         return generateMockRecipe(item, requirements);
     }
 };
@@ -343,9 +379,14 @@ export const generateRecipeVariation = async (userId: string, original: RecipeCa
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
-            config: { responseMimeType: 'application/json' }
+            config: { 
+                responseMimeType: 'application/json',
+                responseSchema: RECIPE_SCHEMA,
+                maxOutputTokens: 8192 
+            }
         });
-        return cleanAndParseJSON<RecipeCard>(response.text);
+        const parsed = JSON.parse(response.text || '{}');
+        return parsed as RecipeCard;
     } catch (e) {
         console.error(e);
         return { ...original, name: `${original.name} (${variationType} - Mock)`, tags: [...(original.tags||[]), "Generated"] };
@@ -365,9 +406,14 @@ export const substituteIngredient = async (recipe: RecipeCard, ingredientName: s
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
-            config: { responseMimeType: 'application/json' }
+            config: { 
+                responseMimeType: 'application/json',
+                responseSchema: RECIPE_SCHEMA, // Reuse schema for consistency
+                maxOutputTokens: 8192
+            }
         });
-        return cleanAndParseJSON<RecipeCard>(response.text);
+        const parsed = JSON.parse(response.text || '{}');
+        return parsed as RecipeCard;
     } catch (e) {
         console.error(e);
         // Fallback Mock Logic

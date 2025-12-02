@@ -150,34 +150,42 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
 
   const savingsAnalysis = useMemo(() => {
       if (!generatedRecipe) return null;
-      let projectedCost = 0;
-      let hasChanges = false;
-      generatedRecipe.ingredients.forEach((ing, idx) => {
-          const qty = ing.qty_per_serving || 0;
-          const originalRate = ing.cost_per_unit || 0;
-          const userRate = altPrices[idx] ? parseFloat(altPrices[idx]) : originalRate;
-          if (altPrices[idx]) hasChanges = true;
-          projectedCost += (qty * userRate); // Assuming rate is per unit, calculation depends on unit normalization which AI handles mostly
-          // To be precise: cost_per_serving is usually pre-calc by AI. If we change unit cost, we scale it.
-          // New Cost = (User Rate / Old Rate) * Old Cost Per Serving.
-          // This avoids unit conversion complexity here.
-          // If old rate is 0 or null, we can't scale easily without standardizing.
-      });
       
-      // Better approach for display: Recalculate totals
+      let totalOriginalCost = generatedRecipe.food_cost_per_serving;
       let totalNewCost = 0;
+      let hasChanges = false;
+
       generatedRecipe.ingredients.forEach((ing, idx) => {
-          const originalCost = ing.cost_per_serving || 0;
-          const originalRate = ing.cost_per_unit || 1;
-          const userRate = altPrices[idx] ? parseFloat(altPrices[idx]) : originalRate;
-          // Simple ratio adjustment
-          totalNewCost += (userRate / originalRate) * originalCost;
+          const originalCostServing = ing.cost_per_serving || 0;
+          const originalRate = ing.cost_per_unit || 0;
+          
+          let userRate = originalRate;
+          if (altPrices[idx] && !isNaN(parseFloat(altPrices[idx]))) {
+              userRate = parseFloat(altPrices[idx]);
+              hasChanges = true;
+          }
+
+          // Calculate new cost per serving based on rate change ratio
+          // If original rate is 0, we can't ratio it. Assume 0 cost unless user provides rate, then we need qty.
+          if (originalRate > 0) {
+              totalNewCost += (userRate / originalRate) * originalCostServing;
+          } else {
+              // Fallback if original rate missing but we have user rate and qty
+              // This is tricky without standardized units, but usually AI gives cost/serving.
+              totalNewCost += originalCostServing; // No change if we can't calc
+          }
       });
 
-      const originalCost = generatedRecipe.food_cost_per_serving;
-      const savings = originalCost - totalNewCost;
-      const savingsPct = originalCost > 0 ? (savings / originalCost) * 100 : 0;
-      return { projectedCost: totalNewCost, savings, savingsPct, hasChanges };
+      const savings = totalOriginalCost - totalNewCost;
+      const savingsPct = totalOriginalCost > 0 ? (savings / totalOriginalCost) * 100 : 0;
+      
+      return { 
+          originalCost: totalOriginalCost,
+          projectedCost: totalNewCost, 
+          savings, 
+          savingsPct, 
+          hasChanges 
+      };
   }, [generatedRecipe, altPrices]);
 
   const checkCredits = (): boolean => {
@@ -316,14 +324,8 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       const ingredients: Ingredient[] = manualIngredients.map((ing, idx) => {
           const qtyNum = parseFloat(ing.qty) || 0;
           const costNum = parseFloat(ing.costPerUnit) || 0;
-          // Simple logic: qty * cost per unit? Assuming unit matches.
-          // For improved accuracy, we'd need density conversion, but for manual entry we assume direct correlation
-          // E.g. 100g * (50/1000g) if cost is per Kg. 
-          // Let's assume user inputs Cost per Unit MATCHING the Qty Unit for simplicity in manual mode unless strictly defined.
-          // OR, typically users know "Cost per Kg".
           
           let costPerServing = 0;
-          // Heuristic: If unit is g/ml and cost is likely per Kg/L
           if (['g', 'ml'].includes(ing.unit.toLowerCase()) && costNum > 10) {
                costPerServing = (qtyNum / 1000) * costNum;
           } else {
@@ -521,7 +523,6 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
         </div>
       </div>
 
-      {/* Render Lists/Queues omitted for brevity, logic remains same */}
       {viewMode === 'saved' && (
           <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col flex-1 animate-fade-in transition-colors">
               <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
@@ -682,7 +683,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                               </div>
                               
                               {/* Detailed Costing Breakdown */}
-                              <div className="grid grid-cols-3 border-b border-slate-100 dark:border-slate-700 text-center">
+                              <div className="grid grid-cols-3 border-b border-slate-100 dark:border-slate-700 text-center bg-slate-50/50 dark:bg-slate-800/50">
                                   <div className="p-4 border-r border-slate-100 dark:border-slate-700">
                                       <p className="text-xs text-slate-500 dark:text-slate-400 uppercase font-bold">Food Cost</p>
                                       <p className="text-xl font-bold text-slate-800 dark:text-white">₹{generatedRecipe.food_cost_per_serving.toFixed(2)}</p>
@@ -700,34 +701,95 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                       </p>
                                   </div>
                               </div>
+
+                              {savingsAnalysis && savingsAnalysis.hasChanges && (
+                                  <div className="mx-8 mt-6 p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800 rounded-xl flex items-center justify-between animate-fade-in">
+                                      <div>
+                                          <p className="text-xs font-bold text-emerald-800 dark:text-emerald-400 uppercase tracking-wide">Projected Savings</p>
+                                          <div className="flex items-baseline gap-2">
+                                              <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                                                  ₹{savingsAnalysis.savings.toFixed(2)}
+                                              </p>
+                                              <span className="text-sm font-bold text-emerald-600">
+                                                  ({savingsAnalysis.savingsPct.toFixed(1)}%)
+                                              </span>
+                                          </div>
+                                          <p className="text-xs text-slate-500 mt-1">
+                                              New Food Cost: <span className="font-bold text-slate-700 dark:text-slate-300">₹{savingsAnalysis.projectedCost.toFixed(2)}</span>
+                                          </p>
+                                      </div>
+                                      <div className="text-right">
+                                           <p className="text-xs text-slate-500">Margin Impact</p>
+                                           <p className="text-lg font-bold text-emerald-600">
+                                               +₹{savingsAnalysis.savings.toFixed(2)} / plate
+                                           </p>
+                                      </div>
+                                  </div>
+                              )}
                               
                               <div className="p-8 border-b border-slate-100 dark:border-slate-700">
-                                  <h3 className="font-bold text-slate-800 dark:text-white mb-4">Ingredients</h3>
-                                  {generatedRecipe.ingredients.map((ing, i) => (
-                                      <div key={i} className="flex justify-between items-center text-sm py-2 border-b border-slate-50 dark:border-slate-800 group">
-                                          <span>{ing.name} ({ing.qty_per_serving?.toFixed(1) || ing.qty} {ing.unit})</span>
-                                          <div className="flex items-center gap-4">
-                                              <span className="font-bold text-slate-600 dark:text-slate-400">₹{(ing.cost_per_unit || 0).toFixed(2)}/{ing.unit}</span>
-                                              <input type="number" placeholder="My Price" className="w-16 text-right border rounded px-1 text-xs dark:bg-slate-800 dark:border-slate-600 dark:text-white" value={altPrices[i] || ''} onChange={(e) => setAltPrices({...altPrices, [i]: e.target.value})} />
-                                              <button 
-                                                onClick={() => handleIngredientSwap(i)}
-                                                className={`p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-400 hover:text-emerald-600 transition-all ${swappingIndex === i ? 'animate-spin text-emerald-600' : 'opacity-0 group-hover:opacity-100'}`}
-                                                title="Find Substitute"
-                                              >
-                                                  {swappingIndex === i ? <Loader2 size={14} /> : <ArrowLeftRight size={14} />}
-                                              </button>
-                                          </div>
-                                      </div>
-                                  ))}
-                                  <div className="mt-4 flex justify-between items-center">
-                                      {savingsAnalysis && savingsAnalysis.hasChanges && (
-                                          <div className="p-2 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-400 rounded text-sm font-bold border border-emerald-100 dark:border-emerald-800">
-                                              Potential Savings: ₹{Math.abs(savingsAnalysis.savings).toFixed(2)}
-                                          </div>
-                                      )}
-                                      <button onClick={handleSuggestSupplierPrices} className="text-xs font-bold text-blue-600 hover:underline ml-auto">
-                                          Suggest Cheaper Prices
+                                  <div className="flex justify-between items-center mb-4">
+                                      <h3 className="font-bold text-slate-800 dark:text-white">Ingredients & Costing</h3>
+                                      <button onClick={handleSuggestSupplierPrices} className="text-xs font-bold text-blue-600 hover:underline flex items-center gap-1">
+                                          <Sparkles size={12} /> Suggest Cheaper Prices
                                       </button>
+                                  </div>
+                                  
+                                  {/* Table Header */}
+                                  <div className="grid grid-cols-12 text-xs font-bold text-slate-400 uppercase mb-2 px-2">
+                                      <div className="col-span-5">Item</div>
+                                      <div className="col-span-2 text-right">Mkt Rate</div>
+                                      <div className="col-span-3 text-right">Your Rate</div>
+                                      <div className="col-span-2 text-right">Variance</div>
+                                  </div>
+
+                                  <div className="space-y-1">
+                                      {generatedRecipe.ingredients.map((ing, i) => {
+                                          const originalRate = ing.cost_per_unit || 0;
+                                          const userRate = altPrices[i] ? parseFloat(altPrices[i]) : originalRate;
+                                          const variance = originalRate > 0 ? ((originalRate - userRate) / originalRate) * 100 : 0;
+                                          const isCheaper = userRate < originalRate;
+                                          
+                                          return (
+                                              <div key={i} className="grid grid-cols-12 items-center text-sm py-3 px-2 border-b border-slate-50 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg group transition-colors">
+                                                  <div className="col-span-5 pr-2">
+                                                      <p className="font-medium text-slate-700 dark:text-slate-200 truncate">{ing.name}</p>
+                                                      <p className="text-xs text-slate-400">{ing.qty_per_serving?.toFixed(1) || ing.qty} {ing.unit}</p>
+                                                  </div>
+                                                  <div className="col-span-2 text-right text-slate-500 dark:text-slate-400 font-mono text-xs">
+                                                      ₹{originalRate.toFixed(0)}
+                                                  </div>
+                                                  <div className="col-span-3 flex justify-end">
+                                                      <div className="relative">
+                                                          <span className="absolute left-2 top-1.5 text-xs text-slate-400">₹</span>
+                                                          <input 
+                                                              type="number" 
+                                                              className={`w-20 pl-4 pr-1 py-1 text-right text-xs border rounded focus:ring-1 focus:ring-emerald-500 outline-none transition-all ${
+                                                                  altPrices[i] ? 'border-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300' : 'border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-900 dark:text-white'
+                                                              }`}
+                                                              placeholder={originalRate.toFixed(0)}
+                                                              value={altPrices[i] || ''} 
+                                                              onChange={(e) => setAltPrices({...altPrices, [i]: e.target.value})} 
+                                                          />
+                                                      </div>
+                                                  </div>
+                                                  <div className="col-span-2 flex justify-end items-center gap-2">
+                                                      {altPrices[i] && (
+                                                          <span className={`text-xs font-bold ${isCheaper ? 'text-emerald-500' : 'text-red-500'}`}>
+                                                              {isCheaper ? '▼' : '▲'} {Math.abs(variance).toFixed(0)}%
+                                                          </span>
+                                                      )}
+                                                      <button 
+                                                          onClick={() => handleIngredientSwap(i)}
+                                                          className={`p-1.5 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-emerald-600 transition-all opacity-0 group-hover:opacity-100 ${swappingIndex === i ? 'opacity-100' : ''}`}
+                                                          title="Find Substitute"
+                                                      >
+                                                          {swappingIndex === i ? <Loader2 size={14} className="animate-spin"/> : <ArrowLeftRight size={14} />}
+                                                      </button>
+                                                  </div>
+                                              </div>
+                                          );
+                                      })}
                                   </div>
                               </div>
 
