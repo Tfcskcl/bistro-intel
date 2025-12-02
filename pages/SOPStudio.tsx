@@ -221,9 +221,23 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
                  </div>
 
                  {error && (
-                    <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm rounded-lg flex items-center gap-2">
-                        <AlertCircle size={16} />
-                        {error}
+                    <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm rounded-lg flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                            <AlertCircle size={16} /> {error}
+                        </div>
+                        {(error.includes('API Key') || error.includes('configure') || error.includes('unauthenticated')) && (
+                             <button 
+                                onClick={async () => {
+                                    if ((window as any).aistudio) {
+                                        await (window as any).aistudio.openSelectKey();
+                                        setError(null);
+                                    }
+                                }}
+                                className="px-3 py-1 bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-200 text-xs font-bold rounded hover:bg-red-200 dark:hover:bg-red-700 transition-colors"
+                             >
+                                Connect Key
+                             </button>
+                        )}
                     </div>
                  )}
 

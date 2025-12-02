@@ -4,7 +4,7 @@ import { PLANS, CREDIT_COSTS } from '../constants';
 import { generateRecipeCard, generateRecipeVariation } from '../services/geminiService';
 import { ingredientService } from '../services/ingredientService';
 import { RecipeCard, MenuItem, User, UserRole, POSChangeRequest, RecipeRequest } from '../types';
-import { Loader2, ChefHat, Scale, Clock, AlertCircle, Upload, Lock, Sparkles, Check, Save, RefreshCw, Search, Plus, Store, Zap, Trash2, Building2, FileSignature, X, AlignLeft, UtensilsCrossed, Inbox, UserCheck, CheckCircle2, Clock3, Carrot, Type, Wallet, Filter, Tag, Eye, Flame, Wand2, Eraser, FileDown, TrendingDown, ArrowRight } from 'lucide-react';
+import { Loader2, ChefHat, Scale, Clock, AlertCircle, Upload, Lock, Sparkles, Check, Save, RefreshCw, Search, Plus, Store, Zap, Trash2, Building2, FileSignature, X, AlignLeft, UtensilsCrossed, Inbox, UserCheck, CheckCircle2, Clock3, Carrot, Type, Wallet, Filter, Tag, Eye, Flame, Wand2, Eraser, FileDown, TrendingDown, ArrowRight, Key } from 'lucide-react';
 import { storageService } from '../services/storageService';
 import { authService } from '../services/authService';
 
@@ -609,6 +609,20 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       }
   };
 
+  const handleConnectKey = async () => {
+      if ((window as any).aistudio) {
+          try {
+              await (window as any).aistudio.openSelectKey();
+              // Clear error to allow retry
+              setError(null);
+          } catch (e) {
+              console.error(e);
+          }
+      } else {
+          alert("API Key configuration is only available in the AI Studio environment.");
+      }
+  };
+
   return (
     <div className="h-[calc(100vh-6rem)] flex flex-col gap-4 relative">
       {/* Request Preview Modal (Admin Only) */}
@@ -1116,7 +1130,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                                                 <span className="text-slate-400 mr-1 text-xs">₹</span>
                                                                 <input 
                                                                     type="number" 
-                                                                    min="0"
+                                                                    min="0" 
                                                                     step="0.01"
                                                                     className="w-20 px-2 py-1 text-right text-xs border border-slate-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 text-slate-800 dark:text-white focus:ring-1 focus:ring-blue-500 outline-none"
                                                                     placeholder={ing.cost_per_unit?.toString()}
@@ -1338,8 +1352,23 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                 </div>
                                 
                                 {error && (
-                                    <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm rounded-lg flex items-center gap-2">
-                                        <AlertCircle size={16} /> {error}
+                                    <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm rounded-lg flex items-center justify-between gap-2">
+                                        <div className="flex items-center gap-2">
+                                            <AlertCircle size={16} /> {error}
+                                        </div>
+                                        {(error.includes('API Key') || error.includes('configure') || error.includes('unauthenticated')) && (
+                                             <button 
+                                                onClick={async () => {
+                                                    if ((window as any).aistudio) {
+                                                        await (window as any).aistudio.openSelectKey();
+                                                        setError(null);
+                                                    }
+                                                }}
+                                                className="px-3 py-1 bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-200 text-xs font-bold rounded hover:bg-red-200 dark:hover:bg-red-700 transition-colors"
+                                             >
+                                                Connect Key
+                                             </button>
+                                        )}
                                     </div>
                                 )}
 
