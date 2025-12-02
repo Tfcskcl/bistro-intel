@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { generateStrategy, generateImplementationPlan } from '../services/geminiService';
 import { StrategyReport, UserRole, User, ImplementationGuide } from '../types';
-import { Send, Loader2, User as UserIcon, Briefcase, TrendingUp, HelpCircle, Play, LifeBuoy, X, BookOpen, UserCheck, Calendar, Sparkles, Target, AlertTriangle, ArrowUpRight, ArrowDownRight, Map, PieChart as PieChartIcon, ScatterChart as ScatterChartIcon, Wallet, TrendingDown, Users, Star, CheckCircle2 } from 'lucide-react';
+import { Send, Loader2, User as UserIcon, Briefcase, TrendingUp, HelpCircle, Play, LifeBuoy, X, BookOpen, UserCheck, Calendar, Sparkles, Target, AlertTriangle, ArrowUpRight, ArrowDownRight, Map, PieChart as PieChartIcon, ScatterChart as ScatterChartIcon, Wallet, TrendingDown, Users, Star, CheckCircle2, Phone, Award } from 'lucide-react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend, ScatterChart, Scatter, ZAxis } from 'recharts';
 import { storageService } from '../services/storageService';
 import { CREDIT_COSTS } from '../constants';
@@ -12,10 +12,10 @@ interface ActionState { [key: number]: 'idle' | 'in_progress' | 'help_requested'
 const COLORS = { High: '#ef4444', Medium: '#f59e0b', Low: '#3b82f6', add: '#10b981', remove: '#ef4444' };
 
 const QUICK_PROMPTS = [
-    { title: "Reduce Food Cost", query: "Analyze my menu and suggest ways to reduce food cost by 5% without lowering quality.", icon: TrendingDown, color: "text-emerald-600 bg-emerald-100" },
-    { title: "Boost Lunch Sales", query: "Create a marketing campaign to increase weekday lunch footfall.", icon: Users, color: "text-blue-600 bg-blue-100" },
-    { title: "Staff Retention", query: "Suggest an employee incentive program to reduce turnover.", icon: UserCheck, color: "text-purple-600 bg-purple-100" },
-    { title: "Menu Engineering", query: "Identify high-margin items and suggest how to promote them.", icon: Star, color: "text-amber-600 bg-amber-100" }
+    { title: "Boost Customer Footfall", query: "Create a detailed marketing plan to increase customer footfall by 20% in the next 30 days. Focus on social media, local partnerships, and weekday promotions.", icon: Users, color: "text-blue-600 bg-blue-100" },
+    { title: "Reduce Food Cost", query: "Analyze my menu and suggest ways to reduce food cost by 5% without lowering quality. Focus on waste reduction and ingredient substitution.", icon: TrendingDown, color: "text-emerald-600 bg-emerald-100" },
+    { title: "Staff Retention", query: "Suggest an employee incentive program to reduce turnover and improve service quality.", icon: UserCheck, color: "text-purple-600 bg-purple-100" },
+    { title: "Menu Engineering", query: "Identify high-margin items and suggest how to promote them using menu psychology.", icon: Star, color: "text-amber-600 bg-amber-100" }
 ];
 
 export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
@@ -48,14 +48,26 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
     setLoading(true);
     setReport(null);
     setError(null);
+    
+    // Gather Context
+    const salesData = storageService.getSalesData(user.id);
+    const totalRev = salesData.reduce((acc: number, curr: any) => acc + curr.revenue, 0);
+    const avgRev = salesData.length ? (totalRev / salesData.length).toFixed(0) : '0';
+    const salesSummary = `Average Daily Revenue: ₹${avgRev}. Total Orders (last 30 days): ${salesData.reduce((acc: any, c: any) => acc + c.items_sold, 0)}.`;
+
     try {
-      const data = await generateStrategy(role, textToSend);
+      // Pass full user object and sales context for deep analysis
+      const data = await generateStrategy(user, textToSend, salesSummary);
       setReport(data);
     } catch (e: any) {
       setError(e.message);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleBookExpert = () => {
+      alert("Consultation request sent! A Bistro Specialist will contact you within 24 hours to discuss the implementation package.");
   };
 
   return (
@@ -77,7 +89,7 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
             <div className="text-slate-400 opacity-60 mb-8 flex flex-col items-center">
                 <TrendingUp size={48} className="mb-4" />
                 <h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-2">Bistro Strategy AI</h2>
-                <p className="text-sm text-slate-500 max-w-md text-center">Your personal consultant for operations, marketing, and menu engineering.</p>
+                <p className="text-sm text-slate-500 max-w-md text-center">Your personal consultant. I analyze your location, weather patterns, competition, and data to provide actionable advice.</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl w-full">
@@ -103,7 +115,10 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
         {loading && (
             <div className="flex flex-col justify-center items-center h-full gap-4">
                 <Loader2 className="animate-spin text-emerald-600" size={48} />
-                <p className="text-slate-500 animate-pulse font-medium">Analyzing restaurant data...</p>
+                <p className="text-slate-500 animate-pulse font-medium text-center">
+                    Analyzing market conditions in {user.location || 'your area'}...<br/>
+                    <span className="text-xs opacity-75">Checking weather, competition, and sales trends.</span>
+                </p>
             </div>
         )}
 
@@ -112,7 +127,7 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
             {/* Executive Summary */}
             <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
                 <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
-                    <Sparkles className="text-emerald-500" size={20}/> Executive Summary
+                    <Sparkles className="text-emerald-500" size={20}/> Executive Analysis
                 </h3>
                 <ul className="space-y-3">
                     {report.summary.map((s,i) => (
@@ -147,7 +162,7 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                 </div>
 
                 <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700">
-                    <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">Menu Engineering</h3>
+                    <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">Seasonal Menu Engineering</h3>
                     <div className="space-y-3">
                         {report.seasonal_menu_suggestions.map((item, i) => (
                             <div key={i} className="flex items-center justify-between p-3 border-b border-slate-100 dark:border-slate-700 last:border-0">
@@ -186,6 +201,35 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                     ))}
                 </div>
             </div>
+
+            {/* Expert Implementation Service Card */}
+            <div className="bg-gradient-to-r from-slate-900 to-slate-800 dark:from-emerald-900 dark:to-slate-900 rounded-xl p-8 flex flex-col md:flex-row items-center justify-between text-white shadow-lg">
+                <div className="mb-6 md:mb-0 md:mr-8">
+                    <div className="flex items-center gap-2 mb-2">
+                        <Award className="text-yellow-400" />
+                        <h3 className="text-xl font-bold">Bistro Expert Implementation</h3>
+                    </div>
+                    <p className="text-slate-300 text-sm max-w-lg leading-relaxed">
+                        Need help executing this strategy? Our specialists can handle the groundwork—from running the ads to training your staff on the new SOPs.
+                    </p>
+                    <div className="flex gap-4 mt-4 text-xs font-bold text-emerald-300">
+                        <span className="flex items-center gap-1"><CheckCircle2 size={12}/> Guaranteed ROI</span>
+                        <span className="flex items-center gap-1"><CheckCircle2 size={12}/> Weekly Reports</span>
+                        <span className="flex items-center gap-1"><CheckCircle2 size={12}/> On-site Support</span>
+                    </div>
+                </div>
+                <div className="text-center bg-white/10 p-6 rounded-xl border border-white/10 backdrop-blur-sm min-w-[200px]">
+                    <p className="text-xs text-slate-400 uppercase font-bold mb-1">Starting At</p>
+                    <p className="text-3xl font-bold text-white mb-4">₹5,000</p>
+                    <button 
+                        onClick={handleBookExpert}
+                        className="w-full py-2 bg-yellow-400 hover:bg-yellow-500 text-slate-900 font-bold rounded-lg transition-colors text-sm flex items-center justify-center gap-2"
+                    >
+                        <Phone size={14} /> Book Expert
+                    </button>
+                </div>
+            </div>
+
           </div>
         )}
       </div>
@@ -197,7 +241,7 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                 type="text" 
                 value={query} 
                 onChange={(e) => setQuery(e.target.value)} 
-                placeholder="Ask a custom strategic question..."
+                placeholder="Ask a custom strategic question about your business..."
                 className="w-full pl-4 pr-12 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:ring-2 focus:ring-emerald-500 outline-none dark:text-white placeholder-slate-400"
                 onKeyDown={(e) => e.key === 'Enter' && handleSend()}
               />

@@ -1,7 +1,7 @@
 
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { SYSTEM_INSTRUCTION, MARKDOWN_INSTRUCTION, APP_CONTEXT } from "../constants";
-import { RecipeCard, SOP, StrategyReport, ImplementationGuide, MenuItem, MenuGenerationRequest } from "../types";
+import { RecipeCard, SOP, StrategyReport, ImplementationGuide, MenuItem, MenuGenerationRequest, User } from "../types";
 
 // Development Key for Live Preview 
 // SECURITY NOTE: We have removed the hardcoded key to prevent exposure.
@@ -99,71 +99,51 @@ const generateMockSOP = (topic: string): SOP => {
     };
 };
 
-const generateMockStrategy = (role: string, query: string): StrategyReport => {
+const generateMockStrategy = (user: User, query: string): StrategyReport => {
     const q = query.toLowerCase();
     
-    // Smart Context Matching
+    // Smart Context Matching based on User
+    const location = user.location || "General Market";
+    
     if (q.includes('marketing') || q.includes('sale') || q.includes('footfall')) {
         return {
             summary: [
-                "Marketing Analysis: Focused on increasing customer acquisition.",
-                "Current trend suggests a need for digital engagement.",
-                "Targeting weekday lunch hours can yield high ROI."
+                `Marketing Strategy for ${user.restaurantName} in ${location}.`,
+                "Analysis of local competition suggests a gap in digital engagement.",
+                "Weather patterns indicate a need for comfort food promotions."
             ],
-            causes: ["Low social visibility", "Lack of loyalty program", "Weekday slump"],
+            causes: ["Low social visibility vs local competitors", "Lack of loyalty program", "Seasonal dip in footfall"],
             action_plan: [
-                { initiative: "Launch Instagram Reel Campaign", impact_estimate: "High (Reach)", cost_estimate: "Low", priority: "High" },
-                { initiative: "Corporate Lunch Partnerships", impact_estimate: "Medium", cost_estimate: "Low", priority: "Medium" },
-                { initiative: "Happy Hour Specials", impact_estimate: "Medium", cost_estimate: "Medium", priority: "Medium" }
+                { initiative: "Launch Instagram Reel Campaign targeting local area", impact_estimate: "High (Reach)", cost_estimate: "Low", priority: "High" },
+                { initiative: "Corporate Lunch Partnerships with nearby offices", impact_estimate: "Medium", cost_estimate: "Low", priority: "Medium" },
+                { initiative: "Happy Hour Specials (4PM-7PM)", impact_estimate: "Medium", cost_estimate: "Medium", priority: "Medium" }
             ],
             seasonal_menu_suggestions: [
-                { type: "add", item: "Power Lunch Combo", reason: "Attract office crowd" }
+                { type: "add", item: "Power Lunch Combo", reason: "Attract office crowd in " + location }
             ],
             roadmap: [
                 { phase_name: "Awareness", duration: "Week 1", steps: ["Social Ads", "Flyers"], milestone: "10k Impressions" },
                 { phase_name: "Conversion", duration: "Week 2-4", steps: ["Discount Codes", "Events"], milestone: "15% Sales Uplift" }
             ]
         };
-    } else if (q.includes('cost') || q.includes('waste') || q.includes('profit')) {
-        return {
-            summary: [
-                "Cost Optimization Strategy: Reducing food waste and COGS.",
-                "Identified high-variance ingredients in inventory.",
-                "Supplier negotiation recommended."
-            ],
-            causes: ["Over-portioning", "Supplier price hikes", "Inventory spoilage"],
-            action_plan: [
-                { initiative: "Implement Strict Portion Control", impact_estimate: "High (5% Saving)", cost_estimate: "Zero", priority: "High" },
-                { initiative: "Renegotiate Dairy Contracts", impact_estimate: "Medium", cost_estimate: "Low", priority: "High" },
-                { initiative: "Daily Waste Logs", impact_estimate: "Medium", cost_estimate: "Low", priority: "Medium" }
-            ],
-            seasonal_menu_suggestions: [
-                { type: "remove", item: "Low Margin Specials", reason: "High waste, low profit" }
-            ],
-            roadmap: [
-                { phase_name: "Audit", duration: "Day 1-3", steps: ["Weigh Waste", "Check Invoices"], milestone: "Baseline Set" },
-                { phase_name: "Control", duration: "Day 4-14", steps: ["Staff Training", "New Ladles"], milestone: "Waste < 2%" }
-            ]
-        };
-    }
-
-    // Default Generic Strategy
+    } 
+    
     return {
         summary: [
-            `Analysis for "${query}" complete.`,
-            "Strategy generated based on best practices.",
-            "Focus on operational efficiency and customer retention."
+            `Strategic analysis for ${user.restaurantName} (${user.cuisineType}).`,
+            `Focused on optimizing operations in ${location}.`,
+            "Data suggests focusing on operational efficiency and customer retention."
         ],
         causes: [
-            "Market competition",
-            "Operational variance"
+            "Market saturation in " + location,
+            "Operational variance in food cost"
         ],
         action_plan: [
-            { initiative: "Review Menu Pricing", impact_estimate: "High", cost_estimate: "Low", priority: "High" },
+            { initiative: "Review Menu Pricing vs Competitors", impact_estimate: "High", cost_estimate: "Low", priority: "High" },
             { initiative: "Staff Training Refresh", impact_estimate: "Medium", cost_estimate: "Low", priority: "Medium" }
         ],
         seasonal_menu_suggestions: [
-            { type: "add", item: "Seasonal Special", reason: "High margin potential." }
+            { type: "add", item: "Seasonal Special", reason: "High margin potential for current weather." }
         ],
         roadmap: [
             { phase_name: "Phase 1: Analysis", duration: "1 Day", steps: ["Review Data", "Set Goals"], milestone: "Plan Approved" }
@@ -202,7 +182,6 @@ export const cleanAndParseJSON = <T>(text: string | undefined): T => {
     if (!text) throw new Error("Empty response from AI");
     try {
         let clean = text.replace(/```json\n?|```/g, '').trim();
-        // Remove markdown comments or other noise if present
         const firstOpen = clean.indexOf('{');
         const lastClose = clean.lastIndexOf('}');
         if (firstOpen !== -1 && lastClose !== -1) {
@@ -215,9 +194,6 @@ export const cleanAndParseJSON = <T>(text: string | undefined): T => {
         throw new Error("Failed to parse AI response. The model output was not valid JSON.");
     }
 };
-
-// Legacy alias for compatibility
-const parseJSON = cleanAndParseJSON;
 
 const createAIClient = () => {
     const key = getApiKey();
@@ -286,7 +262,6 @@ export const verifyLocationWithMaps = async (locationQuery: string): Promise<str
 
 export const estimateMarketRates = async (ingredients: string[], location: string): Promise<Record<string, number>> => {
     const ai = createAIClient();
-    // Mock if no AI
     if (!ai) {
         await new Promise(r => setTimeout(r, 1000));
         const mockRates: Record<string, number> = {};
@@ -317,7 +292,6 @@ export const estimateMarketRates = async (ingredients: string[], location: strin
 export const generateRecipeCard = async (userId: string, item: MenuItem, requirements: string, location?: string, chefPersona: string = 'Executive Chef'): Promise<RecipeCard> => {
     const ai = createAIClient();
     
-    // Mock Fallback
     if (!ai) {
         await new Promise(r => setTimeout(r, 1500));
         return generateMockRecipe(item, requirements);
@@ -350,15 +324,12 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
             }
         });
         
-        // When using responseSchema, response.text is already a valid JSON string
         const parsed = JSON.parse(response.text || '{}');
-        // Ensure SKU if missing
         if (!parsed.sku_id) parsed.sku_id = `AI-${Date.now().toString().slice(-6)}`;
         return parsed as RecipeCard;
 
     } catch (e) {
         console.error("AI Generation Failed, falling back to mock:", e);
-        // Fallback to robust mock if API fails (e.g. Permission Denied or Parse Error)
         return generateMockRecipe(item, requirements);
     }
 };
@@ -408,7 +379,7 @@ export const substituteIngredient = async (recipe: RecipeCard, ingredientName: s
             contents: prompt,
             config: { 
                 responseMimeType: 'application/json',
-                responseSchema: RECIPE_SCHEMA, // Reuse schema for consistency
+                responseSchema: RECIPE_SCHEMA, 
                 maxOutputTokens: 8192
             }
         });
@@ -416,7 +387,6 @@ export const substituteIngredient = async (recipe: RecipeCard, ingredientName: s
         return parsed as RecipeCard;
     } catch (e) {
         console.error(e);
-        // Fallback Mock Logic
         const newIngs = recipe.ingredients.map(i => i.name === ingredientName ? { ...i, name: `${i.name} Substitute (Alt)`, cost_per_unit: i.cost_per_unit ? i.cost_per_unit * 0.9 : 0 } : i);
         return { ...recipe, ingredients: newIngs };
     }
@@ -448,30 +418,53 @@ export const generateSOP = async (topic: string): Promise<SOP> => {
     }
 };
 
-export const generateStrategy = async (role: string, query: string): Promise<StrategyReport> => {
+export const generateStrategy = async (user: User, query: string, salesSummary: string): Promise<StrategyReport> => {
     const ai = createAIClient();
     if (!ai) {
         await new Promise(r => setTimeout(r, 2000));
-        return generateMockStrategy(role, query);
+        return generateMockStrategy(user, query);
     }
 
+    const currentDate = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    const location = user.location || "General Market";
+    const cuisine = user.cuisineType || "General Cuisine";
+
     const template = `{
-        "summary": ["Point 1"], "causes": ["Cause 1"],
-        "action_plan": [{"initiative": "Action", "impact_estimate": "High", "cost_estimate": "Low", "priority": "High"}],
-        "seasonal_menu_suggestions": [{"type": "add", "item": "Dish", "reason": "Why"}],
+        "summary": ["Detailed Point 1", "Detailed Point 2", "Detailed Point 3"], 
+        "causes": ["Root Cause 1 based on location/data"],
+        "action_plan": [{"initiative": "Specific Action", "impact_estimate": "High", "cost_estimate": "Low", "priority": "High"}],
+        "seasonal_menu_suggestions": [{"type": "add", "item": "Dish Name", "reason": "Why it works now"}],
         "roadmap": [{"phase_name": "Phase 1", "duration": "1 week", "steps": ["Step 1"], "milestone": "Goal"}]
     }`;
+
+    const prompt = `
+    Role: Senior Restaurant Strategist for a ${cuisine} restaurant.
+    User Query: "${query}"
+    
+    CONTEXT ANALYSIS:
+    1. Location: ${location}. (Infer demographics, spending power, and local competition).
+    2. Date: ${currentDate}. (Factor in current weather/seasonality for this location).
+    3. Data: ${salesSummary}. (Use this to justify your strategy).
+    
+    TASK:
+    Provide a deep, actionable strategy report. 
+    - The 'summary' must explicitly reference the location, weather/season, and data trends.
+    - The 'action_plan' must include specific implementation steps relevant to the local market.
+    - Suggest 'seasonal_menu_items' that fit the current weather in ${location}.
+    
+    Return strict JSON matching this structure: ${template}
+    `;
 
     try {
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
-            contents: `Role: ${role}. Query: "${query}". Analyze and plan. Return JSON matching: ${template}`,
+            contents: prompt,
             config: { responseMimeType: 'application/json' }
         });
         return cleanAndParseJSON<StrategyReport>(response.text);
     } catch (e) {
         console.error(e);
-        return generateMockStrategy(role, query);
+        return generateMockStrategy(user, query);
     }
 };
 
