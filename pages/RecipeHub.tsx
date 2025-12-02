@@ -1,10 +1,10 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { PLANS, CREDIT_COSTS } from '../constants';
-import { generateRecipeCard, generateRecipeVariation, hasValidApiKey } from '../services/geminiService';
+import { generateRecipeCard, generateRecipeVariation, hasValidApiKey, setStoredApiKey, substituteIngredient } from '../services/geminiService';
 import { ingredientService } from '../services/ingredientService';
 import { RecipeCard, MenuItem, User, UserRole, POSChangeRequest, RecipeRequest } from '../types';
-import { Loader2, ChefHat, Scale, Clock, AlertCircle, Upload, Lock, Sparkles, Check, Save, RefreshCw, Search, Plus, Store, Zap, Trash2, Building2, FileSignature, X, AlignLeft, UtensilsCrossed, Inbox, UserCheck, CheckCircle2, Clock3, Carrot, Type, Wallet, Filter, Tag, Eye, Flame, Wand2, Eraser, FileDown, TrendingDown, ArrowRight, Key, Coins, Leaf, TestTube } from 'lucide-react';
+import { Loader2, ChefHat, Scale, Clock, AlertCircle, Upload, Lock, Sparkles, Check, Save, RefreshCw, Search, Plus, Store, Zap, Trash2, Building2, FileSignature, X, AlignLeft, UtensilsCrossed, Inbox, UserCheck, CheckCircle2, Clock3, Carrot, Type, Wallet, Filter, Tag, Eye, Flame, Wand2, Eraser, FileDown, TrendingDown, ArrowRight, Key, Coins, Leaf, TestTube, ArrowLeftRight } from 'lucide-react';
 import { storageService } from '../services/storageService';
 import { authService } from '../services/authService';
 
@@ -37,6 +37,36 @@ const CHEF_PERSONAS = [
     { id: 'The Wellness Guru', name: 'The Wellness Guru', icon: Leaf, color: 'text-green-600 dark:text-green-400', bg: 'bg-green-100 dark:bg-green-900/30', desc: 'Healthy & Dietary' }
 ];
 
+// Helper to format error messages nicely
+const formatError = (err: any) => {
+    if (!err) return "Unknown error occurred";
+    let msg = typeof err === 'string' ? err : err.message || JSON.stringify(err);
+    
+    // Attempt to parse JSON error strings
+    try {
+        // Handle "Error: { ... }" strings that sometimes leak from libraries
+        if (msg.startsWith('Error: ')) msg = msg.substring(7);
+        
+        if (msg.trim().startsWith('{')) {
+            const parsed = JSON.parse(msg);
+            if (parsed.error) {
+                if (parsed.error.message) return parsed.error.message;
+                // Handle nested Google error format
+                if (parsed.error.code === 403 || parsed.error.status === 'PERMISSION_DENIED') {
+                    return "Access Denied: The API Key is invalid, expired, or blocked.";
+                }
+            }
+        }
+    } catch (e) {}
+    
+    // Friendly overrides for common API errors
+    if (msg.includes('PERMISSION_DENIED') || msg.includes('403')) return "Access Denied: Please update your API Key.";
+    if (msg.includes('leaked') || msg.includes('compromised')) return "Your API Key was blocked for security reasons. Please generate a new one.";
+    if (msg.includes('API Key Required')) return "API Key is missing. Please connect one.";
+    
+    return msg;
+};
+
 export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
   const [selectedSku, setSelectedSku] = useState<string | null>(null);
   const [generatedRecipe, setGeneratedRecipe] = useState<RecipeCard | null>(null);
@@ -45,11 +75,14 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
   const [error, setError] = useState<string | null>(null);
   const [importStatus, setImportStatus] = useState<string | null>(null);
   
-  // API Key State - Initialize directly from service which now has fallback
+  // API Key State
   const [hasApiKey, setHasApiKey] = useState(() => hasValidApiKey());
 
   // Supplier Costing State
   const [altPrices, setAltPrices] = useState<Record<number, string>>({});
+  
+  // Ingredient Swapping State
+  const [swappingIndex, setSwappingIndex] = useState<number | null>(null);
 
   // View Modes
   const [viewMode, setViewMode] = useState<'generator' | 'saved' | 'requests'>('generator');
@@ -89,7 +122,10 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
   const [customItemName, setCustomItemName] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const isAdmin = [UserRole.ADMIN, UserRole.SUPER_ADMIN].includes(user.role);
+  
+  // Role Logic
+  const isStaff = [UserRole.ADMIN, UserRole.SUPER_ADMIN].includes(user.role);
+  const canGenerate = [UserRole.OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN].includes(user.role);
 
   useEffect(() => {
     setSavedRecipes(storageService.getSavedRecipes(user.id));
@@ -97,19 +133,23 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
     refreshRequests();
   }, [user.id, user.role]);
 
-  // Poll for API Key Status
+  // Poll for API Key Status & Auto-recover if key is added
   useEffect(() => {
     const checkKey = async () => {
-        // 1. Check local key / fallback
+        // 1. Check local key (includes blacklist check in service)
         if (hasValidApiKey()) {
             setHasApiKey(true);
-            if (error && (error.includes('API Key') || error.includes('missing'))) {
+            // Auto-clear API errors if key is now present
+            if (error && (error.includes('API Key') || error.includes('missing') || error.includes('Access Denied'))) {
                 setError(null);
             }
             return;
+        } else {
+            // Ensure state reflects invalid key
+            setHasApiKey(false);
         }
 
-        // 2. Check AI Studio Bridge (Only if no fallback)
+        // 2. Check AI Studio Bridge
         if ((window as any).aistudio) {
             try {
                 const has = await (window as any).aistudio.hasSelectedApiKey();
@@ -130,6 +170,14 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
     return () => clearInterval(interval);
   }, [error]);
 
+  // Handle Leaked Key / Permission Errors - Force Reset
+  useEffect(() => {
+      if (error && (error.includes('leaked') || error.includes('Access Denied') || error.includes('403'))) {
+          setHasApiKey(false); // Force UI to show "Connect Key"
+          localStorage.removeItem('gemini_api_key'); // Ensure bad key is gone
+      }
+  }, [error]);
+
   // Reset alt prices when recipe changes
   useEffect(() => {
       setAltPrices({});
@@ -137,7 +185,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
 
   const refreshRequests = () => {
     const allRequests = storageService.getAllRecipeRequests();
-    if (isAdmin) {
+    if (isStaff) {
         setAdminQueue(allRequests.filter(r => r.status === 'pending'));
     } else {
         setMyRequests(allRequests.filter(r => r.userId === user.id));
@@ -212,7 +260,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
   }, [generatedRecipe, altPrices]);
 
   const checkCredits = (): boolean => {
-      if (isAdmin) return true;
+      if (isStaff) return true; // Internal staff bypass
       
       const cost = CREDIT_COSTS.RECIPE;
       if (user.credits < cost) {
@@ -223,7 +271,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
   };
 
   const deductCredits = (): boolean => {
-      if (!isAdmin && onUserUpdate) {
+      if (!isStaff && onUserUpdate) {
           const cost = CREDIT_COSTS.RECIPE;
           const success = storageService.deductCredits(user.id, cost, 'Recipe Generation');
           if (success) {
@@ -262,22 +310,6 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       setSelectedPersona('Executive Chef');
   };
 
-  const loadItemIntoForm = (item: MenuItem) => {
-      setDishName(item.name);
-      setSelectedSku(item.sku_id);
-      // Try to populate ingredients from existing item data
-      if (item.ingredients && item.ingredients.length > 0) {
-          setIngredients(item.ingredients.map(i => i.name).join(', '));
-      } else {
-          setIngredients('');
-      }
-      setCuisine(''); // Reset context fields
-      setDietary([]);
-      setNotes('');
-      setGeneratedRecipe(null);
-      setError(null);
-  };
-
   const handleSurpriseMe = () => {
       const random = SAMPLE_DISHES[Math.floor(Math.random() * SAMPLE_DISHES.length)];
       setDishName(random.name);
@@ -297,20 +329,6 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       setDietary(idea.dietary);
       setError(null);
       setSelectedSku(null);
-  };
-
-  // Populate form from sidebar input
-  const handleGenerateCustomClick = () => {
-      if (!customItemName.trim()) return;
-      setDishName(customItemName);
-      setCuisine('');
-      setIngredients('');
-      setDietary([]);
-      setNotes('');
-      setSelectedSku(null);
-      setError(null);
-      // Clear the sidebar input to show it moved to main form
-      setCustomItemName(''); 
   };
 
   const handleFormSubmit = async (e?: React.FormEvent) => {
@@ -342,8 +360,8 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
           ingredients: []
       };
 
-      if (isAdmin) {
-          await runAdminGeneration(tempItem, requirements);
+      if (canGenerate) {
+          await handleGeneration(tempItem, requirements);
       } else {
           createRequest(tempItem, requirements);
       }
@@ -377,7 +395,12 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       handleTabChange('requests');
   };
 
-  const runAdminGeneration = async (item: MenuItem, requirements: string, targetUserId?: string) => {
+  const handleGeneration = async (item: MenuItem, requirements: string, targetUserId?: string) => {
+      // If user is Owner (not staff), deduct credits before generating
+      if (!isStaff) {
+          if (!deductCredits()) return;
+      }
+
       setLoading(true);
       setLoadingText(`${selectedPersona} is creating ${item.name}...`);
       setGeneratedRecipe(null);
@@ -392,7 +415,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
           setGeneratedRecipe(card);
       } catch (e: any) {
           console.error(e);
-          setError(e.message || "Failed to generate recipe card. Please check your inputs or API key.");
+          setError(formatError(e));
       } finally {
           setLoading(false);
       }
@@ -429,8 +452,8 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
             const variant = await generateRecipeVariation(user.id, generatedRecipe, type, user.location);
             setGeneratedRecipe(variant);
         }
-    } catch (e) {
-      setError(`Failed to create ${type} variation.`);
+    } catch (e: any) {
+      setError(formatError(e));
     } finally {
       setLoading(false);
     }
@@ -457,6 +480,32 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       });
       
       setAltPrices(newAltPrices);
+  };
+
+  const handleIngredientSwap = async (index: number) => {
+      if (!generatedRecipe) return;
+      const ingredient = generatedRecipe.ingredients[index];
+      if (!ingredient) return;
+
+      if (!checkCredits()) return; 
+
+      if (!confirm(`Find a substitute for ${ingredient.name}? This will regenerate the recipe costings.`)) return;
+
+      setSwappingIndex(index);
+      setError(null);
+
+      try {
+          if (deductCredits()) {
+               const updated = await substituteIngredient(generatedRecipe, ingredient.name, user.location);
+               setGeneratedRecipe(updated);
+               setImportStatus(`Swapped ${ingredient.name} for ${updated.ingredients[index]?.name || 'alternative'}`);
+               setTimeout(() => setImportStatus(null), 3000);
+          }
+      } catch (e: any) {
+          setError(formatError(e));
+      } finally {
+          setSwappingIndex(null);
+      }
   };
 
   const handleImportClick = () => {
@@ -490,7 +539,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
       setIsSaving(true);
       
       setTimeout(() => {
-        if (isAdmin && activeRequest) {
+        if (isStaff && activeRequest) {
             const recipeToSave = { ...generatedRecipe };
             // Save to REQUESTER'S library
             storageService.saveRecipe(activeRequest.userId, recipeToSave);
@@ -525,18 +574,6 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
     }
   };
 
-  const handleDiscard = () => {
-      setGeneratedRecipe(null);
-      setSelectedSku(null);
-      setPosPushStatus(null);
-      setError(null);
-      setSelectedRestaurantId('');
-      if (isAdmin && activeRequest) {
-          handleTabChange('requests');
-          setActiveRequest(null);
-      }
-  };
-
   const handlePushToPOS = () => {
       if (!generatedRecipe) return;
       setIsPushing(true);
@@ -562,14 +599,24 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
   };
 
   const handleConnectKey = async () => {
+      // 1. Try AI Studio
       if ((window as any).aistudio) {
           try {
               await (window as any).aistudio.openSelectKey();
               setError(null);
               setHasApiKey(true);
+              return;
           } catch (e) {
               console.error(e);
           }
+      }
+      
+      // 2. Fallback to manual entry
+      const key = prompt("Please enter your Google Gemini API Key:", "");
+      if (key) {
+          setStoredApiKey(key);
+          setHasApiKey(true);
+          setError(null);
       }
   };
 
@@ -693,7 +740,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
 
   return (
     <div className="h-[calc(100vh-6rem)] flex flex-col gap-4 relative">
-      {/* Request Preview Modal (Admin Only) */}
+      {/* ... [Request Preview Modal] ... */}
       {previewRequest && (
           <div className="absolute inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
               <div className="bg-white dark:bg-slate-900 rounded-xl w-full max-w-md shadow-2xl border border-slate-200 dark:border-slate-800 animate-scale-in">
@@ -742,7 +789,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                 onClick={() => handleTabChange('generator')}
                 className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${viewMode === 'generator' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
             >
-                {isAdmin ? (activeRequest ? 'Fulfilling Request' : 'BistroChef') : 'Request Recipe'}
+                {isStaff ? (activeRequest ? 'Fulfilling Request' : 'BistroChef') : 'BistroChef Generator'}
             </button>
             <button 
                 onClick={() => handleTabChange('saved')}
@@ -755,7 +802,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                 onClick={() => handleTabChange('requests')}
                 className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-2 ${viewMode === 'requests' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
             >
-                {isAdmin ? (
+                {isStaff ? (
                     <>
                         Request Queue
                         {adminQueue.length > 0 && <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">{adminQueue.length}</span>}
@@ -777,13 +824,13 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
 
       {viewMode === 'requests' && (
           <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm p-6 overflow-y-auto flex-1 animate-fade-in transition-colors">
-              <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-4">{isAdmin ? 'Customer Request Queue' : 'My Recipe Requests'}</h2>
+              <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-4">{isStaff ? 'Customer Request Queue' : 'My Recipe Requests'}</h2>
               
               <div className="space-y-3">
-                  {(isAdmin ? adminQueue : myRequests).length === 0 ? (
+                  {(isStaff ? adminQueue : myRequests).length === 0 ? (
                       <p className="text-slate-500 dark:text-slate-400 text-center py-8">No pending requests found.</p>
                   ) : (
-                      (isAdmin ? adminQueue : myRequests).map((req, i) => (
+                      (isStaff ? adminQueue : myRequests).map((req, i) => (
                           <div key={i} className="flex justify-between items-center p-4 border border-slate-100 dark:border-slate-800 rounded-lg hover:border-slate-300 dark:hover:border-slate-700 transition-colors bg-slate-50 dark:bg-slate-800/50">
                               <div className="flex items-start gap-4">
                                   <div className={`p-3 rounded-full ${req.status === 'completed' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50 dark:text-emerald-400' : 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/50 dark:text-yellow-400'}`}>
@@ -792,7 +839,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                   <div>
                                       <h4 className="font-bold text-slate-800 dark:text-white">{req.item.name}</h4>
                                       <p className="text-xs text-slate-500 dark:text-slate-400">Requested by: <span className="font-semibold">{req.userName}</span> • {new Date(req.requestDate).toLocaleString()}</p>
-                                      {isAdmin && <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 italic max-w-lg bg-white dark:bg-slate-800 p-1 rounded border border-slate-100 dark:border-slate-700 truncate">{req.requirements}</p>}
+                                      {isStaff && <p className="text-xs text-slate-600 dark:text-slate-300 mt-1 italic max-w-lg bg-white dark:bg-slate-800 p-1 rounded border border-slate-100 dark:border-slate-700 truncate">{req.requirements}</p>}
                                   </div>
                               </div>
                               
@@ -800,7 +847,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                   {req.status === 'completed' ? (
                                       <span className="px-3 py-1 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 text-xs font-bold rounded-full">Completed</span>
                                   ) : (
-                                      isAdmin ? (
+                                      isStaff ? (
                                           <div className="flex gap-2">
                                               <button 
                                                   onClick={() => setPreviewRequest(req)}
@@ -830,6 +877,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
           </div>
       )}
 
+      {/* [Saved View Render Code Omitted for brevity - same as before] */}
       {viewMode === 'saved' && (
           <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col flex-1 animate-fade-in transition-colors">
               <div className="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/50 flex flex-col sm:flex-row justify-between items-center gap-4">
@@ -935,15 +983,15 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
               <div className="w-full lg:w-1/3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm p-6 overflow-y-auto custom-scrollbar transition-colors">
                   <div className="flex justify-between items-center mb-6">
                       <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                          {isAdmin && activeRequest ? <Sparkles className="text-purple-500" /> : <ChefHat className="text-emerald-600" />}
-                          {isAdmin && activeRequest ? 'Fulfilling Request' : 'BistroChef'}
+                          {isStaff && activeRequest ? <Sparkles className="text-purple-500" /> : <ChefHat className="text-emerald-600" />}
+                          {isStaff && activeRequest ? 'Fulfilling Request' : 'BistroChef'}
                       </h2>
                       <button onClick={resetForm} className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 flex items-center gap-1">
                           <RefreshCw size={12} /> Clear Form
                       </button>
                   </div>
 
-                  {isAdmin && activeRequest && (
+                  {isStaff && activeRequest && (
                       <div className="mb-6 p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 rounded-lg animate-fade-in">
                           <div className="flex justify-between items-start mb-2">
                               <span className="text-[10px] font-bold uppercase text-purple-600 dark:text-purple-300 tracking-wide">Request Context</span>
@@ -1088,21 +1136,22 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
 
                       {/* Error State */}
                       {error && (
-                          <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm rounded-lg flex items-center justify-between gap-2 border border-red-100 dark:border-red-900/50 animate-fade-in">
+                          <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm rounded-lg flex flex-col gap-2 border border-red-100 dark:border-red-900/50 animate-fade-in">
                               <div className="flex items-center gap-2">
-                                  <AlertCircle size={16} /> {error}
+                                  <AlertCircle size={16} /> <span className="font-bold">Error:</span> {error}
                               </div>
-                              <div className="flex items-center gap-2">
-                                  {(error.includes('API Key') || error.includes('configure') || error.includes('unauthenticated')) && !hasApiKey && (
+                              <div className="flex items-center gap-2 mt-1">
+                                  {/* Prompt for key if API Key issue or 403 Permission Denied */}
+                                  {(!hasApiKey || error.includes('API Key') || error.includes('Access Denied')) && (
                                       <button 
                                           type="button"
                                           onClick={handleConnectKey}
                                           className="px-3 py-1 bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-200 text-xs font-bold rounded hover:bg-red-200 dark:hover:bg-red-700 transition-colors"
                                       >
-                                          Connect Key
+                                          Update API Key
                                       </button>
                                   )}
-                                  <button onClick={() => setError(null)} className="text-xs hover:underline">Dismiss</button>
+                                  <button onClick={() => setError(null)} className="text-xs hover:underline ml-auto">Dismiss</button>
                               </div>
                           </div>
                       )}
@@ -1120,7 +1169,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                               type="submit" 
                               disabled={loading}
                               className={`w-full py-4 rounded-xl font-bold text-white shadow-lg shadow-slate-900/20 dark:shadow-black/40 flex items-center justify-center gap-2 transition-all active:scale-[0.98] ${
-                                  isAdmin 
+                                  isStaff 
                                   ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700' 
                                   : 'bg-slate-900 dark:bg-emerald-600 hover:bg-slate-800 dark:hover:bg-emerald-700'
                               } ${loading ? 'opacity-80 cursor-not-allowed' : ''}`}
@@ -1132,8 +1181,8 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                   </>
                               ) : (
                                   <>
-                                      {isAdmin ? <Sparkles size={20} fill="currentColor" /> : <ChefHat size={20} />}
-                                      {isAdmin ? (activeRequest ? 'Generate & Fulfill' : 'Generate Recipe Card') : `Request Recipe (${CREDIT_COSTS.RECIPE} CR)`}
+                                      {canGenerate ? <Sparkles size={20} fill="currentColor" /> : <ChefHat size={20} />}
+                                      {canGenerate ? (activeRequest ? 'Generate & Fulfill' : `Generate Recipe Card (${CREDIT_COSTS.RECIPE} CR)`) : `Request Recipe (${CREDIT_COSTS.RECIPE} CR)`}
                                   </>
                               )}
                           </button>
@@ -1193,7 +1242,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                   </button>
                                   <button onClick={handleSaveRecipe} disabled={isSaving} className="px-4 py-1.5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 text-xs font-bold rounded-lg hover:bg-black dark:hover:bg-slate-200 flex items-center gap-2">
                                       {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} 
-                                      {isAdmin && activeRequest ? 'Save & Send' : 'Save'}
+                                      {isStaff && activeRequest ? 'Save & Send' : 'Save'}
                                   </button>
                               </div>
                           </div>
@@ -1265,9 +1314,20 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
 
                                               {generatedRecipe.ingredients.map((ing, i) => (
                                                   <div key={i} className="flex justify-between items-center text-sm p-2 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg transition-colors group">
-                                                      <div>
-                                                          <p className="font-medium text-slate-700 dark:text-slate-200">{ing.name}</p>
-                                                          <p className="text-xs text-slate-400">{ing.qty_per_serving} {ing.unit}</p>
+                                                      <div className="flex items-center gap-3">
+                                                          {/* New Swap Button */}
+                                                          <button
+                                                              onClick={() => handleIngredientSwap(i)}
+                                                              disabled={swappingIndex !== null}
+                                                              className="p-1 text-slate-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-full transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-50"
+                                                              title="Find Substitute"
+                                                          >
+                                                              {swappingIndex === i ? <Loader2 size={14} className="animate-spin" /> : <ArrowLeftRight size={14} />}
+                                                          </button>
+                                                          <div>
+                                                              <p className="font-medium text-slate-700 dark:text-slate-200">{ing.name}</p>
+                                                              <p className="text-xs text-slate-400">{ing.qty_per_serving} {ing.unit}</p>
+                                                          </div>
                                                       </div>
                                                       <div className="flex items-center gap-3">
                                                           <div className="text-right">
@@ -1345,7 +1405,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                       <p className="text-xs text-slate-500 dark:text-slate-400">Push this item directly to your Point of Sale system.</p>
                                   </div>
                                   <div className="flex items-center gap-3">
-                                      {isAdmin && (
+                                      {isStaff && (
                                           <select 
                                               value={selectedRestaurantId} 
                                               onChange={(e) => setSelectedRestaurantId(e.target.value)}
@@ -1357,7 +1417,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                       )}
                                       <button 
                                           onClick={handlePushToPOS}
-                                          disabled={isPushing || (isAdmin && !selectedRestaurantId)}
+                                          disabled={isPushing || (isStaff && !selectedRestaurantId)}
                                           className="px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
                                       >
                                           {isPushing ? <Loader2 size={16} className="animate-spin" /> : <Store size={16} />}

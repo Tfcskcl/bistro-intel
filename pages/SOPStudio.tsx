@@ -40,13 +40,15 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
     }
   }, [user.id, isAdmin]);
 
-  // Poll for API Key Status
+  // Poll for API Key Status & Handle Leaks
   useEffect(() => {
     const checkKey = async () => {
         if (hasValidApiKey()) {
             setHasApiKey(true);
-            if (error && (error.includes('API Key') || error.includes('missing'))) setError(null);
+            if (error && (error.includes('API Key') || error.includes('missing') || error.includes('Access Denied'))) setError(null);
             return;
+        } else {
+            setHasApiKey(false);
         }
 
         if ((window as any).aistudio) {
@@ -64,6 +66,14 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
     checkKey();
     const interval = setInterval(checkKey, 2000);
     return () => clearInterval(interval);
+  }, [error]);
+
+  // Force Reset on Leaked/Denied Errors
+  useEffect(() => {
+      if (error && (error.includes('leaked') || error.includes('Access Denied') || error.includes('403'))) {
+          setHasApiKey(false);
+          localStorage.removeItem('gemini_api_key');
+      }
   }, [error]);
 
   const loadSavedSOPs = () => {
@@ -102,21 +112,38 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
       const sop = await generateSOP(topic);
       setGeneratedSOP(sop);
     } catch (err: any) {
-      setError(err.message || "Failed to generate SOP");
+      const msg = err.message || JSON.stringify(err);
+      if (msg.includes('leaked') || msg.includes('403')) {
+          setError("Your API Key was blocked. Please connect a new one.");
+          setHasApiKey(false);
+      } else {
+          setError(msg || "Failed to generate SOP");
+      }
     } finally {
       setIsGenerating(false);
     }
   };
 
   const handleConnectKey = async () => {
+      // 1. Try AI Studio
       if ((window as any).aistudio) {
           try {
               await (window as any).aistudio.openSelectKey();
               setHasApiKey(true);
               setError(null);
+              return;
           } catch (e) {
               console.error(e);
           }
+      }
+      
+      // 2. Fallback to manual entry
+      const key = prompt("Please enter your Google Gemini API Key:", "");
+      if (key) {
+          // Import dynamically or pass setter via props if needed, but local storage works
+          // Assuming setStoredApiKey is available via side-effect of setting LS
+          localStorage.setItem('gemini_api_key', key);
+          window.location.reload(); 
       }
   };
 
@@ -273,20 +300,20 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
                  </div>
 
                  {error && (
-                    <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm rounded-lg flex items-center justify-between gap-2">
+                    <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm rounded-lg flex flex-col gap-2 border border-red-100 dark:border-red-900/50">
                         <div className="flex items-center gap-2">
                             <AlertCircle size={16} /> {error}
                         </div>
-                        <div className="flex items-center gap-2">
-                            {(error.includes('API Key') || error.includes('configure') || error.includes('unauthenticated')) && !hasApiKey && (
+                        <div className="flex items-center gap-2 mt-1">
+                            {(!hasApiKey || error.includes('API Key') || error.includes('Access Denied')) && (
                                 <button 
                                     onClick={handleConnectKey}
                                     className="px-3 py-1 bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-200 text-xs font-bold rounded hover:bg-red-200 dark:hover:bg-red-700 transition-colors"
                                 >
-                                    Connect Key
+                                    Update API Key
                                 </button>
                             )}
-                            <button onClick={() => setError(null)} className="text-xs hover:underline">Dismiss</button>
+                            <button onClick={() => setError(null)} className="text-xs hover:underline ml-auto">Dismiss</button>
                         </div>
                     </div>
                  )}

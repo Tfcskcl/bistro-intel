@@ -3,10 +3,32 @@ import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { SYSTEM_INSTRUCTION, MARKDOWN_INSTRUCTION, APP_CONTEXT } from "../constants";
 import { RecipeCard, SOP, StrategyReport, ImplementationGuide, MenuItem, MenuGenerationRequest } from "../types";
 
+// Known leaked key to blacklist
+const LEAKED_KEY = 'AIzaSyB8BoSUqHHnmpkSIwpp2jI2xM2TW3IlIgA';
+
 const getApiKey = (): string => {
-  // Priority: 1. Environment Variable (Cloud), 2. Hardcoded Fallback (Live Demo)
-  if (process.env.API_KEY) return process.env.API_KEY;
-  return 'AIzaSyB8BoSUqHHnmpkSIwpp2jI2xM2TW3IlIgA';
+  // 1. Check Local Storage (User Override)
+  const localKey = localStorage.getItem('gemini_api_key');
+  if (localKey && localKey !== LEAKED_KEY) return localKey;
+
+  // 2. Check Environment Variable (Cloud)
+  if (process.env.API_KEY && process.env.API_KEY !== LEAKED_KEY) return process.env.API_KEY;
+
+  // If local storage had the leaked key, clean it up
+  if (localKey === LEAKED_KEY) {
+      localStorage.removeItem('gemini_api_key');
+  }
+
+  return '';
+};
+
+export const setStoredApiKey = (key: string) => {
+    if (key === LEAKED_KEY) {
+        alert("This API Key has been flagged as compromised. Please use a different key.");
+        return;
+    }
+    localStorage.setItem('gemini_api_key', key);
+    window.location.reload(); // Reload to reset state with new key
 };
 
 // Helper for UI components to check status
@@ -171,6 +193,39 @@ export const generateRecipeVariation = async (userId: string, original: RecipeCa
     const prompt = `Create a "${variationType}" variation of the following recipe: ${JSON.stringify(original)}.
     Maintain the same JSON structure. Adjust ingredients, steps, and costs accordingly.
     ${location ? `Ensure revised costs reflect local market rates in ${location}.` : ''}`;
+
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+        config: {
+            responseMimeType: 'application/json'
+        }
+    });
+
+    return parseJSON<RecipeCard>(response.text);
+};
+
+export const substituteIngredient = async (recipe: RecipeCard, ingredientName: string, location?: string): Promise<RecipeCard> => {
+    const apiKey = getApiKey();
+    if (!apiKey) throw new Error("API Key Required");
+    const ai = new GoogleGenAI({ apiKey });
+
+    const prompt = `
+    Context: Professional Kitchen.
+    Task: Substitute the ingredient "${ingredientName}" in the provided recipe with a suitable alternative.
+    Goal: Reduce cost or improve availability while maintaining the dish's essence.
+    
+    Recipe JSON:
+    ${JSON.stringify(recipe)}
+
+    Instructions:
+    1. Identify a good substitute for "${ingredientName}".
+    2. Replace the ingredient in the 'ingredients' list.
+    3. Update 'qty', 'cost_per_unit', 'cost_per_serving' for the new ingredient based on local market rates in "${location || 'General Market'}".
+    4. Recalculate 'food_cost_per_serving' and 'margin_pct' for the whole dish.
+    5. Update 'preparation_steps' if the new ingredient requires different processing.
+    6. Return the COMPLETE updated RecipeCard JSON.
+    `;
 
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',

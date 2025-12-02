@@ -471,7 +471,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onChangeView }) => {
                     </div>
                     <div className="h-[300px] w-full">
                         <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={salesData}>
+                            <ComposedChart data={salesData}>
                                 <defs>
                                     <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
                                         <stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/>
@@ -488,28 +488,54 @@ export const Dashboard: React.FC<DashboardProps> = ({ user, onChangeView }) => {
                                     tickLine={false} 
                                     dy={10} 
                                 />
+                                {/* Left Axis for Revenue */}
                                 <YAxis 
-                                    stroke="#94a3b8" 
+                                    yAxisId="revenue"
+                                    stroke="#10b981" 
                                     tick={{fontSize: 12}} 
                                     axisLine={false} 
                                     tickLine={false} 
                                     tickFormatter={(val) => `₹${val/1000}k`} 
                                 />
+                                {/* Right Axis for Items Sold */}
+                                <YAxis 
+                                    yAxisId="items"
+                                    orientation="right"
+                                    stroke="#3b82f6" 
+                                    tick={{fontSize: 12}} 
+                                    axisLine={false} 
+                                    tickLine={false} 
+                                />
                                 <Tooltip 
                                     contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#fff' }}
                                     itemStyle={{ color: '#fff' }}
-                                    formatter={(val: number) => [`₹${val}`, 'Revenue']}
+                                    formatter={(value: number, name: string) => {
+                                        if (name === 'Revenue') return [`₹${value}`, name];
+                                        return [value, name];
+                                    }}
                                     labelFormatter={(label) => new Date(label).toLocaleDateString()}
                                 />
+                                <Legend />
                                 <Area 
+                                    yAxisId="revenue"
                                     type="monotone" 
                                     dataKey="revenue" 
+                                    name="Revenue"
                                     stroke="#10b981" 
                                     strokeWidth={3} 
                                     fillOpacity={1} 
                                     fill="url(#colorRevenue)" 
                                 />
-                            </AreaChart>
+                                <Line
+                                    yAxisId="items"
+                                    type="monotone"
+                                    dataKey="items_sold"
+                                    name="Items Sold"
+                                    stroke="#3b82f6"
+                                    strokeWidth={3}
+                                    dot={{ r: 4, fill: "#3b82f6", strokeWidth: 2, stroke: "#fff" }}
+                                />
+                            </ComposedChart>
                         </ResponsiveContainer>
                     </div>
                 </div>
