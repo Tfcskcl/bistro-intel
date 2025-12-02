@@ -35,6 +35,9 @@ export interface RecipeCard extends MenuItem {
   confidence?: 'High' | 'Medium' | 'Low';
   assignedRestaurantId?: string;
   assignedRestaurantName?: string;
+  prep_time_minutes?: number;
+  cook_time_minutes?: number;
+  total_time_minutes?: number;
 }
 
 export interface RecipeRequest {

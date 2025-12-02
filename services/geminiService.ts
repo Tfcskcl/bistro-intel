@@ -15,10 +15,41 @@ const generateMockRecipe = (item: MenuItem, requirements: string): RecipeCard =>
     const baseName = item.name || "Custom Dish";
     const nameLower = baseName.toLowerCase();
     
-    // Smart Ingredient Selection based on Name
+    // Smart Ingredient Selection based on Name - ORDER MATTERS (Specific -> Generic)
     const mockIngredients = [];
     
-    if (nameLower.includes('chicken') || nameLower.includes('murgh')) {
+    if (nameLower.includes('risotto')) {
+        mockIngredients.push({ name: "Arborio Rice", qty: "150g", qty_per_serving: 0.15, cost_per_unit: 300, unit: "kg", cost_per_serving: 45 });
+        mockIngredients.push({ name: "Vegetable Stock", qty: "500ml", qty_per_serving: 0.5, cost_per_unit: 60, unit: "l", cost_per_serving: 30 });
+        mockIngredients.push({ name: "Parmesan Cheese", qty: "30g", qty_per_serving: 0.03, cost_per_unit: 1200, unit: "kg", cost_per_serving: 36 });
+        mockIngredients.push({ name: "White Wine", qty: "30ml", qty_per_serving: 0.03, cost_per_unit: 800, unit: "l", cost_per_serving: 24 });
+        if (nameLower.includes('chicken')) {
+             mockIngredients.push({ name: "Chicken Breast", qty: "100g", qty_per_serving: 0.1, cost_per_unit: 250, unit: "kg", cost_per_serving: 25 });
+        } else if (nameLower.includes('mushroom')) {
+             mockIngredients.push({ name: "Button Mushrooms", qty: "80g", qty_per_serving: 0.08, cost_per_unit: 180, unit: "kg", cost_per_serving: 14.4 });
+        }
+    } else if (nameLower.includes('pasta') || nameLower.includes('spaghetti') || nameLower.includes('fettuccine')) {
+        mockIngredients.push({ name: "Pasta (Dry)", qty: "120g", qty_per_serving: 0.12, cost_per_unit: 150, unit: "kg", cost_per_serving: 18 });
+        mockIngredients.push({ name: "Olive Oil", qty: "20ml", qty_per_serving: 0.02, cost_per_unit: 800, unit: "l", cost_per_serving: 16 });
+        mockIngredients.push({ name: "Garlic", qty: "5g", qty_per_serving: 0.005, cost_per_unit: 100, unit: "kg", cost_per_serving: 0.5 });
+        if (nameLower.includes('alfredo') || nameLower.includes('cream')) {
+            mockIngredients.push({ name: "Heavy Cream", qty: "80ml", qty_per_serving: 0.08, cost_per_unit: 220, unit: "l", cost_per_serving: 17.6 });
+        } else {
+            mockIngredients.push({ name: "Tomato Puree", qty: "100g", qty_per_serving: 0.1, cost_per_unit: 60, unit: "kg", cost_per_serving: 6 });
+        }
+    } else if (nameLower.includes('burger')) {
+        mockIngredients.push({ name: "Burger Bun", qty: "1 pc", qty_per_serving: 1, cost_per_unit: 15, unit: "pc", cost_per_serving: 15 });
+        mockIngredients.push({ name: "Patty (Meat/Veg)", qty: "1 pc", qty_per_serving: 1, cost_per_unit: 40, unit: "pc", cost_per_serving: 40 });
+        mockIngredients.push({ name: "Lettuce", qty: "20g", qty_per_serving: 0.02, cost_per_unit: 80, unit: "kg", cost_per_serving: 1.6 });
+        mockIngredients.push({ name: "Cheese Slice", qty: "1 slice", qty_per_serving: 1, cost_per_unit: 12, unit: "slice", cost_per_serving: 12 });
+        mockIngredients.push({ name: "Mayo Sauce", qty: "15g", qty_per_serving: 0.015, cost_per_unit: 180, unit: "kg", cost_per_serving: 2.7 });
+    } else if (nameLower.includes('pizza')) {
+        mockIngredients.push({ name: "Pizza Dough Ball", qty: "200g", qty_per_serving: 0.2, cost_per_unit: 60, unit: "kg", cost_per_serving: 12 });
+        mockIngredients.push({ name: "Mozzarella", qty: "80g", qty_per_serving: 0.08, cost_per_unit: 450, unit: "kg", cost_per_serving: 36 });
+        mockIngredients.push({ name: "Pizza Sauce", qty: "60g", qty_per_serving: 0.06, cost_per_unit: 100, unit: "kg", cost_per_serving: 6 });
+        mockIngredients.push({ name: "Basil", qty: "5g", qty_per_serving: 0.005, cost_per_unit: 400, unit: "kg", cost_per_serving: 2 });
+    } else if (nameLower.includes('chicken') || nameLower.includes('murgh')) {
+        // Generic Chicken fallback
         mockIngredients.push({ name: "Chicken Breast (Boneless)", qty: "200g", qty_per_serving: 0.2, cost_per_unit: 250, unit: "kg", cost_per_serving: 50 });
         mockIngredients.push({ name: "Ginger Garlic Paste", qty: "1 tbsp", qty_per_serving: 0.015, cost_per_unit: 100, unit: "kg", cost_per_serving: 1.5 });
         mockIngredients.push({ name: "Greek Yogurt (Thick)", qty: "50g", qty_per_serving: 0.05, cost_per_unit: 120, unit: "kg", cost_per_serving: 6 });
@@ -40,10 +71,11 @@ const generateMockRecipe = (item: MenuItem, requirements: string): RecipeCard =>
         mockIngredients.push({ name: `Main Protein/Veg for ${baseName}`, qty: "150g", qty_per_serving: 0.15, cost_per_unit: 200, unit: "kg", cost_per_serving: 30 });
     }
 
-    // Add common complex items
-    mockIngredients.push({ name: "Special Spice Blend", qty: "10g", qty_per_serving: 0.01, cost_per_unit: 800, unit: "kg", cost_per_serving: 8 });
-    mockIngredients.push({ name: "Cooking Oil", qty: "20ml", qty_per_serving: 0.02, cost_per_unit: 160, unit: "l", cost_per_serving: 3.2 });
-    mockIngredients.push({ name: "Fresh Garnish (Cilantro/Microgreens)", qty: "5g", qty_per_serving: 0.005, cost_per_unit: 300, unit: "kg", cost_per_serving: 1.5 });
+    // Add common complex items if not already added
+    if (!mockIngredients.some(i => i.name.includes("Oil"))) {
+        mockIngredients.push({ name: "Cooking Oil/Butter", qty: "20ml", qty_per_serving: 0.02, cost_per_unit: 160, unit: "l", cost_per_serving: 3.2 });
+    }
+    mockIngredients.push({ name: "Seasoning (Salt/Pepper)", qty: "5g", qty_per_serving: 0.005, cost_per_unit: 50, unit: "kg", cost_per_serving: 0.25 });
 
     const totalCost = mockIngredients.reduce((acc, curr) => acc + (curr.cost_per_serving || 0), 0);
 
@@ -57,26 +89,29 @@ const generateMockRecipe = (item: MenuItem, requirements: string): RecipeCard =>
         yield: 1,
         preparation_steps: [
             `Mise en place: Gather all ingredients for ${baseName}. Ensure work station is sanitized.`,
-            `Prepare the main ingredient by cleaning and cutting to uniform size (Brunoise/Julienne as suitable). Marinate if required for 20 mins.`,
-            `Heat the cooking vessel to medium-high heat (approx 180°C). Add oil/butter once hot.`,
-            `Sweat aromatics (onions, garlic, ginger) until translucent and fragrant, avoiding browning unless specified.`,
-            `Add the main ingredient and sear to lock in juices (Maillard reaction).`,
-            `Incorporate spices and liquids. Simmer on low heat to develop flavor depth.`,
-            `Check for doneness using a probe thermometer or visual cues (e.g. internal temp 75°C for chicken).`,
-            `Adjust seasoning with salt, pepper, or acidity as needed.`,
-            `Rest the dish for 5 minutes before plating to allow flavors to settle.`,
-            "Garnish freshly and serve immediately at the correct temperature."
+            `Prepare the main components. Cut vegetables to uniform size.`,
+            `Heat the cooking vessel to proper temperature.`,
+            `Begin cooking base aromatics (onions, garlic) if applicable.`,
+            `Add main ingredients in order of cooking time.`,
+            `Season generously with salt and pepper.`,
+            `Simmer or cook until main protein/veg is tender and cooked through.`,
+            `Check seasoning and adjust acidity or salt.`,
+            `Rest the dish for a few minutes if served hot.`,
+            `Plate carefully and garnish before serving.`
         ],
         equipment_needed: ["Chef Knife", "Cutting Board", "Heavy Bottom Pan", "Mixing Bowls", "Tongs/Spatula", "Thermometer"],
-        portioning_guideline: isDrink ? "350ml Glass" : "Standard 28cm Dinner Plate, centered presentation",
-        allergens: ["Check Ingredients", "Dairy", "Nuts (if used)"],
+        portioning_guideline: isDrink ? "350ml Glass" : "Standard Serving Size",
+        allergens: ["Check Ingredients"],
         shelf_life_hours: 24,
         food_cost_per_serving: totalCost,
         suggested_selling_price: Math.ceil(totalCost / 0.30), // 30% Food Cost Model
-        tags: ["Auto-Generated", "Draft", "Detailed"],
-        human_summary: `A comprehensive generated recipe for ${baseName}. This card includes detailed costing estimations and professional preparation steps suitable for kitchen staff training.`,
-        reasoning: "Generated using BistroIntelligence Mock Engine. Ingredients selected based on standard culinary pairings for this dish type.",
-        confidence: "Medium"
+        tags: ["Auto-Generated", "Draft", "Offline Mode"],
+        human_summary: `A generated recipe draft for ${baseName}. This uses offline estimations as the AI service was unreachable. Please review costs and ingredients.`,
+        reasoning: "Generated using BistroIntelligence Offline Engine. Please connect API Key for full AI precision.",
+        confidence: "Low",
+        prep_time_minutes: 20,
+        cook_time_minutes: 15,
+        total_time_minutes: 35
     };
 };
 
@@ -307,16 +342,16 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
     Location: ${location || 'India'}
     
     REQUIREMENTS:
-    1. INGREDIENTS: List EVERY single ingredient including oils, spices, and garnishes. Use precise metric units (g, ml). 
+    1. INGREDIENTS: List EVERY single ingredient including oils, spices, and garnishes. Use precise metric units (g, ml). Ensure costs are realistic for the location.
     2. PREPARATION STEPS (CRITICAL): 
        - Break down instructions into granular, actionable steps.
-       - MANDATORY: Use professional culinary terminology for techniques (e.g., 'brunoise' instead of 'chop small', 'sweat' instead of 'cook onions', 'emulsify', 'blanch').
+       - MANDATORY: Use professional culinary terminology for techniques (e.g., 'brunoise', 'sweat', 'emulsify', 'blanch').
        - Include precise temperatures (e.g., "Bake at 180°C/350°F").
        - Include specific timings (e.g., "Sear for 2 mins per side").
-       - Include sensory cues for doneness (e.g., "until golden brown and fragrant", "until sauce coats the back of a spoon").
+       - Include sensory cues for doneness (e.g., "until golden brown and fragrant").
     3. COSTING: Estimate realistic ingredient costs for ${location || 'India'} in local currency.
-    4. PRICING: Suggested Selling Price should be calculated based on a 30% Food Cost model (Cost * 3.3).
-    5. REASONING: Explain the culinary logic behind key ingredient choices or techniques used (e.g. "Acid added to balance richness").
+    4. PRICING: Suggested Selling Price should be calculated based on a 30% Food Cost model.
+    5. REASONING: Explain the culinary logic behind key ingredient choices or techniques used.
     6. TIME BREAKDOWN: Estimate Prep Time and Cook Time separately.
     7. EQUIPMENT: List all specific kitchen tools required.
     
@@ -325,7 +360,7 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
 
     try {
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-3-pro-preview', // Upgraded for better reasoning and strict schema adherence
             contents: prompt,
             config: { 
                 responseMimeType: 'application/json',
@@ -371,7 +406,7 @@ export const generateRecipeVariation = async (userId: string, original: RecipeCa
         Return valid JSON matching the schema.
         `;
         const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-3-pro-preview', // Upgraded
             contents: prompt,
             config: { 
                 responseMimeType: 'application/json',
