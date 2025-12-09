@@ -728,6 +728,30 @@ export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
         </div>
       </footer>
 
+      {/* Demo Video Modal */}
+      {showDemo && (
+        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in" onClick={() => setShowDemo(false)}>
+            <div className="relative w-full max-w-6xl aspect-video bg-black rounded-3xl shadow-2xl overflow-hidden border border-stone-800" onClick={e => e.stopPropagation()}>
+                <button 
+                    onClick={() => setShowDemo(false)}
+                    className="absolute top-6 right-6 z-10 p-3 bg-black/50 hover:bg-white hover:text-black text-white rounded-full transition-all backdrop-blur-sm border border-white/10"
+                >
+                    <X size={24} />
+                </button>
+                <iframe 
+                    width="100%" 
+                    height="100%" 
+                    src="https://www.youtube.com/embed/ysz5S6PUM-U?autoplay=1&modestbranding=1&rel=0" 
+                    title="BistroIntelligence Demo" 
+                    frameBorder="0" 
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                    allowFullScreen
+                    className="w-full h-full"
+                ></iframe>
+            </div>
+        </div>
+      )}
+
       {/* Legal Modal */}
       {activeLegal && (
           <div className="fixed inset-0 z-[100] bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setActiveLegal(null)}>

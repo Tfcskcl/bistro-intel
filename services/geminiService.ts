@@ -22,10 +22,11 @@ import { ingredientService } from './ingredientService';
 export const hasValidApiKey = (): boolean => {
     try {
         // Robust check for process.env.API_KEY
-        return typeof process !== 'undefined' && 
-               !!process.env && 
-               !!process.env.API_KEY && 
-               process.env.API_KEY.trim().length > 0;
+        if (typeof process !== 'undefined' && process.env) {
+             const key = process.env.API_KEY;
+             return !!key && key.trim().length > 0;
+        }
+        return false;
     } catch (e) {
         return false;
     }
@@ -45,8 +46,8 @@ const createAIClient = () => {
     try {
         return new GoogleGenAI({ apiKey });
     } catch (e) {
-        // Suppress initialization errors
-        console.error("Failed to initialize GoogleGenAI client:", e);
+        // Suppress initialization errors to avoid leaking key
+        console.error("Failed to initialize GoogleGenAI client");
         return null;
     }
 };
@@ -102,11 +103,14 @@ async function safeGenerate<T>(
     try {
         return await apiCall();
     } catch (e: any) {
-        const msg = e.toString();
+        const key = getApiKey();
+        // Redact key from error message if present
+        const msg = e.toString().replace(key, '[REDACTED]');
+        
         if (msg.includes("403") || msg.includes("PERMISSION_DENIED")) {
-            console.warn(`[${operationName}] API Key Restricted. Switching to Demo Mode.`);
+            console.warn(`[${operationName}] API Key Restricted/Invalid. Switching to Demo Mode.`);
         } else {
-            console.warn(`[${operationName}] Failed: ${e.message || "Unknown error"}. Using fallback.`);
+            console.warn(`[${operationName}] Failed: ${msg}. Using fallback.`);
         }
         return fallback;
     }
@@ -802,13 +806,16 @@ export async function generateKitchenLayout(
 
         if (image) {
             // SDK expects base64 string in inlineData without the data URL prefix
-            const base64Data = image.split(',')[1];
-            contentParts.push({
-                inlineData: {
-                    mimeType: "image/png", 
-                    data: base64Data
-                }
-            });
+            // Determine mimeType dynamically
+            const match = image.match(/^data:(.+);base64,(.+)$/);
+            if (match) {
+                contentParts.push({
+                    inlineData: {
+                        mimeType: match[1], 
+                        data: match[2]
+                    }
+                });
+            }
         }
 
         const response = await client.models.generateContent({
@@ -848,12 +855,14 @@ export async function generateMarketingVideo(images: string[], prompt: string, a
         // Prepare image payload if reference images exist
         let imagePayload = undefined;
         if (images && images.length > 0) {
-            // Remove data:image/png;base64, prefix if present
-            const base64Data = images[0].split(',')[1];
-            imagePayload = {
-                imageBytes: base64Data,
-                mimeType: 'image/png',
-            };
+            // Extract actual mime type from data URI
+            const match = images[0].match(/^data:(.+);base64,(.+)$/);
+            if (match) {
+                imagePayload = {
+                    imageBytes: match[2],
+                    mimeType: match[1],
+                };
+            }
         }
 
         let operation = await client.models.generateVideos({
