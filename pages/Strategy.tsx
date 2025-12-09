@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { generateStrategy, generateImplementationPlan } from '../services/geminiService';
-import { StrategyReport, UserRole, User, ImplementationGuide, PlanType } from '../types';
-import { Send, Loader2, User as UserIcon, Briefcase, TrendingUp, HelpCircle, Play, LifeBuoy, X, BookOpen, UserCheck, Calendar, Sparkles, Target, AlertTriangle, ArrowUpRight, ArrowDownRight, Map, PieChart as PieChartIcon, ScatterChart as ScatterChartIcon, Wallet, TrendingDown, Users, Star, CheckCircle2, Phone, Award, Video, Building2 } from 'lucide-react';
+import { generateStrategy, generateImplementationPlan, generateABTestStrategy } from '../services/geminiService';
+import { StrategyReport, UserRole, User, ImplementationGuide, PlanType, ABTestResult } from '../types';
+import { Send, Loader2, User as UserIcon, Briefcase, TrendingUp, HelpCircle, Play, LifeBuoy, X, BookOpen, UserCheck, Calendar, Sparkles, Target, AlertTriangle, ArrowUpRight, ArrowDownRight, Map, PieChart as PieChartIcon, ScatterChart as ScatterChartIcon, Wallet, TrendingDown, Users, Star, CheckCircle2, Phone, Award, Video, Building2, Split, BarChart3, Rocket } from 'lucide-react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend, ScatterChart, Scatter, ZAxis } from 'recharts';
 import { storageService } from '../services/storageService';
 import { paymentService } from '../services/paymentService';
@@ -22,7 +22,15 @@ const QUICK_PROMPTS = [
 export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
   const [role, setRole] = useState<UserRole>(user.role);
   const [query, setQuery] = useState('');
+  
+  // Standard Report State
   const [report, setReport] = useState<StrategyReport | null>(null);
+  
+  // A/B Test State
+  const [abMode, setAbMode] = useState(false);
+  const [abResult, setAbResult] = useState<ABTestResult | null>(null);
+  const [activeVariant, setActiveVariant] = useState<'a' | 'b' | null>(null);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [actionStates, setActionStates] = useState<ActionState>({});
@@ -51,6 +59,8 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
     if (textOverride) setQuery(textOverride);
     setLoading(true);
     setReport(null);
+    setAbResult(null);
+    setActiveVariant(null);
     setError(null);
     
     // Gather Context
@@ -60,9 +70,14 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
     const salesSummary = `Average Daily Revenue: ₹${avgRev}. Total Orders (last 30 days): ${salesData.reduce((acc: any, c: any) => acc + c.items_sold, 0)}.`;
 
     try {
-      // Pass full user object and sales context for deep analysis
-      const data = await generateStrategy(user, textToSend, salesSummary);
-      setReport(data);
+      if (abMode) {
+          const abData = await generateABTestStrategy(user, textToSend, salesSummary);
+          setAbResult(abData);
+      } else {
+          // Standard Strategy
+          const data = await generateStrategy(user, textToSend, salesSummary);
+          setReport(data);
+      }
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -101,6 +116,20 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
       );
   };
 
+  // Helper for A/B Chart
+  const getAbChartData = () => {
+      if (!abResult) return [];
+      const baseline = abResult.baseline_metric.value;
+      const liftA = baseline * (1 + (abResult.variant_a.projected_revenue_lift_pct / 100));
+      const liftB = baseline * (1 + (abResult.variant_b.projected_revenue_lift_pct / 100));
+      
+      return [
+          { name: 'Baseline', value: baseline, fill: '#94a3b8' },
+          { name: 'Strategy A', value: liftA, fill: '#3b82f6' },
+          { name: 'Strategy B', value: liftB, fill: '#8b5cf6' }
+      ];
+  };
+
   return (
     <div className="h-[calc(100vh-6rem)] flex flex-col bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden relative transition-colors">
       {/* Header */}
@@ -109,18 +138,33 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
             <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded-lg"><UserIcon size={20} /></div>
             <div className="text-sm font-semibold text-slate-700 dark:text-slate-200 px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">Viewing as: {user.role.replace('_', ' ')}</div>
         </div>
-        <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-800 rounded-full text-xs font-bold"><Wallet size={12}/> Credits: {user.credits}</div>
+        <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+                <span className={`text-xs font-bold ${abMode ? 'text-slate-800 dark:text-white' : 'text-slate-400'}`}>A/B Testing</span>
+                <button 
+                    onClick={() => setAbMode(!abMode)}
+                    className={`w-10 h-5 rounded-full relative transition-colors ${abMode ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+                >
+                    <div className={`w-3 h-3 bg-white rounded-full absolute top-1 transition-transform ${abMode ? 'left-6' : 'left-1'}`}></div>
+                </button>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-800 rounded-full text-xs font-bold"><Wallet size={12}/> Credits: {user.credits}</div>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 sm:p-8 bg-slate-50 dark:bg-slate-900 custom-scrollbar">
         {error && <div className="max-w-4xl mx-auto mb-4 p-4 bg-red-50 text-red-700 rounded-lg flex items-center gap-3"><AlertTriangle size={20} />{error}</div>}
 
-        {!report && !loading && (
+        {!report && !abResult && !loading && (
           <div className="h-full flex flex-col items-center justify-center p-4">
             <div className="text-slate-400 opacity-60 mb-8 flex flex-col items-center">
-                <TrendingUp size={48} className="mb-4" />
-                <h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-2">Bistro Strategy AI</h2>
-                <p className="text-sm text-slate-500 max-w-md text-center">Your personal consultant. I analyze your location, weather patterns, competition, and data to provide actionable advice.</p>
+                {abMode ? <Split size={48} className="mb-4" /> : <TrendingUp size={48} className="mb-4" />}
+                <h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-2">{abMode ? 'Strategy Comparison Engine' : 'Bistro Strategy AI'}</h2>
+                <p className="text-sm text-slate-500 max-w-md text-center">
+                    {abMode 
+                        ? 'Compare two distinct strategic approaches side-by-side to find the best path for your growth.' 
+                        : 'Your personal consultant. I analyze your location, weather, and data to provide actionable advice.'}
+                </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-4xl w-full">
@@ -147,13 +191,14 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
             <div className="flex flex-col justify-center items-center h-full gap-4">
                 <Loader2 className="animate-spin text-emerald-600" size={48} />
                 <p className="text-slate-500 animate-pulse font-medium text-center">
-                    Analyzing market conditions in {user.location || 'your area'}...<br/>
+                    {abMode ? 'Simulating parallel strategic outcomes...' : 'Analyzing market conditions...'} <br/>
                     <span className="text-xs opacity-75">Checking weather, competition, and sales trends.</span>
                 </p>
             </div>
         )}
 
-        {report && (
+        {/* Standard Report View */}
+        {report && !abMode && (
           <div className="max-w-5xl mx-auto space-y-8 pb-20 animate-fade-in">
             {/* Executive Summary */}
             <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
@@ -161,7 +206,7 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                     <Sparkles className="text-emerald-500" size={20}/> Executive Analysis
                 </h3>
                 <ul className="space-y-3">
-                    {report.summary.map((s,i) => (
+                    {report.summary?.map((s,i) => (
                         <li key={i} className="flex gap-3 text-slate-700 dark:text-slate-300 leading-relaxed">
                             <span className="w-1.5 h-1.5 rounded-full bg-slate-400 mt-2 shrink-0"></span>
                             {s}
@@ -175,7 +220,7 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                 <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700">
                     <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">Strategic Initiatives</h3>
                     <div className="space-y-4">
-                        {report.action_plan.map((action, i) => (
+                        {report.action_plan?.map((action, i) => (
                             <div key={i} className="p-4 bg-slate-50 dark:bg-slate-900 rounded-lg border-l-4 border-l-emerald-500">
                                 <div className="flex justify-between items-start mb-1">
                                     <h4 className="font-bold text-slate-800 dark:text-white text-sm">{action.initiative}</h4>
@@ -195,7 +240,7 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                 <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700">
                     <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">Seasonal Menu Engineering</h3>
                     <div className="space-y-3">
-                        {report.seasonal_menu_suggestions.map((item, i) => (
+                        {report.seasonal_menu_suggestions?.map((item, i) => (
                             <div key={i} className="flex items-center justify-between p-3 border-b border-slate-100 dark:border-slate-700 last:border-0">
                                 <div>
                                     <p className="font-bold text-slate-800 dark:text-white text-sm">{item.item}</p>
@@ -214,12 +259,12 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
             <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700">
                 <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-6">Implementation Roadmap</h3>
                 <div className="relative border-l-2 border-slate-200 dark:border-slate-700 ml-4 space-y-8">
-                    {report.roadmap.map((phase, i) => (
+                    {report.roadmap?.map((phase, i) => (
                         <div key={i} className="relative pl-8">
                             <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-emerald-500 border-4 border-white dark:border-slate-800"></div>
                             <h4 className="font-bold text-slate-800 dark:text-white">{phase.phase_name} <span className="text-xs font-normal text-slate-500 ml-2">({phase.duration})</span></h4>
                             <ul className="mt-2 space-y-1">
-                                {phase.steps.map((step, j) => (
+                                {phase.steps?.map((step, j) => (
                                     <li key={j} className="text-sm text-slate-600 dark:text-slate-300 flex items-center gap-2">
                                         <CheckCircle2 size={12} className="text-emerald-500"/> {step}
                                     </li>
@@ -232,9 +277,128 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                     ))}
                 </div>
             </div>
+          </div>
+        )}
 
-            {/* Expert Implementation Services */}
-            <div className="space-y-4">
+        {/* A/B Test Results View */}
+        {abResult && abMode && (
+            <div className="max-w-6xl mx-auto space-y-8 pb-20 animate-fade-in">
+                {/* Comparison Header */}
+                <div className="text-center">
+                    <h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-2">Strategy Comparison</h2>
+                    <p className="text-slate-500 dark:text-slate-400">Projected outcomes for "{abResult.query}"</p>
+                </div>
+
+                {/* Impact Chart */}
+                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 h-[300px]">
+                    <h3 className="text-sm font-bold text-slate-500 uppercase mb-4 text-center">Projected Revenue Impact</h3>
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={getAbChartData()} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                            <XAxis type="number" hide />
+                            <YAxis dataKey="name" type="category" width={100} tick={{fontSize: 12}} />
+                            <RechartsTooltip 
+                                formatter={(value: number) => `₹${value.toLocaleString()}`}
+                                contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                            />
+                            <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={40}>
+                                {getAbChartData().map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={entry.fill} />
+                                ))}
+                            </Bar>
+                        </BarChart>
+                    </ResponsiveContainer>
+                </div>
+
+                {/* Side-by-Side Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    {/* Strategy A */}
+                    <div className={`relative p-6 rounded-2xl border transition-all ${activeVariant === 'a' ? 'bg-blue-50 dark:bg-blue-900/10 border-blue-500 ring-2 ring-blue-500/20' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
+                        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-blue-500 text-white px-4 py-1 rounded-full text-xs font-bold shadow-sm">Strategy A</div>
+                        <h3 className="text-xl font-bold text-slate-800 dark:text-white mt-4 text-center">{abResult.variant_a.name}</h3>
+                        <p className="text-sm text-slate-500 text-center mb-6">{abResult.variant_a.description}</p>
+                        
+                        <div className="space-y-4 mb-8">
+                            <div className="flex justify-between text-sm">
+                                <span className="text-slate-500">Revenue Lift</span>
+                                <span className="font-bold text-emerald-600">+{abResult.variant_a.projected_revenue_lift_pct}%</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                                <span className="text-slate-500">Difficulty</span>
+                                <span className={`font-bold ${abResult.variant_a.implementation_difficulty === 'High' ? 'text-red-500' : 'text-blue-500'}`}>{abResult.variant_a.implementation_difficulty}</span>
+                            </div>
+                        </div>
+
+                        <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-lg mb-6">
+                            <h4 className="text-xs font-bold text-slate-500 uppercase mb-2">Key Steps</h4>
+                            <ul className="space-y-2">
+                                {abResult.variant_a.key_steps.map((step, i) => (
+                                    <li key={i} className="flex gap-2 text-sm text-slate-700 dark:text-slate-300">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 shrink-0"></div>
+                                        {step}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+
+                        <button 
+                            onClick={() => setActiveVariant('a')}
+                            className={`w-full py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-colors ${activeVariant === 'a' ? 'bg-blue-600 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'}`}
+                        >
+                            {activeVariant === 'a' ? <CheckCircle2 size={18}/> : <Rocket size={18}/>}
+                            {activeVariant === 'a' ? 'Strategy A Active' : 'Activate Strategy A'}
+                        </button>
+                    </div>
+
+                    {/* Strategy B */}
+                    <div className={`relative p-6 rounded-2xl border transition-all ${activeVariant === 'b' ? 'bg-purple-50 dark:bg-purple-900/10 border-purple-500 ring-2 ring-purple-500/20' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
+                        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-purple-500 text-white px-4 py-1 rounded-full text-xs font-bold shadow-sm">Strategy B</div>
+                        <h3 className="text-xl font-bold text-slate-800 dark:text-white mt-4 text-center">{abResult.variant_b.name}</h3>
+                        <p className="text-sm text-slate-500 text-center mb-6">{abResult.variant_b.description}</p>
+                        
+                        <div className="space-y-4 mb-8">
+                            <div className="flex justify-between text-sm">
+                                <span className="text-slate-500">Revenue Lift</span>
+                                <span className="font-bold text-emerald-600">+{abResult.variant_b.projected_revenue_lift_pct}%</span>
+                            </div>
+                            <div className="flex justify-between text-sm">
+                                <span className="text-slate-500">Difficulty</span>
+                                <span className={`font-bold ${abResult.variant_b.implementation_difficulty === 'High' ? 'text-red-500' : 'text-blue-500'}`}>{abResult.variant_b.implementation_difficulty}</span>
+                            </div>
+                        </div>
+
+                        <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-lg mb-6">
+                            <h4 className="text-xs font-bold text-slate-500 uppercase mb-2">Key Steps</h4>
+                            <ul className="space-y-2">
+                                {abResult.variant_b.key_steps.map((step, i) => (
+                                    <li key={i} className="flex gap-2 text-sm text-slate-700 dark:text-slate-300">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-purple-400 mt-1.5 shrink-0"></div>
+                                        {step}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+
+                        <button 
+                            onClick={() => setActiveVariant('b')}
+                            className={`w-full py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-colors ${activeVariant === 'b' ? 'bg-purple-600 text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'}`}
+                        >
+                            {activeVariant === 'b' ? <CheckCircle2 size={18}/> : <Rocket size={18}/>}
+                            {activeVariant === 'b' ? 'Strategy B Active' : 'Activate Strategy B'}
+                        </button>
+                    </div>
+                </div>
+
+                {/* AI Recommendation */}
+                <div className="bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-xl border border-emerald-100 dark:border-emerald-800 text-center">
+                    <p className="text-sm font-bold text-emerald-800 dark:text-emerald-300">🤖 AI Recommendation</p>
+                    <p className="text-sm text-emerald-700 dark:text-emerald-400 mt-1">{abResult.recommendation}</p>
+                </div>
+            </div>
+        )}
+
+        {/* Expert Implementation Services (Available in both modes if result exists) */}
+        {(report || abResult) && (
+            <div className="space-y-4 max-w-5xl mx-auto mt-12 pb-12">
                 <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
                     <Award className="text-yellow-500" /> Bistro Expert Connect
                 </h3>
@@ -313,8 +477,6 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                     </div>
                 </div>
             </div>
-
-          </div>
         )}
       </div>
       
@@ -325,7 +487,7 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                 type="text" 
                 value={query} 
                 onChange={(e) => setQuery(e.target.value)} 
-                placeholder="Ask a custom strategic question about your business..."
+                placeholder={abMode ? "Compare two strategies for... (e.g. increasing lunch sales)" : "Ask a custom strategic question..."}
                 className="w-full pl-4 pr-12 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:ring-2 focus:ring-emerald-500 outline-none dark:text-white placeholder-slate-400"
                 onKeyDown={(e) => e.key === 'Enter' && handleSend()}
               />

@@ -56,6 +56,10 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
   const handleSave = () => {
     if (generatedSOP) {
       storageService.saveSOP(user.id, generatedSOP);
+      
+      // Auto-generate Task
+      storageService.addTask(user.id, `Conduct training session for SOP: ${generatedSOP.title}`, ['Kitchen', 'Admin']);
+      
       loadSavedSOPs();
       setViewMode('saved');
       setGeneratedSOP(null);
@@ -64,10 +68,15 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
   };
 
   const handleCopyLink = (sop: SOP) => {
-      const link = `${window.location.origin}/sop/share/${sop.sop_id}`;
-      navigator.clipboard.writeText(link);
-      setCopyStatus("Shareable link copied to clipboard!");
-      setTimeout(() => setCopyStatus(null), 3000);
+      // Create a dummy link for demo purposes
+      const link = `https://bistroconnect.in/sop/view/${sop.sop_id}`;
+      navigator.clipboard.writeText(link).then(() => {
+          setCopyStatus("Link copied to clipboard!");
+          setTimeout(() => setCopyStatus(null), 3000);
+      }).catch(err => {
+          console.error('Failed to copy: ', err);
+          setCopyStatus("Failed to copy link");
+      });
   };
 
   return (
@@ -120,7 +129,7 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
                         <div>
                             <h3 className="font-bold text-slate-800 dark:text-white mb-2">Procedure</h3>
                             <div className="space-y-2">
-                                {generatedSOP.stepwise_procedure.map((s,i)=>(
+                                {generatedSOP.stepwise_procedure?.map((s,i)=>(
                                     <div key={i} className="flex gap-3 text-sm p-3 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-100 dark:border-slate-700">
                                         <span className="font-bold text-slate-400">{s.step_no}.</span>
                                         <div className="flex-1">
@@ -137,11 +146,11 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
                         <div className="grid grid-cols-2 gap-6">
                             <div>
                                 <h3 className="font-bold text-slate-800 dark:text-white mb-2 text-sm uppercase">Equipment</h3>
-                                <ul className="list-disc pl-5 text-sm text-slate-600 dark:text-slate-300">{generatedSOP.materials_equipment.map((m,i)=><li key={i}>{m}</li>)}</ul>
+                                <ul className="list-disc pl-5 text-sm text-slate-600 dark:text-slate-300">{generatedSOP.materials_equipment?.map((m,i)=><li key={i}>{m}</li>)}</ul>
                             </div>
                             <div>
                                 <h3 className="font-bold text-slate-800 dark:text-white mb-2 text-sm uppercase">KPIs</h3>
-                                <ul className="list-disc pl-5 text-sm text-slate-600 dark:text-slate-300">{generatedSOP.kpis.map((k,i)=><li key={i}>{k}</li>)}</ul>
+                                <ul className="list-disc pl-5 text-sm text-slate-600 dark:text-slate-300">{generatedSOP.kpis?.map((k,i)=><li key={i}>{k}</li>)}</ul>
                             </div>
                         </div>
                     </div>
@@ -164,7 +173,7 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
                             <h4 className="font-bold text-lg text-slate-800 dark:text-white mb-1">{sop.title}</h4>
                             <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">{sop.scope}</p>
                             <div className="mt-3 flex gap-2">
-                                <span className="text-[10px] bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-1 rounded">{sop.stepwise_procedure.length} Steps</span>
+                                <span className="text-[10px] bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-1 rounded">{sop.stepwise_procedure?.length} Steps</span>
                             </div>
                         </div>
                         <button 

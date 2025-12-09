@@ -9,11 +9,17 @@ interface Message {
     text: string;
 }
 
-export const ChatAssistant: React.FC = () => {
+interface ChatAssistantProps {
+    welcomeMessage?: string;
+}
+
+export const ChatAssistant: React.FC<ChatAssistantProps> = ({ 
+    welcomeMessage = 'Hello! I\'m your BistroIntelligence assistant. I can help you navigate the app or answer questions about your restaurant operations. How can I help?' 
+}) => {
     const [isOpen, setIsOpen] = useState(false);
     const [input, setInput] = useState('');
     const [messages, setMessages] = useState<Message[]>([
-        { id: '1', role: 'assistant', text: 'Hello! I\'m your BistroIntelligence assistant. I can help you navigate the app or answer questions about your restaurant operations. How can I help?' }
+        { id: '1', role: 'assistant', text: welcomeMessage }
     ]);
     const [loading, setLoading] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -53,7 +59,7 @@ export const ChatAssistant: React.FC = () => {
     };
 
     return (
-        <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end font-sans">
+        <div className="fixed bottom-6 right-6 z-[60] flex flex-col items-end font-sans">
             {isOpen && (
                 <div className="mb-4 w-80 sm:w-96 h-[500px] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 flex flex-col overflow-hidden animate-scale-in origin-bottom-right">
                     {/* Header */}

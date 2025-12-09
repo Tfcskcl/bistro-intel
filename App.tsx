@@ -13,154 +13,67 @@ import { Billing } from './pages/Billing';
 import { Landing } from './pages/Landing';
 import { KitchenWorkflow } from './pages/KitchenWorkflow';
 import { MenuGenerator } from './pages/MenuGenerator';
-import { InventoryManager } from './pages/InventoryManager'; // New Import
-import { AppView, User, PlanType } from './types';
+import { InventoryManager } from './pages/InventoryManager'; 
+import { CCTVAnalytics } from './pages/CCTVAnalytics';
+import { KitchenLayoutDesigner } from './pages/KitchenLayoutDesigner';
+import { TaskManager } from './pages/TaskManager';
+import OnboardingWizard from './components/OnboardingWizard';
+import { ChatAssistant } from './components/ChatAssistant';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { AppView, User } from './types';
 import { authService } from './services/authService';
-import { trackingService } from './services/trackingService';
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
   const [currentView, setCurrentView] = useState<AppView>(AppView.DASHBOARD);
-  const [loading, setLoading] = useState(true);
   const [showLogin, setShowLogin] = useState(false);
-  
-  // Theme State
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    const saved = localStorage.getItem('theme');
-    if (saved === 'dark' || saved === 'light') return saved;
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  });
+  const [theme, setTheme] = useState<'light'|'dark'>('light');
 
   useEffect(() => {
-    if (theme === 'dark') {
-        document.documentElement.classList.add('dark');
-    } else {
-        document.documentElement.classList.remove('dark');
-    }
-    localStorage.setItem('theme', theme);
-  }, [theme]);
-
-  const toggleTheme = () => {
-    setTheme(prev => prev === 'light' ? 'dark' : 'light');
-  };
-
-  useEffect(() => {
-    // Subscribe to Firebase Auth State
-    const unsubscribe = authService.subscribe((u) => {
-      setUser(u);
-      setLoading(false);
-      if (u) {
-        trackingService.initSession(u);
-      }
-    });
-
-    return () => unsubscribe();
+    return authService.subscribe((u) => setUser(u));
   }, []);
 
-  // Track View Changes
-  useEffect(() => {
-    trackingService.trackPageView(currentView, user || undefined);
-  }, [currentView, user]);
-
-  const handleLogin = (userData: User) => {
-    // State is handled by subscribe, but we can close modal here
-    setShowLogin(false);
-    setCurrentView(AppView.DASHBOARD);
-  };
-
-  const handleLogout = async () => {
-    await authService.logout();
-    // User state update handled by subscribe
-    setCurrentView(AppView.DASHBOARD);
-    setShowLogin(false);
-  };
-
-  const onUserUpdate = async (updatedUser: User) => {
-      await authService.updateUser(updatedUser);
-      // Optimistic update
-      setUser(updatedUser);
-  };
-
-  const handleUpgrade = (plan: PlanType) => {
+  const handleOnboardingComplete = async () => {
       if (user) {
-          const updatedUser = { 
-              ...user, 
-              plan, 
-              isTrial: false,
-              queriesUsed: undefined,
-              queryLimit: undefined
-          };
-          onUserUpdate(updatedUser);
-          alert(`Success! Upgraded to ${plan} plan.`);
+          const updated = { ...user, setupComplete: true };
+          await authService.updateUser(updated);
+          setUser(updated);
       }
   };
 
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 text-slate-400 flex-col gap-4">
-      <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-      Loading BistroIntelligence...
-    </div>;
+  if (!user && !showLogin) return <Landing onGetStarted={() => setShowLogin(true)} />;
+  if (!user && showLogin) return <Login onLogin={() => setShowLogin(false)} onBack={() => setShowLogin(false)} />;
+
+  if (user && !user.setupComplete) {
+      return <OnboardingWizard onComplete={handleOnboardingComplete} />;
   }
 
-  // Route: Authenticated User
-  if (user) {
-    const renderView = () => {
-        switch (currentView) {
-          case AppView.DASHBOARD:
-            return <Dashboard user={user} onChangeView={setCurrentView} />;
-          case AppView.INVENTORY: // New Route
-            return <InventoryManager user={user} onUserUpdate={onUserUpdate} />;
-          case AppView.RECIPES:
-            return <RecipeHub user={user} onUserUpdate={onUserUpdate} />;
-          case AppView.SOP:
-            return <SOPStudio user={user} onUserUpdate={onUserUpdate} />;
-          case AppView.STRATEGY:
-            return <Strategy user={user} onUserUpdate={onUserUpdate} />;
-          case AppView.VIDEO:
-            return <VideoStudio user={user} />;
-          case AppView.KITCHEN_WORKFLOW:
-            return <KitchenWorkflow user={user} onUserUpdate={onUserUpdate} />;
-          case AppView.MENU_GENERATOR:
-            return <MenuGenerator user={user} onUserUpdate={onUserUpdate} />;
-          case AppView.INTEGRATIONS:
-            return <Integrations />;
-          case AppView.BILLING:
-            return <Billing user={user} onUpgrade={handleUpgrade} />;
-          default:
-            return <Dashboard user={user} onChangeView={setCurrentView} />;
-        }
-      };
-    
-      return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-200">
-          <Sidebar 
-            currentView={currentView} 
-            onChangeView={setCurrentView} 
-            user={user}
-            onLogout={handleLogout}
-          />
-          
-          <div className="ml-64 flex flex-col min-h-screen">
-            <Header 
-              theme={theme} 
-              toggleTheme={toggleTheme} 
-              currentView={currentView}
-              onChangeView={setCurrentView}
-            />
-            <main className="flex-1 p-8 overflow-y-auto">
-              {renderView()}
-            </main>
-          </div>
-        </div>
-      );
-  }
-
-  // Route: Public
-  if (showLogin) {
-      return <Login onLogin={handleLogin} onBack={() => setShowLogin(false)} />;
-  }
-
-  return <Landing onGetStarted={() => setShowLogin(true)} />;
+  return (
+    <div className={`min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white flex transition-colors ${theme}`}>
+      <Sidebar currentView={currentView} onChangeView={setCurrentView} user={user!} onLogout={authService.logout} />
+      <div className="flex-1 ml-64 flex flex-col">
+        <Header theme={theme} toggleTheme={() => setTheme(t => t==='light'?'dark':'light')} currentView={currentView} onChangeView={setCurrentView} />
+        <main className="p-8 flex-1 overflow-y-auto">
+          <ErrorBoundary>
+            {currentView === AppView.DASHBOARD && <Dashboard user={user!} onChangeView={setCurrentView} />}
+            {currentView === AppView.CCTV_ANALYTICS && <CCTVAnalytics user={user!} />}
+            {currentView === AppView.TASKS && <TaskManager user={user!} />}
+            {currentView === AppView.RECIPES && <RecipeHub user={user!} />}
+            {currentView === AppView.INVENTORY && <InventoryManager user={user!} />}
+            {currentView === AppView.MENU_GENERATOR && <MenuGenerator user={user!} />}
+            {currentView === AppView.SOP && <SOPStudio user={user!} />}
+            {currentView === AppView.STRATEGY && <Strategy user={user!} />}
+            {currentView === AppView.KITCHEN_WORKFLOW && <KitchenWorkflow user={user!} />}
+            {currentView === AppView.LAYOUT_DESIGN && <KitchenLayoutDesigner user={user!} onUserUpdate={setUser} />}
+            {currentView === AppView.VIDEO && <VideoStudio user={user!} />}
+            {currentView === AppView.INTEGRATIONS && <Integrations />}
+            {currentView === AppView.BILLING && <Billing user={user!} onUpgrade={()=>{}} />}
+          </ErrorBoundary>
+        </main>
+      </div>
+      <ChatAssistant />
+    </div>
+  );
 }
 
 export default App;

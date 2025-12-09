@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { ArrowRight, AlertCircle, CheckCircle2, ArrowLeft, Mail, KeyRound, Store, MapPin, ChefHat, ShieldCheck, User as UserIcon, Shield, FileText, Upload, Loader2, Sparkles, Map } from 'lucide-react';
 import { User, UserRole, PlanType } from '../types';
@@ -75,7 +76,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
       if (mode === 'login') {
         const user = await authService.login(email, password);
         
-        // CHECK: Only seed data for specific Demo Accounts
+        // Seed data for known demo accounts AND check if seed flag is missing for others
         const demoEmails = [
             'owner@bistro.com', 
             'admin@bistro.com', 
@@ -85,6 +86,9 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
         ];
         
         if (demoEmails.includes(user.email.toLowerCase())) {
+            storageService.seedDemoData(user.id);
+        } else {
+            // Also ensure regular users get starter data if their DB is empty
             storageService.seedDemoData(user.id);
         }
 
@@ -110,6 +114,10 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
           credits: 50 // Updated: Default starting credits for 3-day trial
         };
         const user = await authService.signup(newUser, password);
+        
+        // IMPORTANT: Seed data for new signups so they see recipes immediately
+        storageService.seedDemoData(user.id);
+        
         onLogin(user);
       }
     } catch (err: any) {
@@ -412,4 +420,4 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
       </div>
     </div>
   );
-};
+}

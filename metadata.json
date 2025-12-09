@@ -1,5 +1,8 @@
 {
   "name": "BistroIntelligence",
   "description": "AI-powered F&B operations assistant for recipe costing, SOP generation, and business strategy.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
 }

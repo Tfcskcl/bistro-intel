@@ -53,9 +53,6 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
   const handleGenerate = async () => {
       if (!prompt && !referenceImage) return;
       
-      // Note: We no longer block if no key is found. 
-      // The service will handle missing keys by returning a demo/mock response.
-      
       const cost = mediaType === 'video' ? CREDIT_COSTS.VIDEO : CREDIT_COSTS.IMAGE;
       
       if (user.credits < cost) {
@@ -97,6 +94,15 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
           };
 
           storageService.saveMarketingRequest(newReq);
+          
+          // Auto-generate Task
+          const taskAction = mediaType === 'video' ? 'Review & Post Video' : 'Post Image';
+          storageService.addTask(
+              user.id, 
+              `${taskAction}: ${prompt.substring(0, 30)}...`, 
+              ['FOH', 'Admin']
+          );
+
           setCurrentResult(newReq);
           loadHistory();
 

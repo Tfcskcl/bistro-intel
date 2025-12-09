@@ -1,10 +1,9 @@
-
 import React, { useState, useEffect } from 'react';
 import { User, InventoryItem, PurchaseOrder } from '../types';
 import { storageService } from '../services/storageService';
-import { generatePurchaseOrder } from '../services/geminiService';
+import { generatePurchaseOrder, forecastInventoryNeeds } from '../services/geminiService';
 import { CREDIT_COSTS } from '../constants';
-import { Package, Search, Plus, Trash2, AlertTriangle, ArrowDown, ArrowUp, ShoppingCart, Loader2, Mail, CheckCircle2, RefreshCw, BarChart3, Edit2 } from 'lucide-react';
+import { Package, Search, Plus, Trash2, AlertTriangle, ArrowDown, ArrowUp, ShoppingCart, Loader2, Mail, CheckCircle2, RefreshCw, BarChart3, Edit2, TrendingUp, Sparkles, X } from 'lucide-react';
 
 interface InventoryManagerProps {
     user: User;
@@ -26,6 +25,14 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ user, onUser
     const [isGeneratingPO, setIsGeneratingPO] = useState(false);
     const [generatedPO, setGeneratedPO] = useState<PurchaseOrder | null>(null);
     const [selectedSupplier, setSelectedSupplier] = useState<string>('');
+    
+    // Forecast State
+    const [isForecasting, setIsForecasting] = useState(false);
+    const [forecastResult, setForecastResult] = useState<any>(null);
+    const [showForecastModal, setShowForecastModal] = useState(false);
+
+    // Toast State
+    const [toast, setToast] = useState<string|null>(null);
 
     useEffect(() => {
         const data = storageService.getInventory(user.id);
@@ -50,6 +57,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ user, onUser
         storageService.saveInventory(user.id, updated);
         setShowAddModal(false);
         setNewItem({ name: '', category: 'General', currentStock: 0, unit: 'kg', costPerUnit: 0, parLevel: 0, supplier: '' });
+        showToast("Item added successfully");
     };
 
     const handleDelete = (id: string) => {
@@ -57,6 +65,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ user, onUser
         const updated = inventory.filter(i => i.id !== id);
         setInventory(updated);
         storageService.saveInventory(user.id, updated);
+        showToast("Item deleted");
     };
 
     const handleUpdateStock = (id: string, delta: number) => {
@@ -69,6 +78,11 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ user, onUser
         setInventory(updated);
         storageService.saveInventory(user.id, updated);
     };
+    
+    const showToast = (msg: string) => {
+        setToast(msg);
+        setTimeout(() => setToast(null), 3000);
+    }
 
     const handleGeneratePO = async () => {
         if (!selectedSupplier) {
@@ -97,6 +111,23 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ user, onUser
         }
     };
 
+    const handleForecast = async () => {
+        setIsForecasting(true);
+        try {
+            const sales = storageService.getSalesData(user.id);
+            const totalRevenue = sales.reduce((acc, curr) => acc + curr.revenue, 0);
+            const context = `Last 30 days revenue: ${totalRevenue}. Sales trend: ${sales.length > 7 && sales[sales.length-1].revenue > sales[0].revenue ? 'Increasing' : 'Stable'}`;
+            
+            const result = await forecastInventoryNeeds(inventory, context);
+            setForecastResult(result);
+            setShowForecastModal(true);
+        } catch (e) {
+            showToast("Forecast failed");
+        } finally {
+            setIsForecasting(false);
+        }
+    };
+
     // Derived State
     const lowStockCount = inventory.filter(i => i.currentStock < i.parLevel).length;
     const totalValue = inventory.reduce((acc, i) => acc + (i.currentStock * i.costPerUnit), 0);
@@ -109,7 +140,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ user, onUser
     });
 
     return (
-        <div className="h-[calc(100vh-6rem)] flex flex-col gap-6">
+        <div className="h-[calc(100vh-6rem)] flex flex-col gap-6 relative">
             {/* Header Stats */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
@@ -150,6 +181,14 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ user, onUser
                             Auto-Order
                         </button>
                     </div>
+                    <button 
+                        onClick={handleForecast}
+                        disabled={isForecasting}
+                        className="w-full bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 border border-purple-100 dark:border-purple-800 px-3 py-2 rounded text-xs font-bold flex items-center justify-center gap-2 hover:bg-purple-100 dark:hover:bg-purple-900/30"
+                    >
+                        {isForecasting ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                        Smart Forecast (AI)
+                    </button>
                 </div>
             </div>
 
@@ -212,8 +251,8 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ user, onUser
                                     <td className="px-6 py-4 text-slate-600 dark:text-slate-300">₹{item.costPerUnit}</td>
                                     <td className="px-6 py-4 text-slate-500 dark:text-slate-400">{item.supplier}</td>
                                     <td className="px-6 py-4 text-right flex justify-end gap-2">
+                                        <button onClick={() => { handleUpdateStock(item.id, 1); showToast(`Received 1 ${item.unit} ${item.name}`); }} className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 rounded text-xs font-bold border border-emerald-200" title="Quick Receive (+1)">+ Receive</button>
                                         <button onClick={() => handleUpdateStock(item.id, -1)} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded text-slate-500"><ArrowDown size={14}/></button>
-                                        <button onClick={() => handleUpdateStock(item.id, 1)} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded text-slate-500"><ArrowUp size={14}/></button>
                                         <button onClick={() => handleDelete(item.id)} className="p-1.5 hover:bg-red-50 text-red-500 rounded"><Trash2 size={14}/></button>
                                     </td>
                                 </tr>
@@ -272,6 +311,39 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ user, onUser
                 </div>
             )}
 
+            {/* Forecast Result Modal */}
+            {showForecastModal && forecastResult && (
+                <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-white dark:bg-slate-900 rounded-xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-800 animate-scale-in">
+                        <div className="flex justify-between items-start mb-6">
+                            <h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                                <Sparkles className="text-purple-500" /> AI Demand Forecast
+                            </h3>
+                            <button onClick={() => setShowForecastModal(false)} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
+                        </div>
+                        
+                        <div className="space-y-4">
+                            {forecastResult.recommendations?.map((rec: any, i: number) => (
+                                <div key={i} className="p-3 bg-purple-50 dark:bg-purple-900/10 border border-purple-100 dark:border-purple-800 rounded-lg">
+                                    <div className="flex justify-between items-start mb-1">
+                                        <h4 className="font-bold text-slate-800 dark:text-white">{rec.item}</h4>
+                                        <span className="text-xs font-bold bg-white dark:bg-slate-800 px-2 py-0.5 rounded text-purple-700 dark:text-purple-300 border border-purple-100 dark:border-purple-800">{rec.action}</span>
+                                    </div>
+                                    <p className="text-xs text-slate-600 dark:text-slate-400">{rec.reason}</p>
+                                </div>
+                            ))}
+                            {(!forecastResult.recommendations || forecastResult.recommendations.length === 0) && (
+                                <p className="text-center text-slate-500 text-sm">No critical stockouts predicted for this week.</p>
+                            )}
+                        </div>
+                        
+                        <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 text-right">
+                            <button onClick={() => setShowForecastModal(false)} className="px-4 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold rounded-lg hover:opacity-90">Close</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Add Item Modal */}
             {showAddModal && (
                 <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
@@ -297,6 +369,12 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ user, onUser
                             </div>
                         </div>
                     </div>
+                </div>
+            )}
+            
+            {toast && (
+                <div className="fixed bottom-6 right-6 bg-slate-900 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 animate-fade-in-up z-50 text-sm font-bold">
+                    <CheckCircle2 size={16} className="text-emerald-400"/> {toast}
                 </div>
             )}
         </div>

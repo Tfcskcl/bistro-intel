@@ -1,38 +1,12 @@
 
-import { initializeApp } from "firebase/app";
-import { getAuth, Auth } from "firebase/auth";
-import { getFirestore, Firestore } from "firebase/firestore";
+// Mock Firebase Service to prevent Import Errors with CDN UMD builds
+// This ensures the app loads correctly in the browser-only demo environment.
 
-// TODO: Replace with your actual Firebase project configuration
-// You can get this from the Firebase Console -> Project Settings -> General
-const firebaseConfig = {
-  apiKey: "YOUR_API_KEY_HERE",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
-};
+export const app = null;
+export const auth = null;
+export const db = null;
 
-// Check if keys are configured or still placeholders
-export const isFirebaseConfigured = firebaseConfig.apiKey !== "YOUR_API_KEY_HERE" && !firebaseConfig.apiKey.includes("YOUR_");
+// Flag to indicate we are running in a mode that doesn't rely on real Firebase
+export const isFirebaseConfigured = false;
 
-let app;
-let auth: Auth | undefined;
-let db: Firestore | undefined;
-
-if (isFirebaseConfigured) {
-  try {
-    app = initializeApp(firebaseConfig);
-    auth = getAuth(app);
-    db = getFirestore(app);
-  } catch (e) {
-    console.error("Firebase initialization error:", e);
-  }
-} else {
-    // Suppress warning, show info instead for cleaner console
-    console.info("BistroIntelligence: Running in Demo Mode (Mock Authentication Active)");
-}
-
-export { app, auth, db };
 export default app;

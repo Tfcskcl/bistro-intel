@@ -1,22 +1,25 @@
-
-import { RecipeCard, SOP, AppNotification, UserRole, POSChangeRequest, MenuItem, PlanConfig, PlanType, RecipeRequest, SOPRequest, MarketingRequest, CreditTransaction, SocialStats, KitchenWorkflowRequest, MenuGenerationRequest, InventoryItem } from '../types';
-import { MOCK_MENU, MOCK_SALES_DATA, MOCK_INGREDIENT_PRICES, PLANS as DEFAULT_PLANS } from '../constants';
+import { RecipeCard, SOP, AppNotification, UserRole, POSChangeRequest, MenuItem, PlanConfig, PlanType, RecipeRequest, SOPRequest, MarketingRequest, CreditTransaction, SocialStats, KitchenWorkflowRequest, MenuGenerationRequest, InventoryItem, OnboardingState, Task } from '../types';
+import { MOCK_MENU, MOCK_SALES_DATA, MOCK_INGREDIENT_PRICES, MOCK_RECIPES, PLANS as DEFAULT_PLANS } from '../constants';
 import { ingredientService } from './ingredientService';
 
 const getKey = (userId: string, key: string) => `bistro_${userId}_${key}`;
 const PLANS_KEY = 'bistro_system_plans';
-const GLOBAL_RECIPE_REQUESTS_KEY = 'bistro_global_recipe_requests';
-const GLOBAL_SOP_REQUESTS_KEY = 'bistro_global_sop_requests';
-const GLOBAL_MARKETING_REQUESTS_KEY = 'bistro_global_marketing_requests';
-const GLOBAL_KITCHEN_WORKFLOW_REQUESTS_KEY = 'bistro_global_kitchen_workflow_requests';
-const GLOBAL_MENU_GENERATION_REQUESTS_KEY = 'bistro_global_menu_gen_requests';
 const GLOBAL_NOTIFICATIONS_KEY = 'bistro_global_notifications';
 
-// Seed Notifications for new users (Generic welcome)
+// Unified Event Names
+export const storageEvents = {
+  DATA_UPDATED: "bistroconnect-data-updated",
+};
+
+// Dispatch Helper
+export function dispatchDataUpdatedEvent() {
+  window.dispatchEvent(new CustomEvent(storageEvents.DATA_UPDATED));
+}
+
 const WELCOME_NOTIFICATION: AppNotification = {
     id: 'n_welcome',
     title: 'Welcome to BistroIntelligence',
-    message: 'Your dashboard is ready. Go to Data & Integrations to upload your data.',
+    message: 'Your dashboard is ready. Complete onboarding to unlock full power.',
     type: 'success',
     read: false,
     date: new Date().toISOString()
@@ -26,8 +29,6 @@ const MOCK_INVENTORY: InventoryItem[] = [
     { id: 'inv_1', name: 'Arborio Rice', category: 'Dry Goods', currentStock: 12, unit: 'kg', costPerUnit: 300, parLevel: 10, supplier: 'Metro Cash & Carry', lastUpdated: new Date().toISOString() },
     { id: 'inv_2', name: 'Truffle Oil', category: 'Pantry', currentStock: 0.5, unit: 'l', costPerUnit: 1800, parLevel: 1, supplier: 'Gourmet Imports', lastUpdated: new Date().toISOString() },
     { id: 'inv_3', name: 'Chicken Breast', category: 'Meat', currentStock: 15, unit: 'kg', costPerUnit: 250, parLevel: 20, supplier: 'Fresh Meats Co', lastUpdated: new Date().toISOString() },
-    { id: 'inv_4', name: 'Parmesan Cheese', category: 'Dairy', currentStock: 2, unit: 'kg', costPerUnit: 1200, parLevel: 5, supplier: 'Dairy Best', lastUpdated: new Date().toISOString() },
-    { id: 'inv_5', name: 'Olive Oil', category: 'Pantry', currentStock: 25, unit: 'l', costPerUnit: 800, parLevel: 10, supplier: 'Metro Cash & Carry', lastUpdated: new Date().toISOString() },
 ];
 
 export const storageService = {
@@ -37,57 +38,43 @@ export const storageService = {
             const stored = localStorage.getItem(getKey(userId, key));
             return stored ? JSON.parse(stored) : defaultValue;
         } catch (e) {
-            console.error(`Error parsing storage key ${key} for user ${userId}:`, e);
             return defaultValue;
         }
     },
 
     setItem: (userId: string, key: string, data: any) => {
-        try {
-            localStorage.setItem(getKey(userId, key), JSON.stringify(data));
-        } catch (e) {
-            console.error(`Error saving storage key ${key} for user ${userId}:`, e);
-        }
+        localStorage.setItem(getKey(userId, key), JSON.stringify(data));
+        dispatchDataUpdatedEvent(); // Notify listeners
     },
 
-    // Completely reset the app state
     clearAllData: () => {
-        try {
-            // Only clear keys related to this app
-            const keysToRemove: string[] = [];
-            for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                if (key && (key.startsWith('bistro_') || key === 'theme')) {
-                    keysToRemove.push(key);
-                }
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && (key.startsWith('bistro_') || key === 'theme')) {
+                keysToRemove.push(key);
             }
-            keysToRemove.forEach(k => localStorage.removeItem(k));
-            window.location.reload();
-        } catch (e) {
-            console.error("Error clearing data:", e);
         }
+        keysToRemove.forEach(k => localStorage.removeItem(k));
+        window.location.reload();
     },
 
-    // --- PLANS (SYSTEM WIDE) ---
+    // --- ONBOARDING ---
+    getOnboardingState: (userId: string): OnboardingState => {
+        return storageService.getItem<OnboardingState>(userId, 'onboarding', { phaseIdx: 0, data: {}, completed: false });
+    },
+
+    saveOnboardingState: (userId: string, state: OnboardingState) => {
+        storageService.setItem(userId, 'onboarding', state);
+    },
+
+    // --- PLANS ---
     getPlans: (): Record<PlanType, PlanConfig> => {
-        try {
-            const stored = localStorage.getItem(PLANS_KEY);
-            if (stored) {
-                return JSON.parse(stored);
-            }
-            // Initialize if empty
-            localStorage.setItem(PLANS_KEY, JSON.stringify(DEFAULT_PLANS));
-            return DEFAULT_PLANS;
-        } catch (e) {
-            return DEFAULT_PLANS;
-        }
+        const stored = localStorage.getItem(PLANS_KEY);
+        return stored ? JSON.parse(stored) : DEFAULT_PLANS;
     },
 
-    savePlans: (plans: Record<PlanType, PlanConfig>) => {
-        localStorage.setItem(PLANS_KEY, JSON.stringify(plans));
-    },
-
-    // --- CREDITS & TRANSACTIONS ---
+    // --- CREDITS ---
     getUserCredits: (userId: string): number => {
         return storageService.getItem<number>(userId, 'credits_balance', 0);
     },
@@ -96,69 +83,18 @@ export const storageService = {
         storageService.setItem(userId, 'credits_balance', credits);
     },
 
-    getTransactions: (userId: string): CreditTransaction[] => {
-        return storageService.getItem<CreditTransaction[]>(userId, 'credit_transactions', []);
-    },
-
-    addTransaction: (userId: string, transaction: CreditTransaction) => {
-        const txs = storageService.getTransactions(userId);
-        txs.unshift(transaction);
-        storageService.setItem(userId, 'credit_transactions', txs);
-    },
-
     deductCredits: (userId: string, amount: number, description: string): boolean => {
         const current = storageService.getUserCredits(userId);
         if (current < amount) return false;
         
         const newBalance = current - amount;
         storageService.saveUserCredits(userId, newBalance);
-        
-        storageService.addTransaction(userId, {
-            id: `tx_${Date.now()}`,
-            date: new Date().toISOString(),
-            amount: amount,
-            type: 'debit',
-            description
-        });
-
-        // Automated Low Balance Warning
-        const THRESHOLD = 50;
-        if (newBalance < THRESHOLD && current >= THRESHOLD) {
-             const notif: AppNotification = {
-                id: `n_low_bal_${Date.now()}`,
-                title: 'Low Credit Balance',
-                message: `Your wallet is running low (${newBalance} CR remaining). Top up to continue using AI tools without interruption.`,
-                type: 'warning',
-                read: false,
-                date: new Date().toISOString()
-             };
-             
-             // Push to user's personal notifications
-             const key = getKey(userId, 'notifications');
-             const stored = localStorage.getItem(key);
-             let notifications: AppNotification[] = stored ? JSON.parse(stored) : [];
-             // Avoid duplicate unread warnings
-             if (!notifications.some(n => n.title === 'Low Credit Balance' && !n.read)) {
-                 notifications.push(notif);
-                 localStorage.setItem(key, JSON.stringify(notifications));
-             }
-        }
-
         return true;
     },
 
     addCredits: (userId: string, amount: number, description: string) => {
         const current = storageService.getUserCredits(userId);
-        const newBalance = current + amount;
-        storageService.saveUserCredits(userId, newBalance);
-
-        storageService.addTransaction(userId, {
-            id: `tx_${Date.now()}`,
-            date: new Date().toISOString(),
-            amount: amount,
-            type: 'credit',
-            description
-        });
+        storageService.saveUserCredits(userId, current + amount);
     },
 
     // --- INVENTORY ---
@@ -170,15 +106,13 @@ export const storageService = {
         storageService.setItem(userId, 'inventory', items);
     },
 
-    updateInventoryItem: (userId: string, item: InventoryItem) => {
-        const current = storageService.getInventory(userId);
-        const index = current.findIndex(i => i.id === item.id);
-        if (index >= 0) {
-            current[index] = item;
-        } else {
-            current.push(item);
-        }
-        storageService.saveInventory(userId, current);
+    // --- KITCHEN ZONES ---
+    getKitchenZones: (userId: string): any[] => {
+        return storageService.getItem<any[]>(userId, 'kitchen_zones', []);
+    },
+
+    saveKitchenZones: (userId: string, zones: any[]) => {
+        storageService.setItem(userId, 'kitchen_zones', zones);
     },
 
     // --- MENU ---
@@ -190,472 +124,196 @@ export const storageService = {
         storageService.setItem(userId, 'menu', menu);
     },
 
-    importMenuFromCSV: (userId: string, csvText: string): { success: boolean; count: number; message: string } => {
-        try {
-            const lines = csvText.split(/\r\n|\n/);
-            const newItems: MenuItem[] = [];
-            
-            const hasHeader = lines[0].toLowerCase().includes('name') || lines[0].toLowerCase().includes('sku');
-            const startIndex = hasHeader ? 1 : 0;
-
-            // Helper to parse CSV line handling quotes
-            const parseCSVLine = (line: string) => {
-                const values: string[] = [];
-                let current = '';
-                let inQuotes = false;
-                for (let i = 0; i < line.length; i++) {
-                    const char = line[i];
-                    if (char === '"') {
-                        inQuotes = !inQuotes;
-                    } else if (char === ',' && !inQuotes) {
-                        values.push(current.trim().replace(/^"|"$/g, '')); 
-                        current = '';
-                    } else {
-                        current += char;
-                    }
-                }
-                values.push(current.trim().replace(/^"|"$/g, ''));
-                return values;
-            };
-
-            for (let i = startIndex; i < lines.length; i++) {
-                const line = lines[i].trim();
-                if (!line) continue;
-
-                const parts = parseCSVLine(line);
-                
-                if (parts.length >= 2) {
-                    const sku_id = parts[0] || `IMP-${Date.now()}-${i}`;
-                    const name = parts[1];
-                    
-                    if (!name) continue;
-
-                    const catStr = (parts[2] || 'main').toLowerCase();
-                    const category: any = ['main', 'snack', 'beverage', 'dessert'].includes(catStr) ? catStr : 'main';
-                    
-                    const price = parseFloat(parts[3]) || 0;
-                    const prepTime = parseInt(parts[4]) || 15;
-
-                    newItems.push({
-                        sku_id,
-                        name,
-                        category,
-                        current_price: price,
-                        prep_time_min: prepTime,
-                        ingredients: []
-                    });
-                }
-            }
-
-            if (newItems.length === 0) {
-                return { success: false, count: 0, message: "No valid items found in CSV" };
-            }
-
-            const currentMenu = storageService.getMenu(userId);
-            const currentSkus = new Set(currentMenu.map(m => m.sku_id));
-            const uniqueNewItems = newItems.filter(i => !currentSkus.has(i.sku_id));
-            
-            if (uniqueNewItems.length === 0 && newItems.length > 0) {
-                 return { success: false, count: 0, message: "All items duplicate or skipped" };
-            }
-
-            const updatedMenu = [...currentMenu, ...uniqueNewItems];
-            storageService.saveMenu(userId, updatedMenu);
-            
-            return { success: true, count: uniqueNewItems.length, message: `Imported ${uniqueNewItems.length} menu items` };
-
-        } catch (e) {
-            console.error(e);
-            return { success: false, count: 0, message: "Import failed to parse CSV" };
-        }
-    },
-
-    // --- SALES DATA ---
+    // --- SALES ---
     getSalesData: (userId: string): any[] => {
         return storageService.getItem<any[]>(userId, 'sales', []);
     },
 
     saveSalesData: (userId: string, data: any[]) => {
+        // Trigger Inventory Depletion Logic (Mock)
+        const inventory = storageService.getInventory(userId);
+        if (inventory.length > 0) {
+            const updatedInv = inventory.map(i => ({...i, currentStock: Math.max(0, i.currentStock - (Math.random() * 0.5))}));
+            storageService.saveInventory(userId, updatedInv);
+        }
         storageService.setItem(userId, 'sales', data);
     },
 
-    // --- SOCIAL STATS ---
-    getSocialStats: (userId: string): SocialStats[] => {
-        return storageService.getItem<SocialStats[]>(userId, 'social_stats', []);
-    },
-
-    saveSocialStats: (userId: string, stats: SocialStats[]) => {
-        storageService.setItem(userId, 'social_stats', stats);
-    },
-
     // --- RECIPES ---
-    saveRecipe: (userId: string, recipe: RecipeCard) => {
-        const recipes = storageService.getSavedRecipes(userId);
-        const existsIndex = recipes.findIndex(r => r.sku_id === recipe.sku_id && r.name === recipe.name);
-        if (existsIndex >= 0) {
-            recipes[existsIndex] = recipe;
-        } else {
-            recipes.push(recipe);
-        }
-        storageService.setItem(userId, 'saved_recipes', recipes);
-    },
-
     getSavedRecipes: (userId: string): RecipeCard[] => {
         return storageService.getItem<RecipeCard[]>(userId, 'saved_recipes', []);
     },
 
-    // --- RECIPE REQUESTS (GLOBAL/ADMIN ACCESS) ---
-    getAllRecipeRequests: (): RecipeRequest[] => {
-        try {
-            const stored = localStorage.getItem(GLOBAL_RECIPE_REQUESTS_KEY);
-            return stored ? JSON.parse(stored) : [];
-        } catch (e) { return []; }
-    },
-
-    saveRecipeRequest: (request: RecipeRequest) => {
-        const requests = storageService.getAllRecipeRequests();
-        requests.push(request);
-        localStorage.setItem(GLOBAL_RECIPE_REQUESTS_KEY, JSON.stringify(requests));
-
-        storageService.sendSystemNotification({
-            id: `notif_req_${request.id}`,
-            title: 'New Recipe Request',
-            message: `${request.userName} requested: ${request.item.name}`,
-            type: 'info',
-            read: false,
-            date: new Date().toISOString(),
-            role: [UserRole.SUPER_ADMIN, UserRole.ADMIN]
-        });
-    },
-
-    updateRecipeRequest: (updatedRequest: RecipeRequest) => {
-        const requests = storageService.getAllRecipeRequests();
-        const index = requests.findIndex(r => r.id === updatedRequest.id);
-        if (index >= 0) {
-            requests[index] = updatedRequest;
-            localStorage.setItem(GLOBAL_RECIPE_REQUESTS_KEY, JSON.stringify(requests));
-        }
+    saveRecipe: (userId: string, recipe: RecipeCard) => {
+        const recipes = storageService.getSavedRecipes(userId);
+        const index = recipes.findIndex(r => r.sku_id === recipe.sku_id);
+        if (index >= 0) recipes[index] = recipe; else recipes.push(recipe);
+        storageService.setItem(userId, 'saved_recipes', recipes);
     },
 
     // --- SOPS ---
-    saveSOP: (userId: string, sop: SOP) => {
-        const sops = storageService.getSavedSOPs(userId);
-        const existsIndex = sops.findIndex(s => s.sop_id === sop.sop_id);
-        if (existsIndex >= 0) {
-            sops[existsIndex] = sop;
-        } else {
-            sops.push(sop);
-        }
-        storageService.setItem(userId, 'saved_sops', sops);
-    },
-
     getSavedSOPs: (userId: string): SOP[] => {
         return storageService.getItem<SOP[]>(userId, 'saved_sops', []);
     },
 
-    // --- SOP REQUESTS ---
-    getAllSOPRequests: (): SOPRequest[] => {
-        try {
-            const stored = localStorage.getItem(GLOBAL_SOP_REQUESTS_KEY);
-            return stored ? JSON.parse(stored) : [];
-        } catch (e) { return []; }
+    saveSOP: (userId: string, sop: SOP) => {
+        const sops = storageService.getSavedSOPs(userId);
+        const index = sops.findIndex(s => s.sop_id === sop.sop_id);
+        if (index >= 0) sops[index] = sop; else sops.push(sop);
+        storageService.setItem(userId, 'saved_sops', sops);
     },
 
-    saveSOPRequest: (request: SOPRequest) => {
-        const requests = storageService.getAllSOPRequests();
-        requests.push(request);
-        localStorage.setItem(GLOBAL_SOP_REQUESTS_KEY, JSON.stringify(requests));
+    createTrainingTaskFromDeviation: (userId: string, deviationType: string, explanation: string, staffId: string) => {
+        // Create actual task
+        storageService.addTask(
+            userId,
+            `Corrective Training: ${deviationType} for ${staffId}`,
+            ['Urgent', 'Kitchen']
+        );
+    },
 
+    // --- TASKS ---
+    getTasks: (userId: string): Task[] => {
+        return storageService.getItem<Task[]>(userId, 'tasks', []);
+    },
+
+    saveTasks: (userId: string, tasks: Task[]) => {
+        storageService.setItem(userId, 'tasks', tasks);
+    },
+
+    addTask: (userId: string, taskText: string, tags: string[] = ['Auto-Generated']) => {
+        const tasks = storageService.getTasks(userId);
+        const newTask: Task = {
+            id: `task_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+            text: taskText,
+            completed: false,
+            tags: tags,
+            createdAt: new Date().toISOString()
+        };
+        tasks.unshift(newTask);
+        storageService.saveTasks(userId, tasks);
+        // Optional: Notify via system notification
         storageService.sendSystemNotification({
-            id: `notif_sop_${request.id}`,
-            title: 'New SOP Request',
-            message: `${request.userName} requested SOP: ${request.topic}`,
+            id: `notif_${Date.now()}`,
+            title: 'New Task Auto-Created',
+            message: taskText,
             type: 'info',
             read: false,
-            date: new Date().toISOString(),
-            role: [UserRole.SUPER_ADMIN, UserRole.ADMIN]
+            date: new Date().toISOString()
         });
     },
 
-    updateSOPRequest: (updatedRequest: SOPRequest) => {
-        const requests = storageService.getAllSOPRequests();
-        const index = requests.findIndex(r => r.id === updatedRequest.id);
-        if (index >= 0) {
-            requests[index] = updatedRequest;
-            localStorage.setItem(GLOBAL_SOP_REQUESTS_KEY, JSON.stringify(requests));
-        }
-    },
-
-    // --- MARKETING REQUESTS ---
-    getAllMarketingRequests: (): MarketingRequest[] => {
-        try {
-            const stored = localStorage.getItem(GLOBAL_MARKETING_REQUESTS_KEY);
-            return stored ? JSON.parse(stored) : [];
-        } catch (e) { return []; }
-    },
-
-    saveMarketingRequest: (request: MarketingRequest) => {
-        const requests = storageService.getAllMarketingRequests();
-        requests.push(request);
-        localStorage.setItem(GLOBAL_MARKETING_REQUESTS_KEY, JSON.stringify(requests));
-
-        storageService.sendSystemNotification({
-            id: `notif_mkt_${request.id}`,
-            title: `New ${request.type === 'image' ? 'Image' : 'Video'} Request`,
-            message: `${request.userName} requested a ${request.type} generation.`,
-            type: 'info',
-            read: false,
-            date: new Date().toISOString(),
-            role: [UserRole.SUPER_ADMIN, UserRole.ADMIN]
-        });
-    },
-
-    updateMarketingRequest: (updatedRequest: MarketingRequest) => {
-        const requests = storageService.getAllMarketingRequests();
-        const index = requests.findIndex(r => r.id === updatedRequest.id);
-        if (index >= 0) {
-            requests[index] = updatedRequest;
-            localStorage.setItem(GLOBAL_MARKETING_REQUESTS_KEY, JSON.stringify(requests));
-        }
-    },
-
-    // --- KITCHEN WORKFLOW REQUESTS ---
-    getAllKitchenWorkflowRequests: (): KitchenWorkflowRequest[] => {
-        try {
-            const stored = localStorage.getItem(GLOBAL_KITCHEN_WORKFLOW_REQUESTS_KEY);
-            return stored ? JSON.parse(stored) : [];
-        } catch (e) { return []; }
-    },
-
-    saveKitchenWorkflowRequest: (request: KitchenWorkflowRequest) => {
-        const requests = storageService.getAllKitchenWorkflowRequests();
-        requests.push(request);
-        localStorage.setItem(GLOBAL_KITCHEN_WORKFLOW_REQUESTS_KEY, JSON.stringify(requests));
-
-        storageService.sendSystemNotification({
-            id: `notif_kw_${request.id}`,
-            title: 'New Kitchen Workflow Request',
-            message: `${request.userName} submitted a kitchen analysis request.`,
-            type: 'info',
-            read: false,
-            date: new Date().toISOString(),
-            role: [UserRole.SUPER_ADMIN, UserRole.ADMIN]
-        });
-    },
-
-    updateKitchenWorkflowRequest: (updatedRequest: KitchenWorkflowRequest) => {
-        const requests = storageService.getAllKitchenWorkflowRequests();
-        const index = requests.findIndex(r => r.id === updatedRequest.id);
-        if (index >= 0) {
-            requests[index] = updatedRequest;
-            localStorage.setItem(GLOBAL_KITCHEN_WORKFLOW_REQUESTS_KEY, JSON.stringify(requests));
-        }
-    },
-
-    // --- MENU GENERATION REQUESTS ---
-    getAllMenuGenerationRequests: (): MenuGenerationRequest[] => {
-        try {
-            const stored = localStorage.getItem(GLOBAL_MENU_GENERATION_REQUESTS_KEY);
-            return stored ? JSON.parse(stored) : [];
-        } catch (e) { return []; }
-    },
-
-    saveMenuGenerationRequest: (request: MenuGenerationRequest) => {
-        const requests = storageService.getAllMenuGenerationRequests();
-        requests.push(request);
-        localStorage.setItem(GLOBAL_MENU_GENERATION_REQUESTS_KEY, JSON.stringify(requests));
-
-        storageService.sendSystemNotification({
-            id: `notif_menu_${request.id}`,
-            title: 'New Menu Generated',
-            message: `${request.userName} generated a menu for ${request.restaurantName}.`,
-            type: 'info',
-            read: false,
-            date: new Date().toISOString(),
-            role: [UserRole.SUPER_ADMIN, UserRole.ADMIN]
-        });
-    },
-
-    // --- POS REQUESTS ---
-    addPOSChangeRequest: (userId: string, request: POSChangeRequest) => {
-        const requests = storageService.getPOSChangeRequests(userId);
-        requests.push(request);
-        storageService.setItem(userId, 'pos_requests', requests);
-    },
-
-    getPOSChangeRequests: (userId: string): POSChangeRequest[] => {
-        return storageService.getItem<POSChangeRequest[]>(userId, 'pos_requests', []);
-    },
-
-    updatePOSChangeRequest: (userId: string, id: string, status: 'approved' | 'rejected') => {
-        const requests = storageService.getPOSChangeRequests(userId);
-        const updated = requests.map(r => r.id === id ? { ...r, status } : r);
-        storageService.setItem(userId, 'pos_requests', updated);
-    },
-
-    // --- INVOICES ---
-    addInvoice: (userId: string, invoice: any) => {
-        const invoices = storageService.getInvoices(userId);
-        invoices.unshift(invoice);
-        storageService.setItem(userId, 'invoices', invoices);
-    },
-
-    getInvoices: (userId: string): any[] => {
-        return storageService.getItem<any[]>(userId, 'invoices', []);
-    },
-
-    // --- NOTIFICATIONS SYSTEM ---
-
+    // --- NOTIFICATIONS ---
     sendSystemNotification: (notification: AppNotification) => {
-        try {
-            const stored = localStorage.getItem(GLOBAL_NOTIFICATIONS_KEY);
-            const notifications: AppNotification[] = stored ? JSON.parse(stored) : [];
-            notifications.push(notification);
-            localStorage.setItem(GLOBAL_NOTIFICATIONS_KEY, JSON.stringify(notifications));
-        } catch (e) {
-            console.error("Error sending system notification", e);
-        }
+        const stored = localStorage.getItem(GLOBAL_NOTIFICATIONS_KEY);
+        const list = stored ? JSON.parse(stored) : [];
+        list.push(notification);
+        localStorage.setItem(GLOBAL_NOTIFICATIONS_KEY, JSON.stringify(list));
+        dispatchDataUpdatedEvent();
     },
 
     getNotifications: (userId: string, userRole: UserRole): AppNotification[] => {
-        try {
-            // 1. Get Personal Notifications
-            const storedPersonal = localStorage.getItem(getKey(userId, 'notifications'));
-            let notifications: AppNotification[] = storedPersonal ? JSON.parse(storedPersonal) : [WELCOME_NOTIFICATION];
-            
-            // 2. Get Global Notifications
-            const storedGlobal = localStorage.getItem(GLOBAL_NOTIFICATIONS_KEY);
-            if (storedGlobal) {
-                const globalNotifs: AppNotification[] = JSON.parse(storedGlobal);
-                // Filter global notifications relevant to this user's role
-                const applicableGlobal = globalNotifs.filter(n => !n.role || n.role.includes(userRole));
-                notifications = [...notifications, ...applicableGlobal];
-            }
-
-            // 3. Sort by date
-            return notifications.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        } catch (e) {
-            return [WELCOME_NOTIFICATION];
-        }
+        const storedGlobal = localStorage.getItem(GLOBAL_NOTIFICATIONS_KEY);
+        let notifications: AppNotification[] = storedGlobal ? JSON.parse(storedGlobal) : [WELCOME_NOTIFICATION];
+        return notifications.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     },
 
-    markAsRead: (userId: string, id: string) => {
-        try {
-            // 1. Try marking in Personal Storage
-            const personalKey = getKey(userId, 'notifications');
-            const storedPersonal = localStorage.getItem(personalKey);
-            let foundInPersonal = false;
-
-            if (storedPersonal) {
-                let notifications: AppNotification[] = JSON.parse(storedPersonal);
-                const index = notifications.findIndex(n => n.id === id);
-                if (index !== -1) {
-                    notifications[index].read = true;
-                    localStorage.setItem(personalKey, JSON.stringify(notifications));
-                    foundInPersonal = true;
-                }
-            }
-
-            // 2. If not found in personal, try marking in Global Storage
-            if (!foundInPersonal) {
-                const storedGlobal = localStorage.getItem(GLOBAL_NOTIFICATIONS_KEY);
-                if (storedGlobal) {
-                    let global: AppNotification[] = JSON.parse(storedGlobal);
-                    const index = global.findIndex(n => n.id === id);
-                    if (index !== -1) {
-                        global[index].read = true;
-                        localStorage.setItem(GLOBAL_NOTIFICATIONS_KEY, JSON.stringify(global));
-                    }
-                }
-            }
-        } catch (e) {
-            console.error("Error marking read", e);
-        }
+    markAsRead: (userId: string, notificationId: string) => {
+        const storedGlobal = localStorage.getItem(GLOBAL_NOTIFICATIONS_KEY);
+        let notifications: AppNotification[] = storedGlobal ? JSON.parse(storedGlobal) : [];
+        notifications = notifications.map(n => n.id === notificationId ? { ...n, read: true } : n);
+        localStorage.setItem(GLOBAL_NOTIFICATIONS_KEY, JSON.stringify(notifications));
+        dispatchDataUpdatedEvent();
     },
 
-    markAllRead: (userId: string, userRole: UserRole) => {
-        try {
-            // 1. Mark all personal read
-            const personalKey = getKey(userId, 'notifications');
-            const storedPersonal = localStorage.getItem(personalKey);
-            if (storedPersonal) {
-                let notifications: AppNotification[] = JSON.parse(storedPersonal);
-                const updated = notifications.map(n => ({ ...n, read: true }));
-                localStorage.setItem(personalKey, JSON.stringify(updated));
-            }
-
-            // 2. Mark all visible global read
-            const storedGlobal = localStorage.getItem(GLOBAL_NOTIFICATIONS_KEY);
-            if (storedGlobal) {
-                let global: AppNotification[] = JSON.parse(storedGlobal);
-                const updated = global.map(n => {
-                    // If the notification targets this user's role, mark it read
-                    if (!n.role || n.role.includes(userRole)) {
-                        return { ...n, read: true };
-                    }
-                    return n;
-                });
-                localStorage.setItem(GLOBAL_NOTIFICATIONS_KEY, JSON.stringify(updated));
-            }
-        } catch (e) {
-            console.error("Error marking all read", e);
-        }
+    markAllRead: (userId: string, role: UserRole) => {
+        const storedGlobal = localStorage.getItem(GLOBAL_NOTIFICATIONS_KEY);
+        let notifications: AppNotification[] = storedGlobal ? JSON.parse(storedGlobal) : [];
+        notifications = notifications.map(n => ({ ...n, read: true }));
+        localStorage.setItem(GLOBAL_NOTIFICATIONS_KEY, JSON.stringify(notifications));
+        dispatchDataUpdatedEvent();
     },
 
     // --- DEMO SEEDING ---
     seedDemoData: (userId: string) => {
         if (!localStorage.getItem(getKey(userId, 'seeded'))) {
-            console.log(`Seeding demo data for ${userId}...`);
             storageService.setItem(userId, 'menu', MOCK_MENU);
+            storageService.setItem(userId, 'saved_recipes', MOCK_RECIPES);
             storageService.setItem(userId, 'sales', MOCK_SALES_DATA);
             storageService.setItem(userId, 'inventory', MOCK_INVENTORY);
-            
-            // Seed Ingredients via service
             ingredientService.seedDefaults(userId);
-
-            // Seed a sample SOP
-            const sampleSOP: SOP = {
-                sop_id: 'demo_sop_1',
-                title: 'Daily Opening Checklist',
-                scope: 'Front of House & Kitchen',
-                prerequisites: 'Staff must be in uniform',
-                materials_equipment: ['Keys', 'Tablet', 'Sanitizer'],
-                stepwise_procedure: [
-                    { step_no: 1, action: 'Disable Alarm', responsible_role: 'Manager', time_limit: '08:00 AM' },
-                    { step_no: 2, action: 'Turn on HVAC and Lights', responsible_role: 'Manager' },
-                    { step_no: 3, action: 'Check Inventory Deliveries', responsible_role: 'Head Chef' },
-                    { step_no: 4, action: 'Boot up POS Terminals', responsible_role: 'Server' }
-                ],
-                critical_control_points: ['Fridge Temp Check < 4°C'],
-                monitoring_checklist: ['Music On', 'Floors Clean', 'Bathrooms Stocked'],
-                kpis: ['Opened by 08:30 AM'],
-                quick_troubleshooting: 'Call maintenance if HVAC fails'
-            };
-            storageService.setItem(userId, 'saved_sops', [sampleSOP]);
-            
-            // Seed sample notifications
-            const demoNotifs: AppNotification[] = [
-                {
-                    id: 'n_demo_1',
-                    title: 'Food Cost Alert',
-                    message: 'Avocado prices have spiked 15%. Consider adjusting the "Smashed Avo Toast" price.',
-                    type: 'warning',
-                    read: false,
-                    date: new Date().toISOString()
-                },
-                {
-                    id: 'n_demo_2',
-                    title: 'Weekly Sales Report',
-                    message: 'Revenue is up 12% compared to last week. Great job!',
-                    type: 'success',
-                    read: false,
-                    date: new Date(Date.now() - 86400000).toISOString()
-                },
-                WELCOME_NOTIFICATION
-            ];
-            storageService.setItem(userId, 'notifications', demoNotifs);
-
             localStorage.setItem(getKey(userId, 'seeded'), 'true');
         }
-    }
+    },
+
+    // --- REQUESTS & EXTRAS ---
+    getAllRecipeRequests: (): RecipeRequest[] => [],
+    updateRecipeRequest: (request: RecipeRequest) => {},
+    
+    getAllSOPRequests: (): SOPRequest[] => [],
+    
+    getAllMarketingRequests: (): MarketingRequest[] => {
+        // Mock implementation to return stored marketing requests from a global key
+        const stored = localStorage.getItem('bistro_marketing_requests');
+        return stored ? JSON.parse(stored) : [];
+    },
+    saveMarketingRequest: (request: MarketingRequest) => {
+        const stored = localStorage.getItem('bistro_marketing_requests');
+        const list = stored ? JSON.parse(stored) : [];
+        list.push(request);
+        localStorage.setItem('bistro_marketing_requests', JSON.stringify(list));
+    },
+
+    getAllKitchenWorkflowRequests: (): KitchenWorkflowRequest[] => {
+        const stored = localStorage.getItem('bistro_kitchen_requests');
+        return stored ? JSON.parse(stored) : [];
+    },
+    saveKitchenWorkflowRequest: (request: KitchenWorkflowRequest) => {
+        const stored = localStorage.getItem('bistro_kitchen_requests');
+        const list = stored ? JSON.parse(stored) : [];
+        list.push(request);
+        localStorage.setItem('bistro_kitchen_requests', JSON.stringify(list));
+    },
+    updateKitchenWorkflowRequest: (request: KitchenWorkflowRequest) => {
+        const stored = localStorage.getItem('bistro_kitchen_requests');
+        let list: KitchenWorkflowRequest[] = stored ? JSON.parse(stored) : [];
+        list = list.map(r => r.id === request.id ? request : r);
+        localStorage.setItem('bistro_kitchen_requests', JSON.stringify(list));
+    },
+
+    getAllMenuGenerationRequests: (): MenuGenerationRequest[] => {
+        const stored = localStorage.getItem('bistro_menu_requests');
+        return stored ? JSON.parse(stored) : [];
+    },
+    saveMenuGenerationRequest: (request: MenuGenerationRequest) => {
+        const stored = localStorage.getItem('bistro_menu_requests');
+        const list = stored ? JSON.parse(stored) : [];
+        list.push(request);
+        localStorage.setItem('bistro_menu_requests', JSON.stringify(list));
+    },
+
+    getPOSChangeRequests: (userId: string): POSChangeRequest[] => {
+        return storageService.getItem<POSChangeRequest[]>(userId, 'pos_requests', []);
+    },
+    updatePOSChangeRequest: (userId: string, requestId: string, action: string) => {
+        const requests = storageService.getPOSChangeRequests(userId);
+        const updated = requests.map(r => r.id === requestId ? { ...r, status: action as any } : r);
+        storageService.setItem(userId, 'pos_requests', updated);
+    },
+
+    getSocialStats: (userId: string): SocialStats[] => {
+        return storageService.getItem<SocialStats[]>(userId, 'social_stats', []);
+    },
+    saveSocialStats: (userId: string, stats: SocialStats[]) => {
+        storageService.setItem(userId, 'social_stats', stats);
+    },
+
+    getInvoices: (userId: string): any[] => {
+        return storageService.getItem<any[]>(userId, 'invoices', []);
+    },
+    addInvoice: (userId: string, invoice: any) => {
+        const invoices = storageService.getInvoices(userId);
+        invoices.unshift(invoice);
+        storageService.setItem(userId, 'invoices', invoices);
+    },
 };

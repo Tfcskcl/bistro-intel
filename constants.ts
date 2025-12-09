@@ -1,5 +1,6 @@
 
-import { MenuItem, Ingredient, PlanType } from './types';
+
+import { MenuItem, Ingredient, PlanType, RecipeCard } from './types';
 
 export const SYSTEM_INSTRUCTION = `
 You are BistroAssist — an expert F&B operations and menu-engineering assistant built for BistroIntelligence.
@@ -11,6 +12,50 @@ Always:
 • Provide actionable next steps (3 priorities).
 • Tag confidence for each recommendation (High/Medium/Low).
 • Tone: professional, concise, operations-first. Units: INR, grams/ml/serving, dates ISO (YYYY-MM-DD).
+`;
+
+export const UNIFIED_SYSTEM_PROMPT = `
+SYSTEM:
+You are the unified AI engine for BistroConnect Insight — an AI-operated Restaurant OS.
+
+Your responsibilities:
+1. Analyze CCTV staff movement and track actions inside kitchen zones.
+2. Identify workflow steps, SOP compliance, and bottlenecks.
+3. Use recipe definitions to map expected steps vs. actual behavior.
+4. Validate inventory consumption using:
+   - CCTV-detected ingredient usage,
+   - POS sales consumption,
+   - Vendor stock data (BistroSupply).
+5. Detect mismatches, wastage, misuse, shortfalls, or excess consumption.
+6. Generate operational SOPs for each zone and role.
+7. Calculate recipe costing, portion economics, food cost %, profitability.
+8. Generate business strategy recommendations (menu, staff, layout, prep).
+9. Produce marketing images/video scripts/ad copy based on business needs.
+10. Always output machine-readable JSON exactly matching the described schema.
+
+Follow these rules:
+- Never identify staff personally. Use anonymized IDs (anon_01).
+- Be analytical, factual, and structured.
+- If data is missing/uncertain, explain assumptions and provide confidence scores.
+- Always include root causes, impacts, and recommended corrective actions.
+- Always include marketing ideas based on insights.
+`;
+
+export const CCTV_SYSTEM_PROMPT = `
+You are the BistroConnect Insight Operational Brain for F&B. 
+Your role: receive short video clips/frames (staff movement) and kitchen workflow context (SOP, recipe steps, order stream, raw material inventory events), then produce a unified, structured analysis that correlates movement patterns with workflow steps and inventory interactions.
+
+Goals:
+1. Map each staff movement event to an expected workflow step (if any). 
+2. Detect SOP deviations, missing steps, incorrect sequencing, and inventory-driven friction (e.g., repeated trips to store due to missing ingredient).
+3. Detect bottlenecks caused by staff allocation, layout, or raw-material shortages.
+4. Produce prioritized, actionable recommendations (staffing, layout, reorder, recipe tweak).
+5. Output machine-readable JSON (see schema) followed by a short human summary.
+`;
+
+export const CCTV_INTEGRATION_PROMPT = `
+You are the Camera Integration Assistant for BistroConnect Insight.
+Your job is to help users add and configure CCTV cameras inside restaurant kitchens and connect them to our AI-based operational analytics engine.
 `;
 
 export const MARKDOWN_INSTRUCTION = `
@@ -39,7 +84,8 @@ export const CREDIT_COSTS = {
     IMAGE: 20,
     EXPERT_CONNECT: 50,
     WORKFLOW: 50,
-    MENU_GEN: 40
+    MENU_GEN: 40,
+    LAYOUT: 60
 };
 
 export const RECHARGE_RATE = 10; // INR per credit
@@ -114,6 +160,55 @@ export const MOCK_MENU: MenuItem[] = [
   }
 ];
 
+export const MOCK_RECIPES: RecipeCard[] = [
+  {
+    ...MOCK_MENU[0],
+    yield: 1,
+    preparation_steps: [
+      "Blend frozen acai puree with banana until smooth.",
+      "Pour into a chilled bowl.",
+      "Top evenly with granola and fresh berries."
+    ],
+    equipment_needed: ["Blender", "Spatula"],
+    portioning_guideline: "1 Bowl (350g)",
+    allergens: ["Nuts (Granola)"],
+    shelf_life_hours: 0,
+    food_cost_per_serving: 180,
+    suggested_selling_price: 499,
+    tags: ["Healthy", "Breakfast", "Vegan"],
+    confidence: "High",
+    human_summary: "High-margin breakfast item. Ensure acai remains frozen for texture.",
+    ingredients: [
+        { ingredient_id: "ING01", name: "Acai Puree", qty: "100 g", cost_per_unit: 1450, unit: "kg", cost_per_serving: 145, waste_pct: 0 },
+        { ingredient_id: "ING02", name: "Banana", qty: "50 g", cost_per_unit: 60, unit: "kg", cost_per_serving: 3, waste_pct: 5 },
+        { ingredient_id: "ING03", name: "Granola", qty: "30 g", cost_per_unit: 400, unit: "kg", cost_per_serving: 12, waste_pct: 0 }
+    ]
+  },
+  {
+    ...MOCK_MENU[1],
+    yield: 1,
+    preparation_steps: [
+      "Toast sourdough slices until golden brown.",
+      "Mash avocado with lime juice, salt, and pepper.",
+      "Spread avocado mix on toast and top with crumbled feta."
+    ],
+    equipment_needed: ["Toaster", "Mixing Bowl"],
+    portioning_guideline: "2 Slices",
+    allergens: ["Gluten", "Dairy"],
+    shelf_life_hours: 0,
+    food_cost_per_serving: 120,
+    suggested_selling_price: 350,
+    tags: ["Vegetarian", "Brunch"],
+    confidence: "High",
+    human_summary: "Classic brunch staple. Watch avocado ripeness closely to reduce waste.",
+    ingredients: [
+        { ingredient_id: "ING04", name: "Sourdough", qty: "2 slices", cost_per_unit: 20, unit: "slice", cost_per_serving: 40, waste_pct: 2 },
+        { ingredient_id: "ING05", name: "Avocado", qty: "1 pc", cost_per_unit: 80, unit: "pc", cost_per_serving: 80, waste_pct: 10 },
+        { ingredient_id: "ING06", name: "Feta", qty: "20 g", cost_per_unit: 1200, unit: "kg", cost_per_serving: 24, waste_pct: 0 }
+    ]
+  }
+];
+
 export const MOCK_SALES_DATA = [
   { date: "2023-10-01", revenue: 12000, items_sold: 45 },
   { date: "2023-10-02", revenue: 15400, items_sold: 58 },
@@ -134,28 +229,3 @@ export const MOCK_INGREDIENT_PRICES = [
   { ingredient_id: "ING07", name: "Frozen Mango", cost_per_unit: 300, unit: "kg" },
   { ingredient_id: "ING08", name: "Yogurt", cost_per_unit: 100, unit: "l" },
 ];
-
-export const MOCK_PURCHASES = [
-    { date: "2023-10-01", ingredient_id: "ING01", ingredient_name: "Acai Puree", qty: 5, unit: "kg", cost: 7250 },
-    { date: "2023-10-03", ingredient_id: "ING05", ingredient_name: "Avocado", qty: 20, unit: "pc", cost: 1600 },
-    { date: "2023-10-05", ingredient_id: "ING07", ingredient_name: "Frozen Mango", qty: 10, unit: "kg", cost: 3000 },
-];
-
-export const MOCK_EXPENSES = [
-    { date: "2023-10-01", type: "Rent", amount: 50000 },
-    { date: "2023-10-05", type: "Utilities", amount: 12000 },
-    { date: "2023-10-02", type: "Marketing", amount: 8000 },
-    { date: "2023-10-06", type: "Wages", amount: 35000 },
-];
-
-export const MOCK_EMPLOYEES = [
-    { employee_id: "E001", role: "Manager", monthly_cost: 35000 },
-    { employee_id: "E002", role: "Head Cook", monthly_cost: 28000 },
-    { employee_id: "E003", role: "Helper", monthly_cost: 15000 },
-    { employee_id: "E004", role: "Server", monthly_cost: 12000 },
-];
-
-export const BUSINESS_GOALS = {
-    target_monthly_revenue: 1500000,
-    desired_food_cost_pct: 30
-};

@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { Bell, Search, X, Check, Moon, Sun, ChevronRight, Home } from 'lucide-react';
 import { authService } from '../services/authService';
@@ -43,6 +44,7 @@ export const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, currentView,
   const getViewName = (view: AppView) => {
       switch (view) {
           case AppView.DASHBOARD: return 'Dashboard';
+          case AppView.TASKS: return 'Task Manager';
           case AppView.INVENTORY: return 'Inventory Manager';
           case AppView.RECIPES: return 'Recipe & Costing';
           case AppView.SOP: return 'SOP Studio';
@@ -50,6 +52,8 @@ export const Header: React.FC<HeaderProps> = ({ theme, toggleTheme, currentView,
           case AppView.VIDEO: return 'Marketing Studio';
           case AppView.KITCHEN_WORKFLOW: return 'Kitchen Workflow';
           case AppView.MENU_GENERATOR: return 'Menu Generator';
+          case AppView.CCTV_ANALYTICS: return 'Staff Movement & SOPs';
+          case AppView.LAYOUT_DESIGN: return 'Layout Designer';
           case AppView.INTEGRATIONS: return 'Data & Integrations';
           case AppView.BILLING: return 'Plans & Billing';
           default: return 'Dashboard';

@@ -4,9 +4,10 @@ import { PLANS, CREDIT_COSTS } from '../constants';
 import { generateRecipeCard, generateRecipeVariation, substituteIngredient, estimateMarketRates } from '../services/geminiService';
 import { ingredientService } from '../services/ingredientService';
 import { RecipeCard, MenuItem, User, UserRole, POSChangeRequest, RecipeRequest, Ingredient } from '../types';
-import { Loader2, ChefHat, Scale, Clock, AlertCircle, Upload, Lock, Sparkles, Check, Save, RefreshCw, Search, Plus, Store, Zap, Trash2, Building2, FileSignature, X, AlignLeft, UtensilsCrossed, Inbox, UserCheck, CheckCircle2, Clock3, Carrot, Type, Wallet, Filter, Tag, Eye, Flame, Wand2, Eraser, FileDown, TrendingDown, ArrowRight, Key, Coins, Leaf, TestTube, ArrowLeftRight, PenTool, Lightbulb, Calculator, DollarSign, Edit2, Globe, Droplets, Wheat, Bot } from 'lucide-react';
+import { Loader2, ChefHat, Scale, Clock, AlertCircle, Upload, Lock, Sparkles, Check, Save, RefreshCw, Search, Plus, Store, Zap, Trash2, Building2, FileSignature, X, AlignLeft, UtensilsCrossed, Inbox, UserCheck, CheckCircle2, Clock3, Carrot, Type, Wallet, Filter, Tag, Eye, Flame, Wand2, Eraser, FileDown, TrendingDown, ArrowRight, Key, Coins, Leaf, TestTube, ArrowLeftRight, PenTool, Lightbulb, Calculator, DollarSign, Edit2, Globe, Droplets, Wheat, Bot, PieChart as PieChartIcon } from 'lucide-react';
 import { storageService } from '../services/storageService';
 import { authService } from '../services/authService';
+import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 
 interface RecipeHubProps {
   user: User;
@@ -37,6 +38,8 @@ const CHEF_PERSONAS = [
     { id: 'The Purist', name: 'The Purist', icon: Flame, color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-100 dark:bg-orange-900/30', desc: 'Authentic & Traditional' },
     { id: 'The Wellness Guru', name: 'The Wellness Guru', icon: Leaf, color: 'text-green-600 dark:text-green-400', bg: 'bg-green-100 dark:bg-green-900/30', desc: 'Healthy & Dietary' }
 ];
+
+const CHART_COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#6366f1'];
 
 const formatError = (err: any) => {
     if (!err) return "Unknown error occurred";
@@ -193,7 +196,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
   }, [generatedRecipe, savedRecipes]);
 
   const savingsAnalysis = useMemo(() => {
-      if (!generatedRecipe) return null;
+      if (!generatedRecipe || !generatedRecipe.ingredients) return null;
       
       let totalOriginalCost = generatedRecipe.food_cost_per_serving;
       let totalNewCost = 0;
@@ -235,6 +238,33 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
           savingsPct, 
           hasChanges 
       };
+  }, [generatedRecipe, altPrices, wasteValues]);
+
+  const costBreakdownData = useMemo(() => {
+      if (!generatedRecipe?.ingredients) return [];
+      
+      // Calculate costs per ingredient
+      const data = generatedRecipe.ingredients.map((ing, idx) => {
+          const userRate = altPrices[idx] ? parseFloat(altPrices[idx]) : (ing.cost_per_unit || 0);
+          const userWaste = wasteValues[idx] ? parseFloat(wasteValues[idx]) : (ing.waste_pct || 0);
+          const wasteFactor = 100 / (100 - Math.min(userWaste, 99.9));
+          let cost = ing.cost_per_serving || 0;
+          
+          if (ing.cost_per_unit && ing.cost_per_unit > 0) {
+              cost = (cost / ing.cost_per_unit) * userRate * wasteFactor;
+          } else {
+              cost = cost * wasteFactor;
+          }
+          return { name: ing.name, value: cost };
+      });
+
+      // Sort desc and take top 5, group rest as "Others"
+      const sorted = data.sort((a,b) => b.value - a.value);
+      if (sorted.length <= 5) return sorted;
+      
+      const top5 = sorted.slice(0, 5);
+      const others = sorted.slice(5).reduce((acc, curr) => acc + curr.value, 0);
+      return [...top5, { name: 'Others', value: others }];
   }, [generatedRecipe, altPrices, wasteValues]);
 
   const checkCredits = (): boolean => {
@@ -288,7 +318,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
   };
 
   const handleYieldUpdate = (newYieldStr: string) => {
-      if (!generatedRecipe) return;
+      if (!generatedRecipe || !generatedRecipe.ingredients) return;
       const newYield = parseFloat(newYieldStr);
       if (isNaN(newYield) || newYield <= 0) return;
 
@@ -443,9 +473,26 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
           const card = await generateRecipeCard(contextUserId, item, requirements, user.location, selectedPersona);
           setGeneratedRecipe(card);
       } catch (e: any) {
+          // This block should ideally not be reached if safeGenerate is working,
+          // but we handle it just in case.
           console.error(e);
           setError(formatError(e));
       } finally { setLoading(false); }
+  };
+
+  const handleConnectKey = async () => {
+      const aiStudio = (window as any).aistudio;
+      if (aiStudio) {
+          try {
+              await aiStudio.openSelectKey();
+              const selected = await aiStudio.hasSelectedApiKey();
+              if (selected) {
+                  window.location.reload();
+              }
+          } catch(e) {
+              console.error(e);
+          }
+      }
   };
 
   const handleFulfillRequest = (req: RecipeRequest) => {
@@ -469,7 +516,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
 
   // ... (handleSuggestSupplierPrices, handleFetchMarketRates, handleIngredientSwap remain unchanged)
   const handleSuggestSupplierPrices = () => {
-      if (!generatedRecipe) return;
+      if (!generatedRecipe || !generatedRecipe.ingredients) return;
       const newAltPrices: Record<number, string> = { ...altPrices };
       const sortedIngredients = generatedRecipe.ingredients.map((ing, idx) => ({ ...ing, idx })).sort((a, b) => (b.cost_per_unit || 0) - (a.cost_per_unit || 0));
       sortedIngredients.slice(0, 3).forEach((ing) => { if (ing.cost_per_unit && !newAltPrices[ing.idx]) { newAltPrices[ing.idx] = (ing.cost_per_unit * 0.85).toFixed(0); } });
@@ -477,7 +524,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
   };
 
   const handleFetchMarketRates = async () => {
-      if (!generatedRecipe) return;
+      if (!generatedRecipe || !generatedRecipe.ingredients) return;
       setIsFetchingRates(true);
       try {
           const names = generatedRecipe.ingredients.map(i => i.name);
@@ -496,7 +543,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
   };
 
   const handleIngredientSwap = async (index: number) => {
-      if (!generatedRecipe) return;
+      if (!generatedRecipe || !generatedRecipe.ingredients) return;
       const ingredient = generatedRecipe.ingredients[index];
       if (!ingredient) return;
       if (!checkCredits()) return; 
@@ -517,16 +564,18 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
     if (generatedRecipe) {
       setIsSaving(true);
       setTimeout(() => {
-        ingredientService.learnPrices(generatedRecipe.ingredients);
+        if (generatedRecipe.ingredients) ingredientService.learnPrices(generatedRecipe.ingredients);
         const recipeToSave = { ...generatedRecipe };
-        recipeToSave.ingredients = recipeToSave.ingredients.map((ing, idx) => {
-            const userPrice = altPrices[idx] ? parseFloat(altPrices[idx]) : ing.cost_per_unit;
-            const userWaste = wasteValues[idx] ? parseFloat(wasteValues[idx]) : ing.waste_pct;
-            const wasteFactor = 100 / (100 - Math.min(userWaste || 0, 99.9));
-            const newCost = (ing.cost_per_serving || 0) * ((userPrice || 0) / (ing.cost_per_unit || 1)) * wasteFactor;
-            return { ...ing, cost_per_unit: userPrice, waste_pct: userWaste, cost_per_serving: newCost };
-        });
-        recipeToSave.food_cost_per_serving = recipeToSave.ingredients.reduce((acc, curr) => acc + (curr.cost_per_serving || 0), 0);
+        if (recipeToSave.ingredients) {
+            recipeToSave.ingredients = recipeToSave.ingredients.map((ing, idx) => {
+                const userPrice = altPrices[idx] ? parseFloat(altPrices[idx]) : ing.cost_per_unit;
+                const userWaste = wasteValues[idx] ? parseFloat(wasteValues[idx]) : ing.waste_pct;
+                const wasteFactor = 100 / (100 - Math.min(userWaste || 0, 99.9));
+                const newCost = (ing.cost_per_serving || 0) * ((userPrice || 0) / (ing.cost_per_unit || 1)) * wasteFactor;
+                return { ...ing, cost_per_unit: userPrice, waste_pct: userWaste, cost_per_serving: newCost };
+            });
+            recipeToSave.food_cost_per_serving = recipeToSave.ingredients.reduce((acc, curr) => acc + (curr.cost_per_serving || 0), 0);
+        }
         if (isStaff && activeRequest) {
             storageService.saveRecipe(activeRequest.userId, recipeToSave);
             const completedReq: RecipeRequest = { ...activeRequest, status: 'completed', completedDate: new Date().toISOString() };
@@ -635,7 +684,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                           {!dishName && (
                               <div className="flex flex-wrap gap-2">
                                   {POPULAR_IDEAS.map((idea, i) => (
-                                      <button key={i} type="button" onClick={() => handlePopularIdea(idea)} className="px-3 py-1 bg-slate-50 dark:bg-slate-800 text-xs rounded-full border border-slate-200 dark:border-slate-700">{idea.name}</button>
+                                      <button key={i} type="button" onClick={() => handlePopularIdea(idea)} className="px-3 py-1 bg-slate-5 dark:bg-slate-800 text-xs rounded-full border border-slate-200 dark:border-slate-700">{idea.name}</button>
                                   ))}
                               </div>
                           )}
@@ -681,6 +730,26 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
               <div className="flex-1 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col relative overflow-hidden transition-colors">
                   {generatedRecipe ? (
                       <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+                          {generatedRecipe.human_summary?.includes("Demo Mode") && (
+                              <div className="mb-4 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 rounded-xl flex items-center justify-between shadow-sm animate-fade-in">
+                                  <div className="flex items-center gap-3">
+                                      <div className="p-2 bg-amber-100 dark:bg-amber-800/50 rounded-full text-amber-700 dark:text-amber-400">
+                                          <AlertCircle size={20}/>
+                                      </div>
+                                      <div>
+                                          <p className="text-sm font-bold text-amber-900 dark:text-amber-300">Offline Mode Active</p>
+                                          <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">Showing mock data. Connect API Key to enable live AI.</p>
+                                      </div>
+                                  </div>
+                                  <button 
+                                    onClick={handleConnectKey}
+                                    className="px-4 py-2 bg-amber-600 text-white text-xs font-bold rounded-lg hover:bg-amber-700 transition-colors shadow-sm flex items-center gap-2"
+                                  >
+                                      <Key size={14} /> Connect API Key
+                                  </button>
+                              </div>
+                          )}
+                          
                           {/* Recipe Card UI */}
                           <div 
                             className="bg-white dark:bg-slate-900 shadow-xl rounded-2xl overflow-hidden border border-slate-100 dark:border-slate-800 mb-8 relative group"
@@ -844,7 +913,7 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                                                {generatedRecipe.ingredients.map((ing, idx) => {
+                                                {generatedRecipe.ingredients?.map((ing, idx) => {
                                                     const marketRate = ing.cost_per_unit || 0;
                                                     const userRateStr = altPrices[idx];
                                                     const userRate = userRateStr ? parseFloat(userRateStr) : marketRate;
@@ -886,12 +955,48 @@ export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
                                             </tbody>
                                         </table>
                                     </div>
+                                    
+                                    {/* Cost Breakdown Visual */}
+                                    <div className="mt-8 flex flex-col md:flex-row gap-8 items-center bg-white/40 dark:bg-slate-800/40 p-6 rounded-xl border border-slate-200 dark:border-slate-700">
+                                        <div className="w-full md:w-1/3 h-[200px]">
+                                            <h4 className="text-xs font-bold text-slate-500 uppercase mb-2 text-center">Cost Distribution</h4>
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <PieChart>
+                                                    <Pie
+                                                        data={costBreakdownData}
+                                                        cx="50%"
+                                                        cy="50%"
+                                                        innerRadius={40}
+                                                        outerRadius={70}
+                                                        paddingAngle={5}
+                                                        dataKey="value"
+                                                    >
+                                                        {costBreakdownData.map((entry, index) => (
+                                                            <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                                                        ))}
+                                                    </Pie>
+                                                    <RechartsTooltip />
+                                                </PieChart>
+                                            </ResponsiveContainer>
+                                        </div>
+                                        <div className="flex-1 grid grid-cols-2 gap-4">
+                                            {costBreakdownData.map((entry, idx) => (
+                                                <div key={idx} className="flex items-center gap-2">
+                                                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: CHART_COLORS[idx % CHART_COLORS.length] }}></div>
+                                                    <div className="text-xs">
+                                                        <span className="font-bold text-slate-700 dark:text-slate-300">{entry.name}</span>
+                                                        <span className="text-slate-500 ml-1">₹{entry.value.toFixed(1)}</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div className="p-8 bg-slate-50/50 dark:bg-slate-950/50 backdrop-blur-sm">
                                     <h3 className="font-bold text-slate-800 dark:text-white mb-4">Preparation Steps</h3>
                                     <div className="space-y-4">
-                                        {generatedRecipe.preparation_steps.map((step, i) => (
+                                        {generatedRecipe.preparation_steps?.map((step, i) => (
                                             <div key={i} className="flex gap-4">
                                                 <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-slate-600 dark:text-slate-400 shrink-0 text-sm border border-slate-300 dark:border-slate-700">{i + 1}</div>
                                                 <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed mt-1.5">{step}</p>
