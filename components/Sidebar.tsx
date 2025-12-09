@@ -1,12 +1,9 @@
-
 import React, { useState, useEffect } from 'react';
 import { LayoutDashboard, ChefHat, FileText, TrendingUp, Database, CreditCard, LogOut, Clapperboard, RefreshCw, GitMerge, BookOpen, Package, Activity, PenTool, Key, CheckCircle2, ListTodo, ExternalLink } from 'lucide-react';
 import { AppView, User, PlanType, UserRole } from '../types';
 import { Logo } from './Logo';
 import { storageService } from '../services/storageService';
 import { hasValidApiKey } from '../services/geminiService';
-
-// Removed conflicting global declaration
 
 interface SidebarProps {
   currentView: AppView;
@@ -25,21 +22,36 @@ interface MenuItem {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, user, onLogout }) => {
-  const [apiConnected, setApiConnected] = useState(false);
+  // Initialize with env check to avoid flash
+  const [apiConnected, setApiConnected] = useState(hasValidApiKey());
   const [hasCustomKey, setHasCustomKey] = useState(false);
 
   // Check connection on mount and interval
   useEffect(() => {
       const check = async () => {
+          const envKeyValid = hasValidApiKey();
+          
+          if (envKeyValid) {
+              // If env key exists, we are live. No need to check AI Studio.
+              setApiConnected(true);
+              return;
+          }
+
           const aiStudio = (window as any).aistudio;
           if (aiStudio) {
-              const selected = await aiStudio.hasSelectedApiKey();
-              setHasCustomKey(selected);
-              setApiConnected(selected);
+              try {
+                  const selected = await aiStudio.hasSelectedApiKey();
+                  setHasCustomKey(selected);
+                  setApiConnected(selected);
+              } catch (e) {
+                  console.error("AI Studio Check Failed", e);
+                  setApiConnected(false);
+              }
           } else {
-              setApiConnected(hasValidApiKey());
+              setApiConnected(false);
           }
       };
+      
       check();
       const interval = setInterval(check, 3000);
       return () => clearInterval(interval);
@@ -137,7 +149,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
                 <span className="text-xs font-bold text-slate-500 dark:text-slate-400">System Status</span>
             </div>
             
-            {(window as any).aistudio ? (
+            {(window as any).aistudio && !apiConnected ? (
                 <button 
                     onClick={handleConnectKey}
                     className={`flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-bold transition-colors ${

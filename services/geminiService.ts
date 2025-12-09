@@ -21,7 +21,11 @@ import { ingredientService } from './ingredientService';
 
 export const hasValidApiKey = (): boolean => {
     try {
-        return !!process.env.API_KEY;
+        // Robust check for process.env.API_KEY
+        return typeof process !== 'undefined' && 
+               !!process.env && 
+               !!process.env.API_KEY && 
+               process.env.API_KEY.trim().length > 0;
     } catch (e) {
         return false;
     }
@@ -42,6 +46,7 @@ const createAIClient = () => {
         return new GoogleGenAI({ apiKey });
     } catch (e) {
         // Suppress initialization errors
+        console.error("Failed to initialize GoogleGenAI client:", e);
         return null;
     }
 };
