@@ -21,12 +21,12 @@ import { ingredientService } from './ingredientService';
 
 export const hasValidApiKey = (): boolean => {
     try {
-        // Robust check for process.env.API_KEY
-        if (typeof process !== 'undefined' && process.env) {
-             const key = process.env.API_KEY;
-             return !!key && key.trim().length > 0;
-        }
-        return false;
+        // Access process.env.API_KEY directly.
+        // Bundlers (Vite/Webpack) replace this string literal at build time.
+        // We avoid checking 'typeof process' because the global 'process' object might not exist in the browser,
+        // even if the key replacement happened.
+        const key = process.env.API_KEY;
+        return !!key && key.length > 0 && key !== 'undefined';
     } catch (e) {
         return false;
     }

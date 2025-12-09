@@ -253,7 +253,6 @@ export const storageService = {
     getAllSOPRequests: (): SOPRequest[] => [],
     
     getAllMarketingRequests: (): MarketingRequest[] => {
-        // Mock implementation to return stored marketing requests from a global key
         const stored = localStorage.getItem('bistro_marketing_requests');
         return stored ? JSON.parse(stored) : [];
     },
@@ -261,6 +260,12 @@ export const storageService = {
         const stored = localStorage.getItem('bistro_marketing_requests');
         const list = stored ? JSON.parse(stored) : [];
         list.push(request);
+        localStorage.setItem('bistro_marketing_requests', JSON.stringify(list));
+    },
+    deleteMarketingRequest: (id: string) => {
+        const stored = localStorage.getItem('bistro_marketing_requests');
+        let list: MarketingRequest[] = stored ? JSON.parse(stored) : [];
+        list = list.filter(r => r.id !== id);
         localStorage.setItem('bistro_marketing_requests', JSON.stringify(list));
     },
 

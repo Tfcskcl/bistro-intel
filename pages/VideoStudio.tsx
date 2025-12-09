@@ -1,10 +1,9 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { User, UserRole, MarketingRequest } from '../types';
 import { generateMarketingVideo, generateMarketingImage, hasValidApiKey } from '../services/geminiService';
 import { storageService } from '../services/storageService';
 import { CREDIT_COSTS } from '../constants';
-import { Clapperboard, Image as ImageIcon, Loader2, PlayCircle, Download, RefreshCw, Upload, CheckCircle2, Clock, Wallet, Sparkles, Key, AlertCircle, History, Maximize2, X } from 'lucide-react';
+import { Clapperboard, Image as ImageIcon, Loader2, PlayCircle, Download, RefreshCw, Upload, CheckCircle2, Clock, Wallet, Sparkles, Key, AlertCircle, History, Maximize2, X, Trash2 } from 'lucide-react';
 
 interface VideoStudioProps {
   user: User;
@@ -114,13 +113,32 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
       }
   };
 
-  const downloadMedia = (url: string, filename: string) => {
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+  const downloadMedia = async (url: string, filename: string) => {
+      try {
+          // Fetch as blob to handle cross-origin or signed URLs properly
+          const response = await fetch(url);
+          const blob = await response.blob();
+          const blobUrl = window.URL.createObjectURL(blob);
+          
+          const a = document.createElement('a');
+          a.href = blobUrl;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          window.URL.revokeObjectURL(blobUrl);
+      } catch (e) {
+          console.error("Download failed", e);
+          // Fallback to direct link opening
+          window.open(url, '_blank');
+      }
+  };
+
+  const handleDelete = (id: string) => {
+      if(!confirm("Are you sure you want to delete this asset?")) return;
+      storageService.deleteMarketingRequest(id);
+      loadHistory();
+      if (currentResult?.id === id) setCurrentResult(null);
   };
 
   return (
@@ -202,7 +220,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
                       {/* Reference Image (Video Only) */}
                       {mediaType === 'video' && (
                           <div>
-                              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Reference Image (Optional)</label>
+                              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Start Frame (Optional)</label>
                               <div 
                                 onClick={() => fileInputRef.current?.click()}
                                 className="border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-lg p-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 text-center relative overflow-hidden transition-colors"
@@ -220,7 +238,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
                                   ) : (
                                       <div className="text-slate-400 dark:text-slate-500">
                                           <Upload size={20} className="mx-auto mb-1" />
-                                          <span className="text-xs">Click to upload starting frame</span>
+                                          <span className="text-xs">Upload Reference Frame</span>
                                       </div>
                                   )}
                                   <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
@@ -288,7 +306,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
                           
                           <div className="absolute top-4 right-4 flex gap-2">
                               <button 
-                                onClick={() => currentResult.outputUrl && downloadMedia(currentResult.outputUrl, `bistro-${currentResult.type}-${Date.now()}`)}
+                                onClick={() => currentResult.outputUrl && downloadMedia(currentResult.outputUrl, `bistro-${currentResult.type}-${Date.now()}.${currentResult.type === 'video' ? 'mp4' : 'png'}`)}
                                 className="p-2 bg-white/20 hover:bg-white/30 backdrop-blur-md rounded-full text-white transition-colors"
                                 title="Download"
                               >
@@ -324,7 +342,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
               ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                       {history.map((item) => (
-                          <div key={item.id} className="group relative bg-slate-100 dark:bg-slate-800 rounded-xl overflow-hidden aspect-square border border-slate-200 dark:border-slate-700">
+                          <div key={item.id} className="group relative bg-slate-100 dark:bg-slate-800 rounded-xl overflow-hidden aspect-square border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-all">
                               {item.type === 'video' ? (
                                   <video src={item.outputUrl} className="w-full h-full object-cover" />
                               ) : (
@@ -332,11 +350,25 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
                               )}
                               
                               <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-4">
-                                  <div className="flex justify-end">
+                                  <div className="flex justify-between items-start">
                                       <span className="text-[10px] font-bold text-white bg-white/20 backdrop-blur px-2 py-1 rounded uppercase">
                                           {item.type}
                                       </span>
+                                      <button 
+                                        onClick={() => handleDelete(item.id)}
+                                        className="p-1.5 bg-red-500/80 hover:bg-red-600 text-white rounded transition-colors"
+                                        title="Delete"
+                                      >
+                                          <Trash2 size={12} />
+                                      </button>
                                   </div>
+                                  
+                                  {item.type === 'video' && (
+                                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-white/80 pointer-events-none">
+                                          <PlayCircle size={32} />
+                                      </div>
+                                  )}
+
                                   <div>
                                       <p className="text-white text-xs line-clamp-2 mb-3">{item.prompt}</p>
                                       <div className="flex gap-2">
@@ -350,8 +382,9 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
                                               <Maximize2 size={12} /> View
                                           </button>
                                           <button 
-                                            onClick={() => item.outputUrl && downloadMedia(item.outputUrl, `bistro-${item.id}`)}
+                                            onClick={() => item.outputUrl && downloadMedia(item.outputUrl, `bistro-${item.id}.${item.type === 'video' ? 'mp4' : 'png'}`)}
                                             className="p-1.5 bg-white/20 text-white rounded hover:bg-white/30"
+                                            title="Download"
                                           >
                                               <Download size={14} />
                                           </button>
