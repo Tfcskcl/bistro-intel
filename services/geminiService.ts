@@ -20,20 +20,24 @@ import { ingredientService } from './ingredientService';
 
 // --- CONFIGURATION ---
 
-export const hasValidApiKey = (): boolean => {
-    try {
-        const key = process.env.API_KEY;
-        return !!key && key.length > 0 && key !== 'undefined';
-    } catch (e) {
-        return false;
-    }
-};
-
 const getApiKey = (): string => {
     try {
+        // Prioritize local storage for manual overrides in live deployments
+        const localKey = localStorage.getItem('bistro_api_key');
+        if (localKey) return localKey;
+        
         return process.env.API_KEY || "";
     } catch (e) {
         return "";
+    }
+};
+
+export const hasValidApiKey = (): boolean => {
+    try {
+        const key = getApiKey();
+        return !!key && key.length > 0 && key !== 'undefined';
+    } catch (e) {
+        return false;
     }
 };
 
@@ -438,7 +442,7 @@ export const generateMenu = async (request: MenuGenerationRequest): Promise<stri
     // Richer Fallback
     const fallback = JSON.stringify({
         title: request.restaurantName,
-        tagline: "Experience the Taste of Excellence",
+        tagline: "Generated Offline Mode",
         currency: "₹",
         sections: [
             { 

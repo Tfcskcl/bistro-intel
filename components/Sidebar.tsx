@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, ChefHat, FileText, TrendingUp, Database, CreditCard, LogOut, Clapperboard, RefreshCw, GitMerge, BookOpen, Package, Activity, PenTool, Key, CheckCircle2, ListTodo, ExternalLink } from 'lucide-react';
+import { LayoutDashboard, ChefHat, FileText, TrendingUp, Database, CreditCard, LogOut, Clapperboard, RefreshCw, GitMerge, BookOpen, Package, Activity, PenTool, Key, CheckCircle2, ListTodo, ExternalLink, X, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 import { AppView, User, PlanType, UserRole } from '../types';
 import { Logo } from './Logo';
 import { storageService } from '../services/storageService';
@@ -25,6 +25,11 @@ interface MenuItem {
 export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, user, onLogout }) => {
   const [apiConnected, setApiConnected] = useState(hasValidApiKey());
   const [isAiStudioAvailable, setIsAiStudioAvailable] = useState(false);
+  
+  // Key Modal State
+  const [showKeyModal, setShowKeyModal] = useState(false);
+  const [manualKey, setManualKey] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
       // Periodic check for aistudio availability in case of late load
@@ -63,7 +68,17 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
               console.error("Key selection failed", e);
           }
       } else {
-          alert("AI Studio environment not detected. Please configure API_KEY in your deployment settings.");
+          // Open Manual Entry Modal if AI Studio is not available
+          setShowKeyModal(true);
+      }
+  };
+
+  const saveManualKey = () => {
+      if (manualKey.trim()) {
+          localStorage.setItem('bistro_api_key', manualKey.trim());
+          setApiConnected(true);
+          setShowKeyModal(false);
+          window.location.reload();
       }
   };
 
@@ -90,6 +105,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
   const lowCredits = user.credits < 50;
 
   return (
+    <>
     <div className="w-64 bg-white dark:bg-slate-900 text-slate-800 dark:text-white flex flex-col h-screen fixed left-0 top-0 z-20 shadow-xl border-r border-slate-200 dark:border-slate-800 transition-colors duration-200">
       <div className="p-6 border-b border-slate-200 dark:border-slate-800">
         <div className="dark:hidden">
@@ -200,5 +216,73 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
         </button>
       </div>
     </div>
+
+    {/* API Key Modal */}
+    {showKeyModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200 dark:border-slate-800">
+                <div className="p-6">
+                    <div className="flex justify-between items-start mb-4">
+                        <div>
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                <Key className="text-amber-500" size={24} /> Connect API Key
+                            </h3>
+                            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                                Enter your Google Gemini API Key to enable AI features.
+                            </p>
+                        </div>
+                        <button onClick={() => setShowKeyModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors">
+                            <X size={20} />
+                        </button>
+                    </div>
+
+                    <div className="space-y-4">
+                        <div className="relative">
+                            <input
+                                type={showPassword ? "text" : "password"}
+                                value={manualKey}
+                                onChange={(e) => setManualKey(e.target.value)}
+                                placeholder="AIzaSy..."
+                                className="w-full pl-4 pr-12 py-3 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-amber-500 outline-none font-mono text-sm transition-all"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                className="absolute right-3 top-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                            >
+                                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </button>
+                        </div>
+
+                        <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-100 dark:border-blue-800 flex gap-3">
+                            <ShieldCheck className="text-blue-600 dark:text-blue-400 shrink-0" size={18} />
+                            <div className="text-xs text-blue-800 dark:text-blue-300 leading-relaxed">
+                                Your key is stored securely in your browser's local storage. We do not save it on our servers.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="mt-6 flex gap-3">
+                        <a
+                            href="https://aistudio.google.com/app/apikey"
+                            target="_blank"
+                            rel="noreferrer"
+                            className="flex-1 py-3 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold rounded-lg text-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex items-center justify-center gap-2"
+                        >
+                            Get Key <ExternalLink size={14} />
+                        </a>
+                        <button
+                            onClick={saveManualKey}
+                            disabled={!manualKey}
+                            className="flex-1 py-3 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold rounded-lg text-sm hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            Save & Connect
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    )}
+    </>
   );
 };
