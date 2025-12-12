@@ -44,7 +44,7 @@ function App() {
   if (!user && showLogin) return <Login onLogin={() => setShowLogin(false)} onBack={() => setShowLogin(false)} />;
 
   if (user && !user.setupComplete) {
-      return <OnboardingWizard onComplete={handleOnboardingComplete} />;
+      return <OnboardingWizard user={user} onComplete={handleOnboardingComplete} />;
   }
 
   return (
