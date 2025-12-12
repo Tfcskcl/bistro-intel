@@ -24,45 +24,46 @@ interface MenuItem {
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, user, onLogout }) => {
   const [apiConnected, setApiConnected] = useState(hasValidApiKey());
-  const [hasCustomKey, setHasCustomKey] = useState(false);
+  const [isAiStudioAvailable, setIsAiStudioAvailable] = useState(false);
 
   useEffect(() => {
-      const check = async () => {
-          if (hasValidApiKey()) {
-              setApiConnected(true);
-              return;
-          }
+      // Periodic check for aistudio availability in case of late load
+      const checkInterval = setInterval(() => {
           const aiStudio = (window as any).aistudio;
           if (aiStudio) {
-              try {
-                  const selected = await aiStudio.hasSelectedApiKey();
-                  setHasCustomKey(selected);
-                  setApiConnected(selected);
-              } catch (e) {
-                  setApiConnected(false);
-              }
+              setIsAiStudioAvailable(true);
+              aiStudio.hasSelectedApiKey().then((selected: boolean) => {
+                  if (selected || hasValidApiKey()) {
+                      setApiConnected(true);
+                  }
+              }).catch(() => {});
+          } else if (hasValidApiKey()) {
+              setApiConnected(true);
           }
-      };
-      check();
+      }, 1000);
+
+      // Immediate check
+      if (hasValidApiKey()) setApiConnected(true);
+
+      return () => clearInterval(checkInterval);
   }, []);
 
   const handleConnectKey = async () => {
       const aiStudio = (window as any).aistudio;
       if (aiStudio) {
           try {
-              // Open the dialog
               await aiStudio.openSelectKey();
-              
-              // RACE CONDITION FIX: 
-              // Do NOT wait or check status again. Assume success per system instructions.
-              setHasCustomKey(true);
+              // Assume success immediately to update UI
               setApiConnected(true);
-              
-              // Force reload to pick up the new key in the environment
-              window.location.reload();
+              // Trigger a small timeout to allow env var propagation if needed without full reload
+              setTimeout(() => {
+                 window.location.reload(); 
+              }, 500);
           } catch(e) {
               console.error("Key selection failed", e);
           }
+      } else {
+          alert("AI Studio environment not detected. Please configure API_KEY in your deployment settings.");
       }
   };
 
@@ -139,7 +140,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
                 <span className="text-xs font-bold text-slate-500 dark:text-slate-400">System Status</span>
             </div>
             
-            {(window as any).aistudio && !apiConnected ? (
+            {!apiConnected ? (
                 <button 
                     onClick={handleConnectKey}
                     className="flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-bold bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 animate-pulse hover:bg-orange-200 transition-colors"
