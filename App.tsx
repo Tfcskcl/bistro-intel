@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
@@ -67,7 +66,7 @@ function App() {
             {currentView === AppView.LAYOUT_DESIGN && <KitchenLayoutDesigner user={user!} onUserUpdate={setUser} />}
             {currentView === AppView.VIDEO && <VideoStudio user={user!} />}
             {currentView === AppView.INTEGRATIONS && <Integrations />}
-            {currentView === AppView.BILLING && <Billing user={user!} onUpgrade={()=>{}} />}
+            {currentView === AppView.BILLING && <Billing user={user!} />}
           </ErrorBoundary>
         </main>
       </div>

@@ -30,6 +30,28 @@ const DEMO_USERS: (User & {password: string})[] = [
     restaurantName: "The Golden Spoon",
     credits: 2600,
     setupComplete: true
+  },
+  {
+    id: 'demo_admin', 
+    name: 'Mike Admin',
+    email: 'admin@bistro.com',
+    password: 'pass',
+    role: UserRole.ADMIN,
+    plan: PlanType.PRO,
+    restaurantName: "Urban Spices",
+    credits: 500,
+    setupComplete: true
+  },
+  {
+    id: 'super_admin', 
+    name: 'BistroHQ',
+    email: 'info@bistroconnect.in',
+    password: 'Bistro@2403',
+    role: UserRole.SUPER_ADMIN,
+    plan: PlanType.PRO_PLUS,
+    restaurantName: "BistroConnect Platform",
+    credits: 99999,
+    setupComplete: true
   }
 ];
 
@@ -82,6 +104,9 @@ export const authService = {
     
     localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(safeUser));
     notifyObservers(safeUser);
+    
+    storageService.logActivity(safeUser.id, safeUser.name, 'LOGIN', 'User logged in');
+    
     return safeUser;
   },
 
@@ -100,17 +125,26 @@ export const authService = {
       notifyObservers(updatedUser);
   },
   
-  // Minimal stubs
   signup: async (u: User, p: string) => { 
-      // Reuse logic
       const uid = `usr_${Date.now()}`;
       const newUser = {...u, id: uid};
       saveMockUser(newUser, p);
       storageService.saveUserCredits(uid, u.credits);
       localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(newUser));
       notifyObservers(newUser);
+      
+      storageService.logActivity(uid, newUser.name, 'LOGIN', 'New account created');
+      
       return newUser;
   },
   resetPassword: async (e: string) => {},
-  getAllUsers: async () => []
+  
+  // New Admin Method
+  getAllUsers: async (): Promise<User[]> => {
+      const users = getMockUsers();
+      return Object.values(users).map(u => {
+          const { password, ...rest } = u;
+          return { ...rest, credits: storageService.getUserCredits(rest.id) || rest.credits };
+      });
+  }
 };

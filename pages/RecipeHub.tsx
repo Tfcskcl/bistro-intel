@@ -1,1102 +1,960 @@
 
-import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { PLANS, CREDIT_COSTS } from '../constants';
-import { generateRecipeCard, generateRecipeVariation, substituteIngredient, estimateMarketRates } from '../services/geminiService';
-import { ingredientService } from '../services/ingredientService';
-import { RecipeCard, MenuItem, User, UserRole, POSChangeRequest, RecipeRequest, Ingredient } from '../types';
-import { Loader2, ChefHat, Scale, Clock, AlertCircle, Upload, Lock, Sparkles, Check, Save, RefreshCw, Search, Plus, Store, Zap, Trash2, Building2, FileSignature, X, AlignLeft, UtensilsCrossed, Inbox, UserCheck, CheckCircle2, Clock3, Carrot, Type, Wallet, Filter, Tag, Eye, Flame, Wand2, Eraser, FileDown, TrendingDown, ArrowRight, Key, Coins, Leaf, TestTube, ArrowLeftRight, PenTool, Lightbulb, Calculator, DollarSign, Edit2, Globe, Droplets, Wheat, Bot, PieChart as PieChartIcon } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { User, RecipeCard, MenuItem, RecipeComment } from '../types';
+import { generateRecipeCard } from '../services/geminiService';
 import { storageService } from '../services/storageService';
+import { ingredientService } from '../services/ingredientService';
 import { authService } from '../services/authService';
-import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
+import { CREDIT_COSTS } from '../constants';
+import { 
+    ChefHat, Search, Plus, Save, Trash2, ArrowLeft, Loader2, 
+    DollarSign, TrendingUp, Clock, Scale, Utensils, AlertTriangle, 
+    FileDown, Share2, MoreHorizontal, Sparkles, Image as ImageIcon,
+    Printer, Upload, FileText, CheckCircle2, MessageSquare, Send, Users, UserPlus,
+    Copy, Link, Mail, Globe, Check, Lock
+} from 'lucide-react';
+import { 
+    PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend 
+} from 'recharts';
 
-interface RecipeHubProps {
-  user: User;
-  onUserUpdate?: (user: User) => void;
-}
+const CHART_COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
-// ... (Constants: SAMPLE_DISHES, POPULAR_IDEAS remain same)
-const SAMPLE_DISHES = [
-    { name: "Truffle Mushroom Risotto", desc: "Creamy arborio rice, wild mushrooms, parmesan crisp, truffle oil drizzle.", cuisine: "Italian", ingredients: "Arborio Rice, Wild Mushrooms, Truffle Oil, Parmesan", dietary: ["Vegetarian", "Gluten-Free"] },
-    { name: "Spicy Tuna Tartare", desc: "Fresh tuna cubes, avocado mousse, sesame soy dressing, crispy wonton chips.", cuisine: "Asian Fusion", ingredients: "Tuna, Avocado, Sesame Oil, Wonton Wrappers", dietary: ["Pescatarian", "Dairy-Free"] },
-    { name: "Vegan Jackfruit Tacos", desc: "Pulled bbq jackfruit, pineapple salsa, cilantro lime slaw, corn tortillas.", cuisine: "Mexican", ingredients: "Young Jackfruit, Corn Tortillas, Pineapple, Cilantro", dietary: ["Vegan", "Gluten-Free"] },
-    { name: "Classic Beef Wellington", desc: "Filet mignon, mushroom duxelles, prosciutto, puff pastry, red wine jus.", cuisine: "French / British", ingredients: "Beef Tenderloin, Puff Pastry, Mushrooms, Prosciutto", dietary: [] },
-    { name: "Matcha Lava Cake", desc: "Warm green tea chocolate fondant with vanilla bean ice cream.", cuisine: "Japanese Fusion", ingredients: "White Chocolate, Matcha Powder, Eggs, Flour", dietary: ["Vegetarian"] }
-];
+// Helper icon for editable field
+const Edit2Icon = ({size, className}: {size: number, className?: string}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+);
 
-const POPULAR_IDEAS = [
-    { name: "Avocado Toast", desc: "Sourdough toast, smashed avocado, poached egg, chili flakes.", cuisine: "Modern Cafe", ingredients: "Sourdough, Avocado, Egg, Chili Flakes", dietary: ["Vegetarian"] },
-    { name: "Pad Thai", desc: "Rice noodles, tamarind sauce, peanuts, bean sprouts, lime, shrimp/tofu.", cuisine: "Thai", ingredients: "Rice Noodles, Tamarind Paste, Peanuts, Bean Sprouts", dietary: ["Gluten-Free", "Dairy-Free"] },
-    { name: "Caesar Salad", desc: "Romaine lettuce, croutons, parmesan, creamy caesar dressing.", cuisine: "American", ingredients: "Romaine Lettuce, Parmesan, Croutons, Anchovies", dietary: [] },
-    { name: "Butter Chicken", desc: "Tandoori chicken in a rich tomato and butter gravy.", cuisine: "Indian", ingredients: "Chicken, Tomato, Butter, Cream, Garam Masala", dietary: ["Gluten-Free"] },
-    { name: "Acai Bowl", desc: "Frozen acai blend topped with granola, banana, and berries.", cuisine: "Health Food", ingredients: "Acai Pulp, Banana, Granola, Berries", dietary: ["Vegan", "Dairy-Free"] }
-];
-
-const CHEF_PERSONAS = [
-    { id: 'Executive Chef', name: 'Executive Chef', icon: ChefHat, color: 'text-slate-600 dark:text-slate-300', bg: 'bg-slate-100 dark:bg-slate-800', desc: 'Balanced & Professional' },
-    { id: 'The Alchemist', name: 'The Alchemist', icon: TestTube, color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-100 dark:bg-purple-900/30', desc: 'Modern & Innovative' },
-    { id: 'The Accountant', name: 'The Accountant', icon: Coins, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-100 dark:bg-emerald-900/30', desc: 'Cost-Optimized' },
-    { id: 'The Purist', name: 'The Purist', icon: Flame, color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-100 dark:bg-orange-900/30', desc: 'Authentic & Traditional' },
-    { id: 'The Wellness Guru', name: 'The Wellness Guru', icon: Leaf, color: 'text-green-600 dark:text-green-400', bg: 'bg-green-100 dark:bg-green-900/30', desc: 'Healthy & Dietary' }
-];
-
-const CHART_COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#6366f1'];
-
-const formatError = (err: any) => {
-    if (!err) return "Unknown error occurred";
-    let msg = typeof err === 'string' ? err : err.message || JSON.stringify(err);
-    if (msg.includes("leaked") || (msg.includes("PERMISSION_DENIED") && msg.includes("403"))) {
-        return "Access Denied: The system API key has been flagged. Please click 'Connect API Key' to use your own key.";
-    }
-    return msg.length > 100 ? "Generation failed. Please try again." : msg;
-};
-
-// ... (getBgImage helper remains same)
-const getBgImage = (cuisine: string = '', dishName: string = '') => {
-    const term = (cuisine + ' ' + dishName).toLowerCase();
-    const map: Record<string, string> = {
-        'italian': 'https://images.unsplash.com/photo-1498579150354-977475b7ea0b?auto=format&fit=crop&w=1200&q=60',
-        'pizza': 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=1200&q=60',
-        'pasta': 'https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?auto=format&fit=crop&w=1200&q=60',
-        'burger': 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=1200&q=60',
-        'indian': 'https://images.unsplash.com/photo-1585937421612-70a008356f36?auto=format&fit=crop&w=1200&q=60',
-        'curry': 'https://images.unsplash.com/photo-1565557623262-b51c2513a641?auto=format&fit=crop&w=1200&q=60',
-        'mexican': 'https://images.unsplash.com/photo-1565299585323-38d6b0865b47?auto=format&fit=crop&w=1200&q=60',
-        'taco': 'https://images.unsplash.com/photo-1551504734-5ee1c4a1479b?auto=format&fit=crop&w=1200&q=60',
-        'asian': 'https://images.unsplash.com/photo-1512058564366-18510be2db19?auto=format&fit=crop&w=1200&q=60',
-        'thai': 'https://images.unsplash.com/photo-1559314809-0d155014e29e?auto=format&fit=crop&w=1200&q=60',
-        'american': 'https://images.unsplash.com/photo-1550547660-d9450f859349?auto=format&fit=crop&w=1200&q=60',
-        'dessert': 'https://images.unsplash.com/photo-1563729768640-d31d582845c4?auto=format&fit=crop&w=1200&q=60',
-        'cake': 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?auto=format&fit=crop&w=1200&q=60',
-        'healthy': 'https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=1200&q=60',
-        'salad': 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=1200&q=60',
-        'japanese': 'https://images.unsplash.com/photo-1580822184713-fc5400e7fe10?auto=format&fit=crop&w=1200&q=60',
-        'sushi': 'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?auto=format&fit=crop&w=1200&q=60',
-        'chinese': 'https://images.unsplash.com/photo-1525755662778-989d0524087e?auto=format&fit=crop&w=1200&q=60',
-        'noodles': 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=1200&q=60',
-        'soup': 'https://images.unsplash.com/photo-1547592166-23ac45744acd?auto=format&fit=crop&w=1200&q=60',
-        'sandwich': 'https://images.unsplash.com/photo-1528735602780-2552fd46c7af?auto=format&fit=crop&w=1200&q=60',
-        'breakfast': 'https://images.unsplash.com/photo-1533089862017-90f545430939?auto=format&fit=crop&w=1200&q=60',
-        'coffee': 'https://images.unsplash.com/photo-1497935586351-b67a49e012bf?auto=format&fit=crop&w=1200&q=60',
-        'chocolate': 'https://images.unsplash.com/photo-1511381939415-e44015466834?auto=format&fit=crop&w=1200&q=60',
-        'steak': 'https://images.unsplash.com/photo-1600891964092-4316c288032e?auto=format&fit=crop&w=1200&q=60',
-        'seafood': 'https://images.unsplash.com/photo-1534080564583-6be75777b70a?auto=format&fit=crop&w=1200&q=60',
-        'vegan': 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=1200&q=60'
-    };
+export const RecipeHub: React.FC<{ user: User }> = ({ user }) => {
+    const [viewMode, setViewMode] = useState<'list' | 'create' | 'detail'>('list');
+    const [recipes, setRecipes] = useState<RecipeCard[]>([]);
+    const [selectedRecipe, setSelectedRecipe] = useState<RecipeCard | null>(null);
     
-    const key = Object.keys(map).find(k => term.includes(k));
-    return map[key || ''] || 'https://images.unsplash.com/photo-1546549010-b277db638708?auto=format&fit=crop&w=1200&q=60';
-};
+    // Create Mode State
+    const [dishName, setDishName] = useState('');
+    const [requirements, setRequirements] = useState('');
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-export const RecipeHub: React.FC<RecipeHubProps> = ({ user, onUserUpdate }) => {
-  // ... (State declarations remain same)
-  const [selectedSku, setSelectedSku] = useState<string | null>(null);
-  const [generatedRecipe, setGeneratedRecipe] = useState<RecipeCard | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [loadingText, setLoadingText] = useState('Generating with AI...');
-  const [error, setError] = useState<string | null>(null);
-  const [importStatus, setImportStatus] = useState<string | null>(null);
-  
-  // Creation Mode State
-  const [creationMode, setCreationMode] = useState<'ai' | 'manual'>('ai');
+    // Bill Upload State
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [isUploadingBill, setIsUploadingBill] = useState(false);
+    const [uploadFeedback, setUploadFeedback] = useState<string | null>(null);
 
-  // Manual Form State
-  const [manualForm, setManualForm] = useState({
-      name: '',
-      cuisine: '',
-      yield: '1',
-      prepTime: '20',
-      description: '',
-      steps: ''
-  });
-  
-  const [manualIngredients, setManualIngredients] = useState([
-      { id: 1, name: '', qty: '', unit: 'g', costPerUnit: '', wastePct: '0' }
-  ]);
-  const [targetFoodCost, setTargetFoodCost] = useState(30);
-  const [isUpdatingRates, setIsUpdatingRates] = useState(false);
-  const [isFetchingRates, setIsFetchingRates] = useState(false);
+    // Sharing State
+    const [showShareModal, setShowShareModal] = useState(false);
+    const [shareTargetUser, setShareTargetUser] = useState<string>('');
+    const [allUsers, setAllUsers] = useState<User[]>([]);
+    const [copyLinkStatus, setCopyLinkStatus] = useState<'idle' | 'copied'>('idle');
 
-  // Supplier Costing & Waste State
-  const [altPrices, setAltPrices] = useState<Record<number, string>>({});
-  const [wasteValues, setWasteValues] = useState<Record<number, string>>({});
-  const [swappingIndex, setSwappingIndex] = useState<number | null>(null);
+    // Comment State
+    const [newComment, setNewComment] = useState('');
 
-  const [viewMode, setViewMode] = useState<'generator' | 'saved' | 'requests'>('generator');
-  const [savedRecipes, setSavedRecipes] = useState<RecipeCard[]>([]);
-  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
-  
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+    useEffect(() => {
+        loadRecipes();
+        authService.getAllUsers().then(users => {
+            setAllUsers(users.filter(u => u.id !== user.id)); 
+        });
+    }, [user.id]);
 
-  const [myRequests, setMyRequests] = useState<RecipeRequest[]>([]);
-  const [adminQueue, setAdminQueue] = useState<RecipeRequest[]>([]);
-  const [activeRequest, setActiveRequest] = useState<RecipeRequest | null>(null); 
-
-  const [posPushStatus, setPosPushStatus] = useState<string | null>(null);
-  const [restaurants, setRestaurants] = useState<User[]>([]);
-  const [selectedRestaurantId, setSelectedRestaurantId] = useState<string>('');
-
-  const [isSaving, setIsSaving] = useState(false);
-  const [isPushing, setIsPushing] = useState(false);
-
-  // AI Form States
-  const [dishName, setDishName] = useState('');
-  const [cuisine, setCuisine] = useState('');
-  const [ingredients, setIngredients] = useState('');
-  const [dietary, setDietary] = useState<string[]>([]);
-  const [notes, setNotes] = useState('');
-  const [selectedPersona, setSelectedPersona] = useState('Executive Chef');
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const isStaff = [UserRole.ADMIN, UserRole.SUPER_ADMIN].includes(user.role);
-
-  // ... (useEffect and helper functions like filteredRecipes, isRecipeSaved, savingsAnalysis, checkCredits, deductCredits, handleTabChange, resetForm, recalculation handlers remain unchanged)
-
-  useEffect(() => {
-    setSavedRecipes(storageService.getSavedRecipes(user.id));
-    setMenuItems(storageService.getMenu(user.id));
-    refreshRequests();
-  }, [user.id, user.role]);
-
-  useEffect(() => {
-      setAltPrices({});
-      setWasteValues({});
-  }, [generatedRecipe?.sku_id]); 
-
-  const refreshRequests = () => {
-    const allRequests = storageService.getAllRecipeRequests();
-    if (isStaff) {
-        setAdminQueue(allRequests.filter(r => r.status === 'pending'));
-    } else {
-        setMyRequests(allRequests.filter(r => r.userId === user.id));
-    }
-  };
-
-  useEffect(() => {
-    const fetchRestaurants = async () => {
-        const allUsers = await authService.getAllUsers();
-        const owners = allUsers.filter(u => u.restaurantName && u.role === UserRole.OWNER);
-        setRestaurants(owners);
+    const loadRecipes = () => {
+        const saved = storageService.getSavedRecipes(user.id);
+        setRecipes(saved);
+        if (selectedRecipe) {
+            const updated = saved.find(r => r.sku_id === selectedRecipe.sku_id);
+            if (updated) setSelectedRecipe(updated);
+        }
     };
-    fetchRestaurants();
-  }, []);
 
-  const filteredRecipes = useMemo(() => {
-      return savedRecipes.filter(recipe => {
-          const matchesSearch = recipe.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                                recipe.sku_id.toLowerCase().includes(searchQuery.toLowerCase());
-          const matchesTags = selectedTags.length === 0 || selectedTags.every(tag => recipe.tags?.includes(tag));
-          return matchesSearch && matchesTags;
-      });
-  }, [savedRecipes, searchQuery, selectedTags]);
-
-  const isRecipeSaved = useMemo(() => {
-      if (!generatedRecipe) return false;
-      return savedRecipes.some(r => r.sku_id === generatedRecipe.sku_id && r.name === generatedRecipe.name);
-  }, [generatedRecipe, savedRecipes]);
-
-  const savingsAnalysis = useMemo(() => {
-      if (!generatedRecipe || !generatedRecipe.ingredients) return null;
-      
-      let totalOriginalCost = generatedRecipe.food_cost_per_serving;
-      let totalNewCost = 0;
-      let hasChanges = false;
-
-      generatedRecipe.ingredients.forEach((ing, idx) => {
-          const originalCostServing = ing.cost_per_serving || 0;
-          const originalRate = ing.cost_per_unit || 0;
-          
-          let userRate = originalRate;
-          if (altPrices[idx] && !isNaN(parseFloat(altPrices[idx]))) {
-              userRate = parseFloat(altPrices[idx]);
-              hasChanges = true;
-          }
-
-          const userWasteStr = wasteValues[idx];
-          const userWaste = userWasteStr ? parseFloat(userWasteStr) : (ing.waste_pct || 0);
-          if (userWaste > 0) hasChanges = true;
-          
-          const wasteFactor = 100 / (100 - Math.min(userWaste, 99.9));
-
-          let costWithWaste = 0;
-          if (originalRate > 0) {
-              costWithWaste = (originalCostServing / originalRate) * userRate * wasteFactor;
-          } else {
-              costWithWaste = originalCostServing * wasteFactor; 
-          }
-          
-          totalNewCost += costWithWaste;
-      });
-
-      const savings = totalOriginalCost - totalNewCost;
-      const savingsPct = totalOriginalCost > 0 ? (savings / totalOriginalCost) * 100 : 0;
-      
-      return { 
-          originalCost: totalOriginalCost,
-          projectedCost: totalNewCost, 
-          savings, 
-          savingsPct, 
-          hasChanges 
-      };
-  }, [generatedRecipe, altPrices, wasteValues]);
-
-  const costBreakdownData = useMemo(() => {
-      if (!generatedRecipe?.ingredients) return [];
-      
-      // Calculate costs per ingredient
-      const data = generatedRecipe.ingredients.map((ing, idx) => {
-          const userRate = altPrices[idx] ? parseFloat(altPrices[idx]) : (ing.cost_per_unit || 0);
-          const userWaste = wasteValues[idx] ? parseFloat(wasteValues[idx]) : (ing.waste_pct || 0);
-          const wasteFactor = 100 / (100 - Math.min(userWaste, 99.9));
-          let cost = ing.cost_per_serving || 0;
-          
-          if (ing.cost_per_unit && ing.cost_per_unit > 0) {
-              cost = (cost / ing.cost_per_unit) * userRate * wasteFactor;
-          } else {
-              cost = cost * wasteFactor;
-          }
-          return { name: ing.name, value: cost };
-      });
-
-      // Sort desc and take top 5, group rest as "Others"
-      const sorted = data.sort((a,b) => b.value - a.value);
-      if (sorted.length <= 5) return sorted;
-      
-      const top5 = sorted.slice(0, 5);
-      const others = sorted.slice(5).reduce((acc, curr) => acc + curr.value, 0);
-      return [...top5, { name: 'Others', value: others }];
-  }, [generatedRecipe, altPrices, wasteValues]);
-
-  const checkCredits = (): boolean => {
-      if (isStaff) return true;
-      const cost = CREDIT_COSTS.RECIPE;
-      if (user.credits < cost) {
-          setError(`Insufficient Credits. Need ${cost}, have ${user.credits}.`);
-          return false;
-      }
-      return true;
-  };
-
-  const deductCredits = (): boolean => {
-      if (!isStaff && onUserUpdate) {
-          const cost = CREDIT_COSTS.RECIPE;
-          const success = storageService.deductCredits(user.id, cost, 'Recipe Generation');
-          if (success) {
-              onUserUpdate({ ...user, credits: user.credits - cost });
-              return true;
-          } else {
-              setError("Insufficient credits.");
-              return false;
-          }
-      }
-      return true;
-  };
-
-  const handleTabChange = (mode: 'generator' | 'saved' | 'requests', keepState = false) => {
-      setViewMode(mode);
-      setError(null);
-      if (mode === 'generator' && !keepState) resetForm();
-  };
-
-  const resetForm = () => {
-      setActiveRequest(null);
-      setGeneratedRecipe(null);
-      setSelectedSku(null);
-      setDishName('');
-      setCuisine('');
-      setIngredients('');
-      setDietary([]);
-      setNotes('');
-      setPosPushStatus(null);
-      setError(null);
-      setAltPrices({});
-      setWasteValues({});
-      setSelectedPersona('Executive Chef');
-      setManualForm({ name: '', cuisine: '', yield: '1', prepTime: '20', description: '', steps: '' });
-      setManualIngredients([{ id: 1, name: '', qty: '', unit: 'g', costPerUnit: '', wastePct: '0' }]);
-      setTargetFoodCost(30);
-  };
-
-  const handleYieldUpdate = (newYieldStr: string) => {
-      if (!generatedRecipe || !generatedRecipe.ingredients) return;
-      const newYield = parseFloat(newYieldStr);
-      if (isNaN(newYield) || newYield <= 0) return;
-
-      const oldYield = generatedRecipe.yield || 1;
-      const factor = oldYield / newYield; 
-
-      const newFoodCost = generatedRecipe.food_cost_per_serving * factor;
-      const newSellingPrice = generatedRecipe.suggested_selling_price * factor;
-
-      const updatedIngredients = generatedRecipe.ingredients.map(ing => ({
-          ...ing,
-          qty_per_serving: (ing.qty_per_serving || 0) * factor,
-          cost_per_serving: (ing.cost_per_serving || 0) * factor
-      }));
-
-      setGeneratedRecipe({
-          ...generatedRecipe,
-          yield: newYield,
-          food_cost_per_serving: newFoodCost,
-          suggested_selling_price: newSellingPrice,
-          ingredients: updatedIngredients
-      });
-  };
-
-  const handleManualCostUpdate = (newCostStr: string) => {
-      if (!generatedRecipe) return;
-      const newCost = newCostStr === '' ? 0 : parseFloat(newCostStr);
-      setGeneratedRecipe({ ...generatedRecipe, food_cost_per_serving: newCost });
-  };
-
-  const handleManualPriceUpdate = (newPriceStr: string) => {
-      if (!generatedRecipe) return;
-      const newPrice = newPriceStr === '' ? 0 : parseFloat(newPriceStr);
-      setGeneratedRecipe({ ...generatedRecipe, suggested_selling_price: newPrice });
-  };
-
-  const handleManualPercentUpdate = (newPctStr: string) => {
-      if (!generatedRecipe) return;
-      const newPct = parseFloat(newPctStr);
-      if (isNaN(newPct) || newPct <= 0) return;
-      const newSellingPrice = generatedRecipe.food_cost_per_serving / (newPct / 100);
-      setGeneratedRecipe({ ...generatedRecipe, suggested_selling_price: newSellingPrice });
-  };
-
-  const resetSellingPrice = () => {
-      if (!generatedRecipe) return;
-      const recommended = generatedRecipe.food_cost_per_serving / 0.30;
-      setGeneratedRecipe({ ...generatedRecipe, suggested_selling_price: recommended });
-  };
-
-  const handleSurpriseMe = () => {
-      const random = SAMPLE_DISHES[Math.floor(Math.random() * SAMPLE_DISHES.length)];
-      setDishName(random.name);
-      setNotes(random.desc);
-      setCuisine(random.cuisine);
-      setIngredients(random.ingredients);
-      setDietary(random.dietary);
-      setError(null);
-      setSelectedSku(null);
-  };
-
-  const handlePopularIdea = (idea: typeof POPULAR_IDEAS[0]) => {
-      setDishName(idea.name);
-      setNotes(idea.desc);
-      setCuisine(idea.cuisine);
-      setIngredients(idea.ingredients);
-      setDietary(idea.dietary);
-      setError(null);
-      setSelectedSku(null);
-  };
-
-  const handleFormSubmit = async (e?: React.FormEvent) => {
-      if (e) e.preventDefault();
-      if (!dishName) { setError("Please enter a dish name."); return; }
-      if (!checkCredits()) return;
-      setError(null);
-
-      const requirements = `
-          Cuisine Style: ${cuisine || 'Standard'}
-          Key Ingredients to Include: ${ingredients || 'AI Suggested'}
-          Dietary Restrictions: ${dietary.length > 0 ? dietary.join(', ') : 'None'}
-          Preparation Notes: ${notes || 'Standard preparation'}
-      `.trim();
-
-      const tempItem: MenuItem = {
-          sku_id: selectedSku || `NEW-${Date.now().toString().slice(-4)}`,
-          name: dishName,
-          category: 'main',
-          prep_time_min: 0,
-          current_price: 0,
-          ingredients: []
-      };
-
-      await handleGeneration(tempItem, requirements);
-  };
-
-  // ... (Manual form handlers: addManualIngredient, removeManualIngredient, updateManualIngredient, handleAutoFillRates, handleManualCreate remain unchanged)
-  const addManualIngredient = () => setManualIngredients([...manualIngredients, { id: Date.now(), name: '', qty: '', unit: 'g', costPerUnit: '', wastePct: '0' }]);
-  const removeManualIngredient = (id: number) => manualIngredients.length > 1 && setManualIngredients(manualIngredients.filter(i => i.id !== id));
-  const updateManualIngredient = (id: number, field: string, value: string) => setManualIngredients(manualIngredients.map(i => i.id === id ? { ...i, [field]: value } : i));
-
-  const handleAutoFillRates = async () => {
-      if (manualIngredients.some(i => !i.name)) { setError("Please name all ingredients first."); return; }
-      setIsUpdatingRates(true);
-      const namesToFetch: string[] = [];
-      const updatedIngredients = [...manualIngredients];
-      updatedIngredients.forEach((ing) => {
-          const learnedPrice = ingredientService.getLearnedPrice(ing.name);
-          if (learnedPrice) { ing.costPerUnit = learnedPrice.toString(); } else { namesToFetch.push(ing.name); }
-      });
-      if (namesToFetch.length > 0) {
-          const rates = await estimateMarketRates(namesToFetch, user.location || 'India');
-          updatedIngredients.forEach(ing => { if (namesToFetch.includes(ing.name)) { const rate = rates[ing.name]; if (rate) ing.costPerUnit = rate.toString(); } });
-      }
-      setManualIngredients(updatedIngredients);
-      setIsUpdatingRates(false);
-  };
-
-  const handleManualCreate = (e: React.FormEvent) => {
-      e.preventDefault();
-      setError(null);
-      if (!manualForm.name) { setError("Dish name required"); return; }
-      const yieldNum = parseFloat(manualForm.yield) || 1;
-      const ingredients: Ingredient[] = manualIngredients.map((ing, idx) => {
-          const qtyNum = parseFloat(ing.qty) || 0;
-          const costNum = parseFloat(ing.costPerUnit) || 0;
-          const wastePct = parseFloat(ing.wastePct) || 0;
-          const wasteFactor = 100 / (100 - Math.min(wastePct, 99.9));
-          const effectiveCostPerUnit = costNum * wasteFactor;
-          let costPerServing = 0;
-          if (['g', 'ml'].includes(ing.unit.toLowerCase()) && effectiveCostPerUnit > 10) { costPerServing = (qtyNum / 1000) * effectiveCostPerUnit; } else { costPerServing = qtyNum * effectiveCostPerUnit; }
-          return { ingredient_id: `man_${Date.now()}_${idx}`, name: ing.name || 'Unnamed', qty: `${ing.qty} ${ing.unit}`, qty_per_serving: qtyNum / yieldNum, cost_per_unit: costNum, unit: ing.unit, cost_per_serving: costPerServing / yieldNum, waste_pct: wastePct };
-      });
-      const totalCostPerServing = ingredients.reduce((acc, curr) => acc + (curr.cost_per_serving || 0), 0);
-      const suggestedPrice = totalCostPerServing / (targetFoodCost / 100);
-      const recipe: RecipeCard = {
-          sku_id: `MAN-${Date.now().toString().slice(-6)}`, name: manualForm.name, category: 'main', prep_time_min: parseInt(manualForm.prepTime) || 0, current_price: 0, ingredients: ingredients, yield: yieldNum, preparation_steps: manualForm.steps.split('\n').filter(s => s.trim()), equipment_needed: [], portioning_guideline: `1/${yieldNum} of recipe`, allergens: [], shelf_life_hours: 48, food_cost_per_serving: totalCostPerServing, suggested_selling_price: suggestedPrice, tags: ['Manual', manualForm.cuisine].filter(Boolean), human_summary: manualForm.description || 'Manually created recipe card.', confidence: 'High'
-      };
-      setGeneratedRecipe(recipe);
-  };
-
-  const handleGeneration = async (item: MenuItem, requirements: string, targetUserId?: string) => {
-      if (!isStaff) { if (!deductCredits()) return; }
-      setLoading(true);
-      setLoadingText(`${selectedPersona} is creating ${item.name}...`);
-      setGeneratedRecipe(null);
-      setPosPushStatus(null);
-      setSelectedRestaurantId('');
-      setError(null);
-      try {
-          const contextUserId = targetUserId || (activeRequest ? activeRequest.userId : user.id);
-          const card = await generateRecipeCard(contextUserId, item, requirements, user.location, selectedPersona);
-          setGeneratedRecipe(card);
-      } catch (e: any) {
-          // This block should ideally not be reached if safeGenerate is working,
-          // but we handle it just in case.
-          console.error(e);
-          setError(formatError(e));
-      } finally { setLoading(false); }
-  };
-
-  const handleConnectKey = async () => {
-      const aiStudio = (window as any).aistudio;
-      if (aiStudio) {
-          try {
-              await aiStudio.openSelectKey();
-              const selected = await aiStudio.hasSelectedApiKey();
-              if (selected) {
-                  window.location.reload();
-              }
-          } catch(e) {
-              console.error(e);
-          }
-      }
-  };
-
-  const handleFulfillRequest = (req: RecipeRequest) => {
-      setActiveRequest(req); setViewMode('generator'); setDishName(req.item.name); setSelectedSku(req.item.sku_id); setNotes(req.requirements); setCuisine(''); setIngredients(''); setDietary([]); setGeneratedRecipe(null); 
-  };
-
-  const handleVariation = async (type: string) => {
-    if (!generatedRecipe) return;
-    if (!checkCredits()) return; 
-    setLoading(true);
-    setLoadingText(`Creating ${type} variation...`);
-    setError(null);
-    setPosPushStatus(null);
-    try {
-        if (deductCredits()) {
-            const variant = await generateRecipeVariation(user.id, generatedRecipe, type, user.location);
-            setGeneratedRecipe(variant);
+    const handleGenerate = async () => {
+        if (!dishName) return;
+        if (user.credits < CREDIT_COSTS.RECIPE) {
+            setError(`Insufficient credits. Need ${CREDIT_COSTS.RECIPE} CR.`);
+            return;
         }
-    } catch (e: any) { setError(formatError(e)); } finally { setLoading(false); }
-  };
 
-  // ... (handleSuggestSupplierPrices, handleFetchMarketRates, handleIngredientSwap remain unchanged)
-  const handleSuggestSupplierPrices = () => {
-      if (!generatedRecipe || !generatedRecipe.ingredients) return;
-      const newAltPrices: Record<number, string> = { ...altPrices };
-      const sortedIngredients = generatedRecipe.ingredients.map((ing, idx) => ({ ...ing, idx })).sort((a, b) => (b.cost_per_unit || 0) - (a.cost_per_unit || 0));
-      sortedIngredients.slice(0, 3).forEach((ing) => { if (ing.cost_per_unit && !newAltPrices[ing.idx]) { newAltPrices[ing.idx] = (ing.cost_per_unit * 0.85).toFixed(0); } });
-      setAltPrices(newAltPrices);
-  };
+        setIsGenerating(true);
+        setError(null);
 
-  const handleFetchMarketRates = async () => {
-      if (!generatedRecipe || !generatedRecipe.ingredients) return;
-      setIsFetchingRates(true);
-      try {
-          const names = generatedRecipe.ingredients.map(i => i.name);
-          const location = user.location || "General Market";
-          const newAltPrices: Record<number, string> = { ...altPrices };
-          const namesToFetch: string[] = [];
-          generatedRecipe.ingredients.forEach((ing, idx) => { const learnedPrice = ingredientService.getLearnedPrice(ing.name); if (learnedPrice) { newAltPrices[idx] = learnedPrice.toString(); } else { namesToFetch.push(ing.name); } });
-          if (namesToFetch.length > 0) {
-              const rates = await estimateMarketRates(namesToFetch, location);
-              generatedRecipe.ingredients.forEach((ing, idx) => { if (namesToFetch.includes(ing.name)) { const rate = rates[ing.name]; if (rate) newAltPrices[idx] = rate.toString(); } });
-          }
-          setAltPrices(newAltPrices);
-          setImportStatus(`Market rates for ${location} fetched!`);
-          setTimeout(() => setImportStatus(null), 3000);
-      } catch (e) { console.error(e); setError("Failed to fetch market rates."); } finally { setIsFetchingRates(false); }
-  };
+        try {
+            storageService.deductCredits(user.id, CREDIT_COSTS.RECIPE, `Recipe Gen: ${dishName}`);
+            
+            const item: MenuItem = {
+                sku_id: `sku_${Date.now()}`,
+                name: dishName,
+                category: 'main', // Default
+                prep_time_min: 15,
+                current_price: 0,
+                ingredients: []
+            };
 
-  const handleIngredientSwap = async (index: number) => {
-      if (!generatedRecipe || !generatedRecipe.ingredients) return;
-      const ingredient = generatedRecipe.ingredients[index];
-      if (!ingredient) return;
-      if (!checkCredits()) return; 
-      if (!confirm(`Find a substitute for ${ingredient.name}?`)) return;
-      setSwappingIndex(index);
-      setError(null);
-      try {
-          if (deductCredits()) {
-               const updated = await substituteIngredient(generatedRecipe, ingredient.name, user.location);
-               setGeneratedRecipe(updated);
-               setImportStatus(`Swapped ${ingredient.name} for ${updated.ingredients[index]?.name || 'alternative'}`);
-               setTimeout(() => setImportStatus(null), 3000);
-          }
-      } catch (e: any) { setError(formatError(e)); } finally { setSwappingIndex(null); }
-  };
-
-  const handleSaveRecipe = () => {
-    if (generatedRecipe) {
-      setIsSaving(true);
-      setTimeout(() => {
-        if (generatedRecipe.ingredients) ingredientService.learnPrices(generatedRecipe.ingredients);
-        const recipeToSave = { ...generatedRecipe };
-        if (recipeToSave.ingredients) {
-            recipeToSave.ingredients = recipeToSave.ingredients.map((ing, idx) => {
-                const userPrice = altPrices[idx] ? parseFloat(altPrices[idx]) : ing.cost_per_unit;
-                const userWaste = wasteValues[idx] ? parseFloat(wasteValues[idx]) : ing.waste_pct;
-                const wasteFactor = 100 / (100 - Math.min(userWaste || 0, 99.9));
-                const newCost = (ing.cost_per_serving || 0) * ((userPrice || 0) / (ing.cost_per_unit || 1)) * wasteFactor;
-                return { ...ing, cost_per_unit: userPrice, waste_pct: userWaste, cost_per_serving: newCost };
-            });
-            recipeToSave.food_cost_per_serving = recipeToSave.ingredients.reduce((acc, curr) => acc + (curr.cost_per_serving || 0), 0);
+            const recipe = await generateRecipeCard(user.id, item, requirements);
+            setSelectedRecipe(recipe);
+            setViewMode('detail');
+        } catch (e: any) {
+            setError(e.message || "Failed to generate recipe.");
+        } finally {
+            setIsGenerating(false);
         }
-        if (isStaff && activeRequest) {
-            storageService.saveRecipe(activeRequest.userId, recipeToSave);
-            const completedReq: RecipeRequest = { ...activeRequest, status: 'completed', completedDate: new Date().toISOString() };
-            storageService.updateRecipeRequest(completedReq);
-            refreshRequests();
-            resetForm();
-            setImportStatus(`Sent to ${activeRequest.userName}!`);
-            handleTabChange('requests');
+    };
+
+    const handleSave = () => {
+        if (selectedRecipe) {
+            storageService.saveRecipe(user.id, selectedRecipe);
+            loadRecipes();
+            alert("Recipe saved to library!");
+        }
+    };
+
+    const handleDelete = (sku_id: string) => {
+        if (confirm("Are you sure?")) {
+            const updated = recipes.filter(r => r.sku_id !== sku_id);
+            localStorage.setItem(`bistro_${user.id}_saved_recipes`, JSON.stringify(updated));
+            loadRecipes();
+            if (selectedRecipe?.sku_id === sku_id) {
+                setSelectedRecipe(null);
+                setViewMode('list');
+            }
+        }
+    };
+
+    const handlePrint = () => {
+        const printContent = document.getElementById('print-area');
+        if (!printContent) return;
+
+        // Clone the content to manipulate it safely
+        const clone = printContent.cloneNode(true) as HTMLElement;
+
+        // 1. Remove all buttons from the clone
+        const buttons = clone.querySelectorAll('button');
+        buttons.forEach(b => b.remove());
+
+        // 2. Remove elements explicitly marked to hide
+        const noPrints = clone.querySelectorAll('.no-print');
+        noPrints.forEach(el => el.remove());
+
+        // 3. Convert Inputs to clean text spans
+        const inputs = clone.querySelectorAll('input');
+        inputs.forEach((input) => {
+            const span = document.createElement('span');
+            // Get current value from the original input if possible, else fall back to attribute
+            span.textContent = (input as HTMLInputElement).value;
+            span.className = "font-mono font-bold text-slate-900";
+            if (input.parentElement) {
+                input.parentElement.replaceChild(span, input);
+            }
+        });
+
+        const win = window.open('', '', 'width=900,height=650');
+        if (win) {
+            win.document.write(`
+                <html>
+                    <head>
+                        <title>${selectedRecipe?.name || 'Recipe'} - Print</title>
+                        <script src="https://cdn.tailwindcss.com"></script>
+                        <style>
+                            @page { size: A4; margin: 10mm; }
+                            body { margin: 20px; -webkit-print-color-adjust: exact; print-color-adjust: exact; font-family: sans-serif; background: white; }
+                            /* Hide scrollbars */
+                            ::-webkit-scrollbar { display: none; }
+                            .no-print { display: none !important; }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="p-8 max-w-4xl mx-auto">
+                            <div class="mb-8 border-b pb-4 flex justify-between items-end">
+                                <div>
+                                    <h1 class="text-3xl font-bold text-slate-900 mb-1">${selectedRecipe?.name}</h1>
+                                    <p class="text-sm text-slate-500 uppercase tracking-wide">BistroConnect Recipe Card</p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-xs text-slate-400">Generated on ${new Date().toLocaleDateString()}</p>
+                                </div>
+                            </div>
+                            ${clone.innerHTML}
+                        </div>
+                        <script>
+                            // Wait for Tailwind CDN to process styles
+                            setTimeout(() => {
+                                window.print();
+                                window.close();
+                            }, 1000);
+                        </script>
+                    </body>
+                </html>
+            `);
+            win.document.close();
+        }
+    };
+
+    const handleExportCSV = () => {
+        if (!selectedRecipe) return;
+        
+        let csvContent = "data:text/csv;charset=utf-8,";
+        
+        csvContent += `Recipe Name,${selectedRecipe.name}\n`;
+        csvContent += `Yield,${selectedRecipe.yield} portions\n`;
+        csvContent += `Food Cost Per Serving,${selectedRecipe.food_cost_per_serving}\n`;
+        csvContent += `Suggested Selling Price,${selectedRecipe.suggested_selling_price}\n\n`;
+        
+        csvContent += "Ingredient,Qty,Unit,Cost Per Unit,Waste %,Cost Per Serving\n";
+        selectedRecipe.ingredients.forEach(ing => {
+            const row = [
+                ing.name,
+                ing.qty,
+                ing.unit,
+                ing.cost_per_unit || 0,
+                ing.waste_pct || 0,
+                ing.cost_per_serving || 0
+            ].join(",");
+            csvContent += row + "\n";
+        });
+        
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `${selectedRecipe.name.replace(/\s+/g, '_')}_costing.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const handleShareInternal = () => {
+        if (!selectedRecipe || !shareTargetUser) return;
+        const targetUserObj = allUsers.find(u => u.id === shareTargetUser);
+        if (!targetUserObj) return;
+
+        const success = storageService.shareRecipeWithUser(user.id, user.name, shareTargetUser, selectedRecipe);
+        if (success) {
+            alert(`Shared with ${targetUserObj.name}!`);
+            setShareTargetUser('');
         } else {
-            const restaurant = restaurants.find(r => r.id === selectedRestaurantId);
-            const finalRecipe = { ...recipeToSave, assignedRestaurantId: selectedRestaurantId, assignedRestaurantName: restaurant?.restaurantName };
-            storageService.saveRecipe(user.id, finalRecipe);
-            setSavedRecipes(storageService.getSavedRecipes(user.id));
-            setImportStatus(isRecipeSaved ? "Recipe updated!" : "Recipe saved!");
+            alert("Failed to share.");
         }
-        setIsSaving(false);
-        setTimeout(() => setImportStatus(null), 2000);
-      }, 600);
-    }
-  };
+    };
 
-  const handleDownloadPDF = () => {
-      if (!generatedRecipe) return;
-      const content = `<html><head><title>${generatedRecipe.name}</title></head><body><h1>${generatedRecipe.name}</h1></body></html>`;
-      const printWindow = window.open('', '_blank');
-      if (printWindow) { printWindow.document.write(content); printWindow.document.close(); printWindow.print(); }
-  };
+    const handleCopyLink = () => {
+        if (!selectedRecipe) return;
+        // Mocking a public share link
+        const shareUrl = `https://bistroconnect.in/shared/recipe/${selectedRecipe.sku_id}?token=${Math.random().toString(36).substr(2, 9)}`;
+        navigator.clipboard.writeText(shareUrl).then(() => {
+            setCopyLinkStatus('copied');
+            setTimeout(() => setCopyLinkStatus('idle'), 2000);
+        });
+    };
 
-  return (
-    <div className="h-[calc(100vh-6rem)] flex flex-col gap-4 relative">
-      {/* Tab Navigation (Unchanged) */}
-      <div className="flex justify-between items-center">
-        <div className="flex gap-2">
-            <button onClick={() => handleTabChange('generator')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${viewMode === 'generator' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300'}`}>BistroChef Generator</button>
-            <button onClick={() => handleTabChange('saved')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${viewMode === 'saved' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300'}`}>Saved Library ({savedRecipes.length})</button>
-            {isStaff && (
-                <button onClick={() => handleTabChange('requests')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-2 ${viewMode === 'requests' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300'}`}>Queue {adminQueue.length > 0 ? `(${adminQueue.length})` : ''}</button>
-            )}
-        </div>
-        <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-400 rounded-full text-xs font-bold">
-                <Wallet size={12} /> Credits: {user.credits}
+    const handlePostComment = () => {
+        if (!newComment.trim() || !selectedRecipe) return;
+        
+        const comment: RecipeComment = {
+            id: `cmt_${Date.now()}`,
+            userId: user.id,
+            userName: user.name,
+            text: newComment,
+            date: new Date().toISOString()
+        };
+
+        storageService.addRecipeComment(user.id, selectedRecipe.sku_id, comment);
+        setNewComment('');
+        loadRecipes(); 
+    };
+
+    const recalculateCosts = (ingredients: any[]) => {
+        const newFoodCost = ingredients.reduce((acc, curr) => acc + (curr.cost_per_serving || 0), 0);
+        const newSellingPrice = Math.ceil(newFoodCost / 0.30);
+        return { newFoodCost: parseFloat(newFoodCost.toFixed(2)), newSellingPrice };
+    };
+
+    const handleIngredientCostChange = (index: number, newCost: number) => {
+        if (!selectedRecipe) return;
+        
+        const updatedIngredients = [...selectedRecipe.ingredients];
+        updatedIngredients[index] = { 
+            ...updatedIngredients[index], 
+            cost_per_serving: isNaN(newCost) ? 0 : newCost 
+        };
+
+        const { newFoodCost, newSellingPrice } = recalculateCosts(updatedIngredients);
+
+        setSelectedRecipe({
+            ...selectedRecipe,
+            ingredients: updatedIngredients,
+            food_cost_per_serving: newFoodCost,
+            suggested_selling_price: newSellingPrice
+        });
+    };
+
+    const handleBillUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0] && selectedRecipe) {
+            setIsUploadingBill(true);
+            setUploadFeedback(null);
+
+            setTimeout(() => {
+                const updatedIngredients = selectedRecipe.ingredients.map(ing => {
+                    const shouldUpdate = Math.random() > 0.6; 
+                    if (shouldUpdate && ing.cost_per_unit) {
+                        const variance = 1 + (Math.random() * 0.2 - 0.1); 
+                        const newCost = ing.cost_per_unit * variance;
+                        return {
+                            ...ing,
+                            cost_per_unit: parseFloat(newCost.toFixed(2)),
+                            cost_per_serving: parseFloat(((ing.qty_per_serving || 0.1) * newCost * (1 + (ing.waste_pct || 0)/100)).toFixed(2))
+                        };
+                    }
+                    return ing;
+                });
+
+                const { newFoodCost, newSellingPrice } = recalculateCosts(updatedIngredients);
+
+                const updatedRecipe = {
+                    ...selectedRecipe,
+                    ingredients: updatedIngredients,
+                    food_cost_per_serving: newFoodCost,
+                    suggested_selling_price: newSellingPrice
+                };
+                
+                setSelectedRecipe(updatedRecipe);
+                ingredientService.learnPrices(updatedIngredients);
+                
+                setIsUploadingBill(false);
+                setUploadFeedback("Costs updated & prices recalculated!");
+                
+                if (fileInputRef.current) fileInputRef.current.value = '';
+                
+                setTimeout(() => setUploadFeedback(null), 3000);
+            }, 2000);
+        }
+    };
+
+    const costBreakdownData = selectedRecipe?.ingredients?.map((ing) => ({
+        name: ing.name,
+        value: ing.cost_per_serving || 0
+    })).sort((a, b) => b.value - a.value).slice(0, 6) || [];
+
+    return (
+        <div className="h-[calc(100vh-6rem)] flex flex-col gap-6 relative">
+            {/* Header */}
+            <div className="flex justify-between items-center print:hidden">
+                <div className="flex gap-2">
+                    <button 
+                        onClick={() => setViewMode('list')}
+                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${viewMode === 'list' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
+                    >
+                        Recipe Library
+                    </button>
+                    <button 
+                        onClick={() => { setViewMode('create'); setSelectedRecipe(null); }}
+                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors flex items-center gap-2 ${viewMode === 'create' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
+                    >
+                        <Plus size={16} /> New Recipe
+                    </button>
+                </div>
             </div>
-        </div>
-      </div>
 
-      {viewMode === 'saved' && (
-          // Saved Recipes List (Unchanged)
-          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col flex-1 animate-fade-in transition-colors">
-              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
-                  <h2 className="text-xl font-bold text-slate-800 dark:text-white">Saved Recipes</h2>
-                  <div className="relative">
-                      <input type="text" placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-8 pr-4 py-2 border rounded-lg text-sm bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
-                      <Search className="absolute left-2.5 top-2.5 text-slate-400" size={16} />
-                  </div>
-              </div>
-              <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {filteredRecipes.map((recipe, idx) => (
-                      <div key={idx} onClick={() => { setGeneratedRecipe(recipe); setViewMode('generator'); }} className="border border-slate-200 dark:border-slate-700 rounded-xl p-5 cursor-pointer hover:shadow-md bg-white dark:bg-slate-800">
-                          <h3 className="font-bold text-slate-800 dark:text-white">{recipe.name}</h3>
-                          <p className="text-xs text-slate-500 mt-1">{recipe.sku_id}</p>
-                          <div className="mt-3 flex gap-2"><span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded">₹{recipe.food_cost_per_serving.toFixed(0)}</span></div>
-                      </div>
-                  ))}
-              </div>
-          </div>
-      )}
+            {/* Share & Export Modal */}
+            {showShareModal && selectedRecipe && (
+                <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+                    <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl max-w-lg w-full overflow-hidden border border-slate-200 dark:border-slate-800">
+                        {/* Modal Header */}
+                        <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
+                            <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                <Share2 size={20} className="text-blue-500" /> Share Recipe
+                            </h3>
+                            <button onClick={() => setShowShareModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
+                                <span className="sr-only">Close</span>
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
 
-      {viewMode === 'generator' && (
-          <div className="flex flex-col lg:flex-row gap-6 h-full overflow-hidden">
-              {/* Form Side */}
-              <div className="w-full lg:w-1/3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm p-6 overflow-y-auto custom-scrollbar transition-colors">
-                  {/* ... (Form Header & Controls Unchanged) */}
-                  <div className="flex justify-between items-center mb-4">
-                      <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                          <ChefHat className="text-emerald-600" /> BistroChef
-                      </h2>
-                      <button onClick={resetForm} className="text-xs text-slate-400 flex items-center gap-1"><RefreshCw size={12} /> Clear</button>
-                  </div>
-
-                  <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg mb-6">
-                      <button onClick={() => setCreationMode('ai')} className={`flex-1 py-2 text-xs font-bold rounded-md transition-all ${creationMode === 'ai' ? 'bg-white dark:bg-slate-700 shadow text-slate-800 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>
-                          <Sparkles size={14} className="inline mr-1" /> AI Assistant
-                      </button>
-                      <button onClick={() => setCreationMode('manual')} className={`flex-1 py-2 text-xs font-bold rounded-md transition-all ${creationMode === 'manual' ? 'bg-white dark:bg-slate-700 shadow text-slate-800 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>
-                          <PenTool size={14} className="inline mr-1" /> Manual Entry
-                      </button>
-                  </div>
-
-                  {creationMode === 'ai' ? (
-                      <form onSubmit={handleFormSubmit} className="space-y-5">
-                          <div>
-                              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Chef Persona</label>
-                              <div className="grid grid-cols-2 gap-2">
-                                  {CHEF_PERSONAS.map(persona => (
-                                      <button key={persona.id} type="button" onClick={() => setSelectedPersona(persona.id)} className={`p-2 rounded-lg border text-left transition-all ${selectedPersona === persona.id ? `border-emerald-500 ring-1 ring-emerald-500 ${persona.bg}` : 'border-slate-200 dark:border-slate-700'}`}>
-                                          <span className="text-xs font-bold block">{persona.name}</span>
-                                      </button>
-                                  ))}
-                              </div>
-                          </div>
-                          <div>
-                              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Dish Name</label>
-                              <input type="text" value={dishName} onChange={(e) => setDishName(e.target.value)} placeholder="e.g. Truffle Risotto" className="w-full px-4 py-2 text-sm border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
-                          </div>
-                          {!dishName && (
-                              <div className="flex flex-wrap gap-2">
-                                  {POPULAR_IDEAS.map((idea, i) => (
-                                      <button key={i} type="button" onClick={() => handlePopularIdea(idea)} className="px-3 py-1 bg-slate-5 dark:bg-slate-800 text-xs rounded-full border border-slate-200 dark:border-slate-700">{idea.name}</button>
-                                  ))}
-                              </div>
-                          )}
-                          <div className="grid grid-cols-2 gap-4">
-                              <input type="text" value={cuisine} onChange={(e) => setCuisine(e.target.value)} placeholder="Cuisine Style" className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
-                              <input type="text" value={ingredients} onChange={(e) => setIngredients(e.target.value)} placeholder="Key Ingredients" className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
-                          </div>
-                          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Preparation context..." className="w-full px-3 py-2 text-sm border rounded-lg h-24 dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
-                          {error && (
-                              <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-xs rounded-lg flex items-start gap-2">
-                                  <AlertCircle size={14} className="mt-0.5 shrink-0" />
-                                  <span>{error}</span>
-                              </div>
-                          )}
-                          <button type="submit" disabled={loading} className="w-full py-4 rounded-xl font-bold text-white bg-slate-900 dark:bg-emerald-600 hover:opacity-90 flex items-center justify-center gap-2">
-                              {loading ? <Loader2 className="animate-spin" size={20} /> : <Sparkles size={20} />}
-                              Generate Recipe ({CREDIT_COSTS.RECIPE} CR)
-                          </button>
-                      </form>
-                  ) : (
-                      // Manual Form (Unchanged)
-                      <form onSubmit={handleManualCreate} className="space-y-5">
-                          {/* ... Manual form fields same as original ... */}
-                          <div>
-                              <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Dish Name *</label>
-                              <input required type="text" value={manualForm.name} onChange={(e) => setManualForm({...manualForm, name: e.target.value})} placeholder="Dish Name" className="w-full px-4 py-2 text-sm border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
-                          </div>
-                          <div className="grid grid-cols-2 gap-4">
-                              <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Yield (Portions)</label><input type="number" min="1" value={manualForm.yield} onChange={(e) => setManualForm({...manualForm, yield: e.target.value})} className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white" /></div>
-                              <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Target Food Cost %</label><input type="number" min="15" max="80" value={targetFoodCost} onChange={(e) => setTargetFoodCost(parseFloat(e.target.value))} className="w-full px-3 py-2 text-sm border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white" /></div>
-                          </div>
-                          <div>
-                              <div className="flex justify-between items-center mb-2"><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Ingredients</label><div className="flex gap-2"><button type="button" onClick={handleAutoFillRates} disabled={isUpdatingRates} className="text-[10px] bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 px-2 py-1 rounded flex items-center gap-1 hover:bg-purple-200">{isUpdatingRates ? <Loader2 size={10} className="animate-spin"/> : <Sparkles size={10}/>} Auto-fill Rates</button><button type="button" onClick={addManualIngredient} className="text-xs text-blue-600 font-bold flex items-center gap-1 hover:underline"><Plus size={12}/> Add</button></div></div>
-                              <div className="space-y-2">{manualIngredients.map((ing) => (<div key={ing.id} className="flex gap-2"><input placeholder="Item" value={ing.name} onChange={(e) => updateManualIngredient(ing.id, 'name', e.target.value)} className="flex-1 min-w-0 px-2 py-1.5 text-xs border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white" /><input placeholder="Qty" value={ing.qty} onChange={(e) => updateManualIngredient(ing.id, 'qty', e.target.value)} className="w-12 px-2 py-1.5 text-xs border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white" /><input placeholder="Unit" value={ing.unit} onChange={(e) => updateManualIngredient(ing.id, 'unit', e.target.value)} className="w-12 px-2 py-1.5 text-xs border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white" /><input placeholder="Price" type="number" value={ing.costPerUnit} onChange={(e) => updateManualIngredient(ing.id, 'costPerUnit', e.target.value)} className="w-14 px-2 py-1.5 text-xs border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white" /><input placeholder="W%" type="number" value={ing.wastePct} onChange={(e) => updateManualIngredient(ing.id, 'wastePct', e.target.value)} className="w-10 px-2 py-1.5 text-xs border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white text-red-500" title="Waste %"/><button type="button" onClick={() => removeManualIngredient(ing.id)} className="text-slate-400 hover:text-red-500"><Trash2 size={14} /></button></div>))}</div>
-                          </div>
-                          <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Steps</label><textarea value={manualForm.steps} onChange={(e) => setManualForm({...manualForm, steps: e.target.value})} placeholder="Enter preparation steps..." className="w-full px-3 py-2 text-sm border rounded-lg h-24 dark:bg-slate-800 dark:border-slate-700 dark:text-white" /></div>
-                          <button type="submit" className="w-full py-4 rounded-xl font-bold text-white bg-slate-900 dark:bg-emerald-600 hover:opacity-90 flex items-center justify-center gap-2"><Save size={20} /> Create Recipe Card</button>
-                      </form>
-                  )}
-              </div>
-
-              {/* Preview Side */}
-              <div className="flex-1 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col relative overflow-hidden transition-colors">
-                  {generatedRecipe ? (
-                      <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-                          {generatedRecipe.human_summary?.includes("Demo Mode") && (
-                              <div className="mb-4 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 rounded-xl flex items-center justify-between shadow-sm animate-fade-in">
-                                  <div className="flex items-center gap-3">
-                                      <div className="p-2 bg-amber-100 dark:bg-amber-800/50 rounded-full text-amber-700 dark:text-amber-400">
-                                          <AlertCircle size={20}/>
-                                      </div>
-                                      <div>
-                                          <p className="text-sm font-bold text-amber-900 dark:text-amber-300">Offline Mode Active</p>
-                                          <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">Showing mock data. Connect API Key to enable live AI.</p>
-                                      </div>
-                                  </div>
-                                  <button 
-                                    onClick={handleConnectKey}
-                                    className="px-4 py-2 bg-amber-600 text-white text-xs font-bold rounded-lg hover:bg-amber-700 transition-colors shadow-sm flex items-center gap-2"
-                                  >
-                                      <Key size={14} /> Connect API Key
-                                  </button>
-                              </div>
-                          )}
-                          
-                          {/* Recipe Card UI */}
-                          <div 
-                            className="bg-white dark:bg-slate-900 shadow-xl rounded-2xl overflow-hidden border border-slate-100 dark:border-slate-800 mb-8 relative group"
-                            style={{ 
-                                backgroundImage: `url(${getBgImage(generatedRecipe.tags?.[0], generatedRecipe.name)})`,
-                                backgroundSize: 'cover',
-                                backgroundPosition: 'center',
-                            }}
-                          >
-                              {/* Background Overlay */}
-                              <div className="absolute inset-0 bg-white/92 dark:bg-slate-950/92 backdrop-blur-[1px] z-0 transition-opacity duration-500"></div>
-                              
-                              <div className="relative z-10">
-                                <div className="bg-slate-900/90 dark:bg-black/80 text-white p-8 backdrop-blur-sm">
-                                    <div className="flex justify-between items-start">
-                                        <div className="flex-1 mr-4">
-                                            {/* AGENT BADGE */}
-                                            {creationMode === 'ai' && (
-                                                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[10px] font-bold uppercase tracking-wider mb-3">
-                                                    <Bot size={12} /> Designed by: {selectedPersona}
-                                                </div>
-                                            )}
-                                            
-                                            <h1 className="text-3xl font-bold">{generatedRecipe.name}</h1>
-                                            <p className="text-slate-300 text-sm mt-2">{generatedRecipe.human_summary}</p>
-                                            
-                                            <div className="flex gap-4 mt-4">
-                                                {/* Editable Yield */}
-                                                <div className="flex items-center gap-2 bg-white/10 w-fit px-3 py-1.5 rounded-lg border border-white/10">
-                                                    <Scale size={16} className="text-emerald-400" />
-                                                    <span className="text-xs font-bold uppercase tracking-wide text-slate-300">Yield:</span>
-                                                    <input 
-                                                        type="number"
-                                                        value={generatedRecipe.yield || 1}
-                                                        onChange={(e) => handleYieldUpdate(e.target.value)}
-                                                        className="w-12 bg-transparent text-white font-bold text-sm text-center border-b border-white/30 focus:border-emerald-400 outline-none"
-                                                    />
-                                                    <span className="text-xs text-slate-400">Servings</span>
-                                                </div>
-
-                                                {/* Time Display */}
-                                                <div className="flex items-center gap-3 text-slate-300 text-xs font-medium">
-                                                    <div className="flex items-center gap-1"><Carrot size={14} className="text-orange-400"/> Prep: {generatedRecipe.prep_time_minutes || 20}m</div>
-                                                    <div className="flex items-center gap-1"><Flame size={14} className="text-red-400"/> Cook: {generatedRecipe.cook_time_minutes || 15}m</div>
-                                                </div>
-                                            </div>
+                        <div className="p-6 space-y-6">
+                            
+                            {/* Option 1: Public Link */}
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2 flex items-center gap-2">
+                                    <Globe size={14} /> Public Link
+                                </label>
+                                <div className="flex gap-2">
+                                    <div className="flex-1 relative">
+                                        <input 
+                                            readOnly 
+                                            value={`https://bistroconnect.in/shared/recipe/${selectedRecipe.sku_id}`}
+                                            className="w-full pl-4 pr-10 py-2.5 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-600 dark:text-slate-300 focus:outline-none"
+                                        />
+                                        <div className="absolute right-3 top-2.5 text-emerald-500 pointer-events-none">
+                                            <Lock size={14} />
                                         </div>
-                                        <div className="text-right flex flex-col items-end gap-2 shrink-0">
-                                            <p className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
-                                                Selling Price <Edit2 size={10} />
+                                    </div>
+                                    <button 
+                                        onClick={handleCopyLink}
+                                        className={`px-4 py-2 rounded-lg font-bold text-sm transition-all flex items-center gap-2 min-w-[100px] justify-center ${
+                                            copyLinkStatus === 'copied' 
+                                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' 
+                                            : 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:opacity-90'
+                                        }`}
+                                    >
+                                        {copyLinkStatus === 'copied' ? <Check size={16} /> : <Copy size={16} />}
+                                        {copyLinkStatus === 'copied' ? 'Copied' : 'Copy'}
+                                    </button>
+                                </div>
+                                <p className="text-[10px] text-slate-400 mt-1">Anyone with the link can view this recipe.</p>
+                            </div>
+
+                            <div className="border-t border-slate-100 dark:border-slate-800"></div>
+
+                            {/* Option 2: Internal Team */}
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2 flex items-center gap-2">
+                                    <Users size={14} /> Collaborate with Team
+                                </label>
+                                <div className="flex gap-2">
+                                    <select 
+                                        value={shareTargetUser} 
+                                        onChange={(e) => setShareTargetUser(e.target.value)}
+                                        className="flex-1 p-2.5 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-blue-500 outline-none"
+                                    >
+                                        <option value="">Select team member...</option>
+                                        {allUsers.map(u => (
+                                            <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
+                                        ))}
+                                    </select>
+                                    <button 
+                                        onClick={handleShareInternal}
+                                        disabled={!shareTargetUser}
+                                        className="px-4 py-2 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 font-bold text-sm rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/50 disabled:opacity-50 transition-colors"
+                                    >
+                                        Invite
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="border-t border-slate-100 dark:border-slate-800"></div>
+
+                            {/* Option 3: Export/Email */}
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2 flex items-center gap-2">
+                                    <FileDown size={14} /> Export Options
+                                </label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <button 
+                                        onClick={handlePrint}
+                                        className="flex items-center justify-center gap-2 px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-sm transition-colors"
+                                    >
+                                        <Printer size={16} /> Save as PDF
+                                    </button>
+                                    <button 
+                                        onClick={() => { alert(`Sent PDF of "${selectedRecipe.name}" to ${user.email}`); setShowShareModal(false); }}
+                                        className="flex items-center justify-center gap-2 px-4 py-3 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-sm transition-colors"
+                                    >
+                                        <Mail size={16} /> Email PDF
+                                    </button>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Content */}
+            <div className="flex-1 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden transition-colors">
+                
+                {/* LIST VIEW */}
+                {viewMode === 'list' && (
+                    <div className="p-6 h-full overflow-y-auto">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {recipes.map(recipe => (
+                                <div 
+                                    key={recipe.sku_id} 
+                                    onClick={() => { setSelectedRecipe(recipe); setViewMode('detail'); }}
+                                    className="p-5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 hover:border-emerald-500 dark:hover:border-emerald-500 cursor-pointer transition-all group relative"
+                                >
+                                    {recipe.sharedBy && (
+                                        <div className="absolute top-2 right-2 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                                            <Users size={10} /> Shared by {recipe.sharedBy.split(' ')[0]}
+                                        </div>
+                                    )}
+                                    <div className="flex justify-between items-start mb-3">
+                                        <div className="p-2 bg-white dark:bg-slate-700 rounded-lg shadow-sm">
+                                            <ChefHat size={20} className="text-emerald-600 dark:text-emerald-400" />
+                                        </div>
+                                        <span className="text-xs font-bold bg-slate-200 dark:bg-slate-600 text-slate-600 dark:text-slate-300 px-2 py-1 rounded">
+                                            {recipe.category}
+                                        </span>
+                                    </div>
+                                    <h3 className="font-bold text-slate-900 dark:text-white mb-1 truncate">{recipe.name}</h3>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 line-clamp-2">{recipe.human_summary}</p>
+                                    
+                                    <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 border-t border-slate-200 dark:border-slate-700 pt-3">
+                                        <span className="flex items-center gap-1"><Clock size={12}/> {recipe.prep_time_min + (recipe.cook_time_minutes || 0)}m</span>
+                                        <span className="flex items-center gap-1 font-bold text-slate-700 dark:text-slate-300">
+                                            <DollarSign size={12}/> ₹{recipe.food_cost_per_serving.toFixed(0)}
+                                        </span>
+                                    </div>
+                                </div>
+                            ))}
+                            {recipes.length === 0 && (
+                                <div className="col-span-full text-center py-20 text-slate-400">
+                                    <ChefHat size={48} className="mx-auto mb-4 opacity-50" />
+                                    <p>No recipes found. Create your first one!</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* CREATE VIEW */}
+                {viewMode === 'create' && (
+                    <div className="p-8 h-full overflow-y-auto flex flex-col items-center justify-center max-w-2xl mx-auto">
+                        <div className="w-full space-y-6">
+                            <div className="text-center mb-8">
+                                <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Bistro Recipe Architect</h2>
+                                <p className="text-slate-500 dark:text-slate-400">Describe your dish, and we'll engineer the perfect recipe with costing and plating.</p>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Dish Name</label>
+                                <input 
+                                    value={dishName}
+                                    onChange={(e) => setDishName(e.target.value)}
+                                    placeholder="e.g. Truffle Mushroom Risotto"
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Requirements / Twist</label>
+                                <textarea 
+                                    value={requirements}
+                                    onChange={(e) => setRequirements(e.target.value)}
+                                    placeholder="e.g. Make it vegan, use locally sourced ingredients, keep food cost under ₹150..."
+                                    className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 outline-none h-32 resize-none"
+                                />
+                            </div>
+
+                            {error && (
+                                <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg text-sm flex items-center gap-2">
+                                    <AlertTriangle size={16} /> {error}
+                                </div>
+                            )}
+
+                            <button 
+                                onClick={handleGenerate}
+                                disabled={isGenerating || !dishName}
+                                className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg hover:shadow-xl disabled:opacity-50"
+                            >
+                                {isGenerating ? <Loader2 className="animate-spin" /> : <ChefHat />} 
+                                Generate Recipe ({CREDIT_COSTS.RECIPE} CR)
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* DETAIL VIEW */}
+                {viewMode === 'detail' && selectedRecipe && (
+                    <div className="h-full flex flex-col">
+                        {/* Detail Header */}
+                        <div className="p-6 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 flex justify-between items-center print:hidden">
+                            <div className="flex items-center gap-4">
+                                <button onClick={() => setViewMode('list')} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors">
+                                    <ArrowLeft size={20} className="text-slate-600 dark:text-slate-300" />
+                                </button>
+                                <div>
+                                    <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                        {selectedRecipe.name}
+                                        {selectedRecipe.sharedBy && (
+                                            <span className="text-[10px] bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 px-2 py-0.5 rounded-full font-normal">
+                                                Shared by {selectedRecipe.sharedBy}
+                                            </span>
+                                        )}
+                                    </h2>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                                        <span className="uppercase">{selectedRecipe.category}</span> • Yield: {selectedRecipe.yield} Servings
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex gap-2">
+                                <button onClick={() => setShowShareModal(true)} className="px-4 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 font-bold rounded-lg flex items-center gap-2 transition-colors">
+                                    <Share2 size={18} /> Share
+                                </button>
+                                <button onClick={handleExportCSV} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg" title="Export to Excel">
+                                    <FileDown size={20} />
+                                </button>
+                                <button onClick={handlePrint} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg" title="Download PDF / Print">
+                                    <Printer size={20} />
+                                </button>
+                                <button onClick={handleSave} className="px-4 py-2 bg-emerald-600 text-white font-bold rounded-lg hover:bg-emerald-700 transition-colors flex items-center gap-2">
+                                    <Save size={16} /> Save
+                                </button>
+                                <button onClick={() => handleDelete(selectedRecipe.sku_id)} className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg">
+                                    <Trash2 size={20} />
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-6 lg:p-8" id="print-area">
+                            <div className="max-w-5xl mx-auto space-y-8">
+                                {/* Image & Summary Section */}
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    {/* Image Card */}
+                                    <div className="md:col-span-1 h-64 md:h-auto bg-slate-100 dark:bg-slate-800 rounded-xl overflow-hidden shadow-sm relative group border border-slate-200 dark:border-slate-700">
+                                        {selectedRecipe.imageUrl ? (
+                                            <img 
+                                                src={selectedRecipe.imageUrl} 
+                                                alt={selectedRecipe.name} 
+                                                className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                                            />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center text-slate-400 flex-col gap-2">
+                                                <ImageIcon size={48} />
+                                                <span className="text-xs">No Image Available</span>
+                                            </div>
+                                        )}
+                                        {selectedRecipe.imageUrl && (
+                                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <span className="text-white text-xs font-bold px-2 py-1 bg-black/40 backdrop-blur rounded flex items-center gap-1">
+                                                    <Sparkles size={10} /> AI Generated Reference
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Stats Cards */}
+                                    <div className="md:col-span-2 grid grid-cols-2 gap-4">
+                                        <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl border border-emerald-100 dark:border-emerald-800 flex flex-col justify-center">
+                                            <p className="text-xs font-bold text-emerald-800 dark:text-emerald-400 uppercase mb-1">Food Cost</p>
+                                            <p className="text-2xl font-black text-emerald-700 dark:text-emerald-300">₹{selectedRecipe.food_cost_per_serving.toFixed(2)}</p>
+                                        </div>
+                                        
+                                        {/* Editable Selling Price */}
+                                        <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-100 dark:border-blue-800 flex flex-col justify-center relative group">
+                                            <p className="text-xs font-bold text-blue-800 dark:text-blue-400 uppercase mb-1 flex items-center gap-1">
+                                                Selling Price <Edit2Icon size={10} className="opacity-50"/>
                                             </p>
-                                            <div className="flex items-center justify-end gap-1">
-                                                <span className="text-2xl font-black text-white/50">₹</span>
+                                            <div className="flex items-center">
+                                                <span className="text-2xl font-black text-blue-700 dark:text-blue-300 mr-1">₹</span>
                                                 <input 
-                                                    type="number"
-                                                    value={generatedRecipe.suggested_selling_price}
-                                                    onChange={(e) => handleManualPriceUpdate(e.target.value)}
-                                                    className="w-28 bg-transparent text-3xl font-black text-right text-white border-b-2 border-white/20 focus:border-emerald-500 outline-none"
+                                                    type="number" 
+                                                    value={selectedRecipe.suggested_selling_price}
+                                                    onChange={(e) => {
+                                                        const newPrice = Math.max(0, parseFloat(e.target.value) || 0);
+                                                        setSelectedRecipe(prev => prev ? { ...prev, suggested_selling_price: newPrice } : null);
+                                                    }}
+                                                    className="text-2xl font-black text-blue-700 dark:text-blue-300 bg-transparent border-b border-blue-300 focus:border-blue-500 outline-none w-full max-w-[120px] p-0"
                                                 />
-                                                <button onClick={resetSellingPrice} title="Reset to 30% Cost" className="ml-2 p-1 hover:bg-white/10 rounded-full text-slate-400 hover:text-white transition-colors">
-                                                    <RefreshCw size={14} />
-                                                </button>
                                             </div>
-                                            
-                                            <button 
-                                              onClick={handleSaveRecipe}
-                                              className={`mt-2 text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg transition-colors border ${isRecipeSaved ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50' : 'bg-white/10 hover:bg-white/20 text-white border-white/10'}`}
-                                            >
-                                              {isRecipeSaved ? <Check size={14} /> : <Save size={14} />}
-                                              {isRecipeSaved ? 'Saved' : 'Save'}
-                                            </button>
                                         </div>
-                                    </div>
-                                </div>
-                                
-                                {/* Detailed Costing Breakdown */}
-                                <div className="grid grid-cols-3 border-b border-slate-100 dark:border-slate-700 text-center bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm">
-                                    <div className="p-4 border-r border-slate-100 dark:border-slate-700 flex flex-col items-center">
-                                        <p className="text-xs text-slate-500 dark:text-slate-400 uppercase font-bold mb-1 flex items-center gap-1">Food Cost <Edit2 size={10}/></p>
-                                        <div className="flex items-center justify-center">
-                                            <span className="text-lg font-bold text-slate-500 mr-0.5">₹</span>
-                                            <input 
-                                                type="number"
-                                                value={generatedRecipe.food_cost_per_serving}
-                                                onChange={(e) => handleManualCostUpdate(e.target.value)}
-                                                className="w-20 bg-transparent text-xl font-bold text-slate-800 dark:text-white text-center border-b border-dashed border-slate-300 focus:border-emerald-500 outline-none"
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="p-4 border-r border-slate-100 dark:border-slate-700 flex flex-col items-center">
-                                        <p className="text-xs text-slate-500 dark:text-slate-400 uppercase font-bold mb-1 flex items-center gap-1">Food Cost % <Edit2 size={10}/></p>
-                                        <div className="flex items-center justify-center">
-                                            <input 
-                                                type="number"
-                                                value={((generatedRecipe.food_cost_per_serving / generatedRecipe.suggested_selling_price) * 100).toFixed(1)}
-                                                onChange={(e) => handleManualPercentUpdate(e.target.value)}
-                                                className="w-16 bg-transparent text-xl font-bold text-slate-800 dark:text-white text-center border-b border-dashed border-slate-300 focus:border-emerald-500 outline-none"
-                                            />
-                                            <span className="text-lg font-bold text-slate-500 ml-0.5">%</span>
-                                        </div>
-                                    </div>
-                                    <div className="p-4">
-                                        <p className="text-xs text-slate-500 dark:text-slate-400 uppercase font-bold">Gross Margin</p>
-                                        <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">
-                                            ₹{(generatedRecipe.suggested_selling_price - generatedRecipe.food_cost_per_serving).toFixed(2)}
-                                        </p>
-                                    </div>
-                                </div>
 
-                                {savingsAnalysis && savingsAnalysis.hasChanges && (
-                                    <div className="mx-8 mt-6 p-4 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800 rounded-xl flex items-center justify-between animate-fade-in backdrop-blur-sm">
-                                        <div>
-                                            <p className="text-xs font-bold text-emerald-800 dark:text-emerald-400 uppercase tracking-wide">Projected Cost</p>
-                                            <div className="flex items-baseline gap-2">
-                                                <p className="text-2xl font-black text-slate-800 dark:text-white">
-                                                    ₹{savingsAnalysis.projectedCost.toFixed(2)}
+                                        <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-100 dark:border-amber-800 flex flex-col justify-center">
+                                            <p className="text-xs font-bold text-amber-800 dark:text-amber-400 uppercase mb-1">Margin</p>
+                                            <p className="text-2xl font-black text-amber-700 dark:text-amber-300">
+                                                {selectedRecipe.suggested_selling_price > 0 
+                                                    ? ((1 - (selectedRecipe.food_cost_per_serving / selectedRecipe.suggested_selling_price)) * 100).toFixed(1)
+                                                    : '0.0'}%
+                                            </p>
+                                        </div>
+                                        <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-100 dark:border-purple-800 flex flex-col justify-center">
+                                            <p className="text-xs font-bold text-purple-800 dark:text-purple-400 uppercase mb-1">Time</p>
+                                            <div className="flex items-baseline gap-1">
+                                                <p className="text-2xl font-black text-purple-700 dark:text-purple-300">
+                                                    {selectedRecipe.total_time_minutes || (selectedRecipe.prep_time_min + (selectedRecipe.cook_time_minutes || 0))}m
                                                 </p>
-                                                {savingsAnalysis.savings > 0 && (
-                                                    <span className="text-sm font-bold text-emerald-600">
-                                                        (Saved {savingsAnalysis.savingsPct.toFixed(1)}%)
+                                                {(selectedRecipe.prep_time_minutes || selectedRecipe.cook_time_minutes) && (
+                                                    <span className="text-xs text-purple-600 dark:text-purple-400">
+                                                        ({selectedRecipe.prep_time_minutes || selectedRecipe.prep_time_min} prep / {selectedRecipe.cook_time_minutes || 0} cook)
                                                     </span>
                                                 )}
                                             </div>
-                                            <p className="text-xs text-slate-500 mt-1">
-                                                Based on user rates & waste adjustments
-                                            </p>
                                         </div>
-                                        <div className="text-right">
-                                             <p className="text-xs text-slate-500">Margin Impact</p>
-                                             <p className={`text-lg font-bold ${savingsAnalysis.savings > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                                                 {savingsAnalysis.savings > 0 ? '+' : ''}₹{savingsAnalysis.savings.toFixed(2)} / plate
-                                             </p>
-                                        </div>
+                                        
+                                        {/* Nutritional Info Section */}
+                                        {selectedRecipe.nutritional_info && (
+                                            <div className="col-span-2 grid grid-cols-4 gap-2 mt-2">
+                                                <div className="bg-slate-100 dark:bg-slate-800 rounded p-2 text-center border border-slate-200 dark:border-slate-700">
+                                                    <p className="text-[10px] uppercase font-bold text-slate-500">Calories</p>
+                                                    <p className="font-bold text-slate-700 dark:text-slate-300 text-sm">{selectedRecipe.nutritional_info.calories}</p>
+                                                </div>
+                                                <div className="bg-slate-100 dark:bg-slate-800 rounded p-2 text-center border border-slate-200 dark:border-slate-700">
+                                                    <p className="text-[10px] uppercase font-bold text-slate-500">Protein</p>
+                                                    <p className="font-bold text-slate-700 dark:text-slate-300 text-sm">{selectedRecipe.nutritional_info.protein}g</p>
+                                                </div>
+                                                <div className="bg-slate-100 dark:bg-slate-800 rounded p-2 text-center border border-slate-200 dark:border-slate-700">
+                                                    <p className="text-[10px] uppercase font-bold text-slate-500">Carbs</p>
+                                                    <p className="font-bold text-slate-700 dark:text-slate-300 text-sm">{selectedRecipe.nutritional_info.carbs}g</p>
+                                                </div>
+                                                <div className="bg-slate-100 dark:bg-slate-800 rounded p-2 text-center border border-slate-200 dark:border-slate-700">
+                                                    <p className="text-[10px] uppercase font-bold text-slate-500">Fat</p>
+                                                    <p className="font-bold text-slate-700 dark:text-slate-300 text-sm">{selectedRecipe.nutritional_info.fat}g</p>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
-                                )}
-                                
-                                {/* Ingredients Table (Unchanged logic, just ensure styled correctly) */}
-                                <div className="p-8 border-b border-slate-100 dark:border-slate-700">
-                                    <div className="flex justify-between items-center mb-4">
-                                        <h3 className="font-bold text-slate-800 dark:text-white">Ingredients & Costing</h3>
-                                        <div className="flex gap-3">
-                                            <button onClick={handleFetchMarketRates} disabled={isFetchingRates} className="text-xs font-bold text-purple-600 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 hover:underline flex items-center gap-1 transition-colors">
-                                                {isFetchingRates ? <Loader2 size={12} className="animate-spin" /> : <Globe size={12} />} 
-                                                Fetch Live Rates
-                                            </button>
-                                            <button onClick={handleSuggestSupplierPrices} className="text-xs font-bold text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 hover:underline flex items-center gap-1">
-                                                <Zap size={12} /> Suggest Cheaper Prices
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm shadow-sm">
-                                        <table className="w-full text-sm text-left">
-                                            <thead className="bg-slate-50/80 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 font-bold uppercase text-xs backdrop-blur-sm">
-                                                <tr>
-                                                    <th className="px-4 py-3">Ingredient</th>
-                                                    <th className="px-4 py-3">Qty / Portion</th>
-                                                    <th className="px-4 py-3">Market Rate</th>
-                                                    <th className="px-4 py-3 bg-emerald-50/50 dark:bg-emerald-900/10">Your Rate</th>
-                                                    <th className="px-4 py-3 bg-red-50/50 dark:bg-red-900/10 text-red-700 dark:text-red-400">Waste %</th>
-                                                    <th className="px-4 py-3 text-right">Cost</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                                                {generatedRecipe.ingredients?.map((ing, idx) => {
-                                                    const marketRate = ing.cost_per_unit || 0;
-                                                    const userRateStr = altPrices[idx];
-                                                    const userRate = userRateStr ? parseFloat(userRateStr) : marketRate;
-                                                    const userWasteStr = wasteValues[idx];
-                                                    const userWaste = userWasteStr ? parseFloat(userWasteStr) : (ing.waste_pct || 0);
-                                                    const isVariance = userRate !== marketRate;
-                                                    const variancePct = marketRate > 0 ? ((userRate - marketRate) / marketRate) * 100 : 0;
-                                                    const wasteFactor = 100 / (100 - Math.min(userWaste, 99.9));
-                                                    let displayCost = ing.cost_per_serving || 0;
-                                                    if (marketRate > 0) {
-                                                        displayCost = (displayCost / marketRate) * userRate * wasteFactor;
-                                                    } else {
-                                                        displayCost = displayCost * wasteFactor;
-                                                    }
+                                </div>
 
-                                                    return (
-                                                        <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 group odd:bg-slate-50/30 dark:odd:bg-slate-800/20 transition-colors">
-                                                            <td className="px-4 py-4 font-medium text-slate-700 dark:text-slate-200 flex items-center gap-2 border-r border-transparent">
-                                                                {ing.name}
-                                                                <button onClick={() => handleIngredientSwap(idx)} className="text-slate-400 hover:text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity" title="Find Substitute">
-                                                                    {swappingIndex === idx ? <Loader2 size={14} className="animate-spin"/> : <ArrowLeftRight size={14} />}
-                                                                </button>
-                                                            </td>
-                                                            <td className="px-4 py-4 text-slate-500 dark:text-slate-400 border-l border-slate-100 dark:border-slate-800/50">{ing.qty_per_serving ? `${ing.qty_per_serving.toFixed(2)} ${ing.unit}` : ing.qty}</td>
-                                                            <td className="px-4 py-4 text-slate-500 dark:text-slate-400 border-l border-slate-100 dark:border-slate-800/50">₹{marketRate.toFixed(2)} / {ing.unit}</td>
-                                                            <td className="px-4 py-4 bg-emerald-50/30 dark:bg-emerald-900/5 border-l border-slate-100 dark:border-slate-800/50">
-                                                                <div className="flex items-center gap-2">
-                                                                    <input type="number" placeholder={marketRate.toFixed(2)} value={altPrices[idx] || ''} onChange={(e) => setAltPrices({...altPrices, [idx]: e.target.value})} className="w-20 px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-emerald-500 outline-none bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
-                                                                    {isVariance && <span className={`text-[10px] font-bold ${variancePct > 0 ? 'text-red-500' : 'text-emerald-500'}`}>{variancePct > 0 ? '+' : ''}{variancePct.toFixed(0)}%</span>}
+                                {/* Main Content Grid */}
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                                    <div className="space-y-6">
+                                        {/* Ingredients Table & Bill Upload */}
+                                        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden relative">
+                                            {isUploadingBill && (
+                                                <div className="absolute inset-0 bg-white/80 dark:bg-slate-900/80 z-20 flex flex-col items-center justify-center backdrop-blur-sm">
+                                                    <Loader2 className="animate-spin text-emerald-600 mb-2" size={32}/>
+                                                    <p className="font-bold text-slate-800 dark:text-white">Analyzing Invoice...</p>
+                                                    <p className="text-xs text-slate-500">Updating ingredient costs</p>
+                                                </div>
+                                            )}
+                                            
+                                            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/50 flex justify-between items-center no-print">
+                                                <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                                                    <Scale size={18} /> Ingredients & Costing
+                                                </h3>
+                                                
+                                                <div className="print:hidden">
+                                                    <button 
+                                                        onClick={() => fileInputRef.current?.click()}
+                                                        className="text-[10px] flex items-center gap-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 hover:border-emerald-500 text-slate-600 dark:text-slate-300 px-2 py-1.5 rounded transition-all"
+                                                        title="Upload Bill to Update Prices"
+                                                    >
+                                                        <Upload size={12} /> Update Costs (Bill)
+                                                    </button>
+                                                    <input 
+                                                        type="file" 
+                                                        ref={fileInputRef} 
+                                                        className="hidden" 
+                                                        accept=".pdf,.csv,.jpg,.png,.jpeg"
+                                                        onChange={handleBillUpload}
+                                                    />
+                                                </div>
+                                            </div>
+                                            
+                                            {uploadFeedback && (
+                                                <div className="bg-emerald-50 dark:bg-emerald-900/30 px-6 py-2 text-xs text-emerald-700 dark:text-emerald-400 font-bold flex items-center gap-2 animate-fade-in no-print">
+                                                    <CheckCircle2 size={12} /> {uploadFeedback}
+                                                </div>
+                                            )}
+
+                                            <table className="w-full text-sm text-left">
+                                                <thead className="text-xs text-slate-500 dark:text-slate-400 uppercase bg-slate-50 dark:bg-slate-800">
+                                                    <tr>
+                                                        <th className="px-6 py-3">Item</th>
+                                                        <th className="px-6 py-3">Qty</th>
+                                                        <th className="px-6 py-3 text-right">Cost</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                                                    {selectedRecipe.ingredients.map((ing, i) => (
+                                                        <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 group">
+                                                            <td className="px-6 py-3 font-medium text-slate-800 dark:text-white">{ing.name}</td>
+                                                            <td className="px-6 py-3 text-slate-600 dark:text-slate-300">{ing.qty}</td>
+                                                            <td className="px-6 py-3 text-right font-mono text-slate-600 dark:text-slate-300">
+                                                                <div className="flex items-center justify-end gap-1">
+                                                                    <span>₹</span>
+                                                                    <input
+                                                                        type="number"
+                                                                        step="0.1"
+                                                                        value={ing.cost_per_serving || ''}
+                                                                        placeholder="0.00"
+                                                                        onChange={(e) => handleIngredientCostChange(i, parseFloat(e.target.value))}
+                                                                        className="w-20 bg-transparent text-right outline-none border-b border-transparent focus:border-emerald-500 transition-colors text-slate-800 dark:text-white"
+                                                                    />
                                                                 </div>
                                                             </td>
-                                                            <td className="px-4 py-4 bg-red-50/30 dark:bg-red-900/5 border-l border-slate-100 dark:border-slate-800/50">
-                                                                <input type="number" placeholder="0" min="0" max="99" value={wasteValues[idx] || (ing.waste_pct ? ing.waste_pct.toString() : '')} onChange={(e) => setWasteValues({...wasteValues, [idx]: e.target.value})} className="w-16 px-2 py-1 text-xs border rounded focus:ring-1 focus:ring-red-500 outline-none bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-white text-red-600 dark:text-red-400" />
-                                                            </td>
-                                                            <td className="px-4 py-4 text-right font-bold text-slate-700 dark:text-slate-300 border-l border-slate-100 dark:border-slate-800/50">₹{displayCost.toFixed(2)}</td>
                                                         </tr>
-                                                    );
-                                                })}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                    
-                                    {/* Cost Breakdown Visual */}
-                                    <div className="mt-8 flex flex-col md:flex-row gap-8 items-center bg-white/40 dark:bg-slate-800/40 p-6 rounded-xl border border-slate-200 dark:border-slate-700">
-                                        <div className="w-full md:w-1/3 h-[200px]">
-                                            <h4 className="text-xs font-bold text-slate-500 uppercase mb-2 text-center">Cost Distribution</h4>
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <PieChart>
-                                                    <Pie
-                                                        data={costBreakdownData}
-                                                        cx="50%"
-                                                        cy="50%"
-                                                        innerRadius={40}
-                                                        outerRadius={70}
-                                                        paddingAngle={5}
-                                                        dataKey="value"
-                                                    >
-                                                        {costBreakdownData.map((entry, index) => (
-                                                            <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                                                        ))}
-                                                    </Pie>
-                                                    <RechartsTooltip />
-                                                </PieChart>
-                                            </ResponsiveContainer>
+                                                    ))}
+                                                </tbody>
+                                            </table>
                                         </div>
-                                        <div className="flex-1 grid grid-cols-2 gap-4">
-                                            {costBreakdownData.map((entry, idx) => (
-                                                <div key={idx} className="flex items-center gap-2">
-                                                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: CHART_COLORS[idx % CHART_COLORS.length] }}></div>
-                                                    <div className="text-xs">
-                                                        <span className="font-bold text-slate-700 dark:text-slate-300">{entry.name}</span>
-                                                        <span className="text-slate-500 ml-1">₹{entry.value.toFixed(1)}</span>
+
+                                        {/* Cost Breakdown Visual */}
+                                        <div className="mt-8 flex flex-col md:flex-row gap-8 items-center bg-white/40 dark:bg-slate-800/40 p-6 rounded-xl border border-slate-200 dark:border-slate-700 print:break-inside-avoid">
+                                            <div className="w-full md:w-1/3 h-[220px]">
+                                                <h4 className="text-xs font-bold text-slate-500 uppercase mb-2 text-center">Cost Distribution</h4>
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <PieChart>
+                                                        <Pie
+                                                            data={costBreakdownData}
+                                                            cx="50%"
+                                                            cy="50%"
+                                                            innerRadius={45}
+                                                            outerRadius={75}
+                                                            paddingAngle={4}
+                                                            dataKey="value"
+                                                            stroke="none"
+                                                        >
+                                                            {costBreakdownData.map((entry, index) => (
+                                                                <Cell 
+                                                                    key={`cell-${index}`} 
+                                                                    fill={CHART_COLORS[index % CHART_COLORS.length]} 
+                                                                    stroke={index === 0 ? 'rgba(255,255,255,0.8)' : 'none'}
+                                                                    strokeWidth={index === 0 ? 3 : 0}
+                                                                />
+                                                            ))}
+                                                        </Pie>
+                                                        <RechartsTooltip 
+                                                            content={({ active, payload }) => {
+                                                                if (active && payload && payload.length) {
+                                                                    const data = payload[0].payload;
+                                                                    return (
+                                                                        <div className="bg-slate-900 text-white p-2.5 rounded-lg shadow-xl text-xs border border-slate-700">
+                                                                            <p className="font-bold mb-1">{data.name}</p>
+                                                                            <div className="flex items-center justify-between gap-4">
+                                                                                <span className="text-slate-400">Cost:</span>
+                                                                                <span className="text-emerald-400 font-mono font-bold">₹{data.value.toFixed(2)}</span>
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                }
+                                                                return null;
+                                                            }}
+                                                        />
+                                                    </PieChart>
+                                                </ResponsiveContainer>
+                                            </div>
+                                            <div className="flex-1 grid grid-cols-2 gap-4">
+                                                {costBreakdownData.map((entry, idx) => (
+                                                    <div key={idx} className="flex items-start gap-2">
+                                                        <div className="w-3 h-3 rounded-full shrink-0 mt-1" style={{ backgroundColor: CHART_COLORS[idx % CHART_COLORS.length] }}></div>
+                                                        <div className="text-xs flex-1">
+                                                            <div className="flex justify-between items-baseline">
+                                                                <span className={`font-bold ${idx === 0 ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-400'}`}>
+                                                                    {entry.name}
+                                                                </span>
+                                                                <span className="text-slate-500 font-mono ml-2">₹{entry.value.toFixed(1)}</span>
+                                                            </div>
+                                                            {idx === 0 && (
+                                                                <div className="mt-1 inline-flex items-center gap-1 text-[9px] font-bold text-red-500 uppercase tracking-wider bg-red-50 dark:bg-red-900/20 px-1.5 py-0.5 rounded">
+                                                                    <TrendingUp size={8} /> Top Cost Driver
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-6">
+                                        {/* Preparation & Presentation Details */}
+                                        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
+                                            <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                                                <ChefHat size={18} /> Prep & Presentation
+                                            </h3>
+                                            <div className="space-y-4">
+                                                <div>
+                                                    <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Equipment Needed</p>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {selectedRecipe.equipment_needed.map((item, i) => (
+                                                            <span key={i} className="px-2 py-1 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs rounded border border-slate-200 dark:border-slate-600 font-medium">
+                                                                {item}
+                                                            </span>
+                                                        ))}
+                                                        {(!selectedRecipe.equipment_needed || selectedRecipe.equipment_needed.length === 0) && (
+                                                            <span className="text-sm text-slate-400 italic">Standard kitchen equipment</span>
+                                                        )}
                                                     </div>
                                                 </div>
-                                            ))}
+                                                
+                                                <div>
+                                                    <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Gourmet Plating & Presentation</p>
+                                                    <div className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
+                                                        <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-line">
+                                                            {selectedRecipe.portioning_guideline || "No specific presentation guidelines."}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Instructions */}
+                                        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 print:break-inside-avoid">
+                                            <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                                                <Utensils size={18} /> Preparation Steps
+                                            </h3>
+                                            <div className="space-y-4">
+                                                {selectedRecipe.preparation_steps.map((step, i) => (
+                                                    <div key={i} className="flex gap-4">
+                                                        <span className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center text-xs font-bold mt-0.5">
+                                                            {i + 1}
+                                                        </span>
+                                                        <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">{step}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* AI Insights */}
+                                        <div className="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/10 dark:to-purple-900/10 rounded-xl border border-indigo-100 dark:border-indigo-800 p-6 print:break-inside-avoid">
+                                            <h3 className="font-bold text-indigo-900 dark:text-indigo-300 mb-2 text-sm uppercase flex items-center gap-2">
+                                                <Sparkles size={14} /> Chef's Notes
+                                            </h3>
+                                            <p className="text-sm text-indigo-800 dark:text-indigo-200 leading-relaxed italic">
+                                                "{selectedRecipe.human_summary}"
+                                            </p>
+                                            
+                                            {selectedRecipe.allergens && selectedRecipe.allergens.length > 0 && (
+                                                <div className="mt-4 pt-4 border-t border-indigo-200/50">
+                                                    <p className="text-xs font-bold text-indigo-800 dark:text-indigo-300 uppercase mb-2">Allergens</p>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {selectedRecipe.allergens.map((alg, i) => (
+                                                            <span key={i} className="px-2 py-1 bg-white dark:bg-slate-800 text-indigo-700 dark:text-indigo-300 text-xs rounded border border-indigo-100 dark:border-indigo-800 font-medium">
+                                                                {alg}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Team Comments Section */}
+                                        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 print:hidden">
+                                            <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                                                <MessageSquare size={18} /> Team Feedback & Notes
+                                            </h3>
+                                            
+                                            <div className="space-y-4 mb-4 max-h-60 overflow-y-auto custom-scrollbar">
+                                                {(!selectedRecipe.comments || selectedRecipe.comments.length === 0) ? (
+                                                    <p className="text-sm text-slate-400 italic text-center py-4">No comments yet. Start the discussion!</p>
+                                                ) : (
+                                                    selectedRecipe.comments.map((comment) => (
+                                                        <div key={comment.id} className="flex gap-3">
+                                                            <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-600 dark:text-slate-300 shrink-0">
+                                                                {comment.userName.charAt(0)}
+                                                            </div>
+                                                            <div className="flex-1 bg-slate-50 dark:bg-slate-900 rounded-lg p-3 border border-slate-100 dark:border-slate-700">
+                                                                <div className="flex justify-between items-baseline mb-1">
+                                                                    <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{comment.userName}</span>
+                                                                    <span className="text-[10px] text-slate-400">{new Date(comment.date).toLocaleDateString()}</span>
+                                                                </div>
+                                                                <p className="text-sm text-slate-600 dark:text-slate-400">{comment.text}</p>
+                                                            </div>
+                                                        </div>
+                                                    ))
+                                                )}
+                                            </div>
+
+                                            <div className="flex gap-2">
+                                                <input 
+                                                    type="text" 
+                                                    value={newComment}
+                                                    onChange={(e) => setNewComment(e.target.value)}
+                                                    placeholder="Add a note for the kitchen team..."
+                                                    className="flex-1 px-4 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                                    onKeyDown={(e) => e.key === 'Enter' && handlePostComment()}
+                                                />
+                                                <button 
+                                                    onClick={handlePostComment}
+                                                    disabled={!newComment.trim()}
+                                                    className="p-2 bg-slate-900 dark:bg-emerald-600 text-white rounded-lg hover:opacity-90 disabled:opacity-50 transition-colors"
+                                                >
+                                                    <Send size={18} />
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-
-                                <div className="p-8 bg-slate-50/50 dark:bg-slate-950/50 backdrop-blur-sm">
-                                    <h3 className="font-bold text-slate-800 dark:text-white mb-4">Preparation Steps</h3>
-                                    <div className="space-y-4">
-                                        {generatedRecipe.preparation_steps?.map((step, i) => (
-                                            <div key={i} className="flex gap-4">
-                                                <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 flex items-center justify-center font-bold text-slate-600 dark:text-slate-400 shrink-0 text-sm border border-slate-300 dark:border-slate-700">{i + 1}</div>
-                                                <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed mt-1.5">{step}</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* Equipment & Allergens (Unchanged) */}
-                                <div className="grid grid-cols-2 border-t border-slate-100 dark:border-slate-800">
-                                    <div className="p-8 border-r border-slate-100 dark:border-slate-700 bg-white/30 dark:bg-slate-900/30 backdrop-blur-sm">
-                                        <h3 className="font-bold text-slate-800 dark:text-white mb-3 flex items-center gap-2"><UtensilsCrossed size={16} className="text-blue-500" /> Equipment Needed</h3>
-                                        {generatedRecipe.equipment_needed && generatedRecipe.equipment_needed.length > 0 ? (
-                                            <div className="flex flex-wrap gap-2">{generatedRecipe.equipment_needed.map((item, i) => (<span key={i} className="px-3 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 rounded-lg text-xs font-medium border border-blue-100 dark:border-blue-800">{item}</span>))}</div>
-                                        ) : <p className="text-xs text-slate-400 italic">No equipment listed.</p>}
-                                    </div>
-                                    <div className="p-8 bg-white/30 dark:bg-slate-900/30 backdrop-blur-sm">
-                                        <h3 className="font-bold text-slate-800 dark:text-white mb-3 flex items-center gap-2"><AlertCircle size={16} className="text-red-500" /> Allergens</h3>
-                                        {generatedRecipe.allergens && generatedRecipe.allergens.length > 0 ? (
-                                            <div className="flex flex-wrap gap-2">{generatedRecipe.allergens.map((item, i) => (<span key={i} className="px-3 py-1 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 rounded-lg text-xs font-medium border border-red-100 dark:border-red-800">{item}</span>))}</div>
-                                        ) : <p className="text-xs text-slate-400 italic">No allergens detected.</p>}
-                                    </div>
-                                </div>
-
-                                {generatedRecipe.reasoning && (
-                                    <div className="p-8 border-t border-slate-100 dark:border-slate-800 bg-amber-50/50 dark:bg-amber-900/10 backdrop-blur-sm">
-                                        <h3 className="font-bold text-amber-800 dark:text-amber-400 mb-2 flex items-center gap-2">
-                                            <Lightbulb size={18} /> {creationMode === 'ai' ? `${selectedPersona}'s Agent Insight` : "Chef's Insight"}
-                                        </h3>
-                                        <p className="text-sm text-amber-900/80 dark:text-amber-200/80 italic">
-                                            "{generatedRecipe.reasoning}"
-                                        </p>
-                                    </div>
-                                )}
-                              </div>
-                          </div>
-                      </div>
-                  ) : (
-                      <div className="h-full flex flex-col items-center justify-center text-slate-400 opacity-60 p-8 text-center">
-                          <ChefHat size={64} className="mb-6" />
-                          <h3 className="text-xl font-bold mb-2">BistroChef is Ready</h3>
-                          <p className="max-w-md">Select an AI persona or switch to manual mode to create your professional recipe card.</p>
-                      </div>
-                  )}
-                  
-                  {/* Footer Variations (Unchanged) */}
-                  {generatedRecipe && (
-                      <div className="p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center shrink-0">
-                          <div className="flex gap-2 overflow-x-auto pb-1 max-w-[60%] custom-scrollbar">
-                              <button onClick={() => handleVariation('Vegan')} className="whitespace-nowrap px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-300 flex items-center gap-1"><Leaf size={12} className="text-green-500" /> Vegan</button>
-                              <button onClick={() => handleVariation('Low-Calorie')} className="whitespace-nowrap px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-300 flex items-center gap-1"><Droplets size={12} className="text-blue-400" /> Low-Cal</button>
-                              <button onClick={() => handleVariation('Spicy')} className="whitespace-nowrap px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-300 flex items-center gap-1"><Flame size={12} className="text-red-500" /> Spicy</button>
-                              <button onClick={() => handleVariation('Budget-Friendly')} className="whitespace-nowrap px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-300 flex items-center gap-1"><Wallet size={12} className="text-emerald-500" /> Budget</button>
-                              <button onClick={() => handleVariation('Gluten-Free')} className="whitespace-nowrap px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 dark:text-slate-300 flex items-center gap-1"><Wheat size={12} className="text-amber-500" /> GF</button>
-                          </div>
-                          <div className="flex gap-2">
-                              <button onClick={handleDownloadPDF} className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"><FileDown size={20} /></button>
-                              {isStaff && adminQueue.length > 0 && activeRequest && (
-                                  <button onClick={handleSaveRecipe} className="px-6 py-2 bg-emerald-600 text-white font-bold rounded-lg hover:bg-emerald-700 transition-colors flex items-center gap-2"><CheckCircle2 size={18} /> Complete Request</button>
-                              )}
-                          </div>
-                      </div>
-                  )}
-              </div>
-          </div>
-      )}
-
-      {viewMode === 'requests' && isStaff && (
-          // Requests Queue (Unchanged)
-          <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col flex-1 animate-fade-in transition-colors">
-              <div className="p-6 border-b border-slate-100 dark:border-slate-800">
-                  <h2 className="text-xl font-bold text-slate-800 dark:text-white">Recipe Requests Queue</h2>
-              </div>
-              <div className="flex-1 overflow-y-auto p-6">
-                  {adminQueue.length === 0 ? (
-                      <p className="text-slate-500 text-center py-12">No pending requests.</p>
-                  ) : (
-                      <div className="space-y-4">
-                          {adminQueue.map(req => (
-                              <div key={req.id} className="border border-slate-200 dark:border-slate-700 rounded-xl p-6 bg-slate-50 dark:bg-slate-800">
-                                  <div className="flex justify-between items-start mb-4">
-                                      <div><h3 className="font-bold text-lg text-slate-800 dark:text-white">{req.item.name}</h3><p className="text-sm text-slate-500 dark:text-slate-400">Requested by <span className="font-bold">{req.userName}</span></p></div>
-                                      <span className="text-xs font-bold bg-yellow-100 text-yellow-700 px-2 py-1 rounded">PENDING</span>
-                                  </div>
-                                  <div className="bg-white dark:bg-slate-900 p-4 rounded-lg border border-slate-200 dark:border-slate-700 text-sm text-slate-600 dark:text-slate-300 mb-4">{req.requirements}</div>
-                                  <div className="flex justify-end"><button onClick={() => handleFulfillRequest(req)} className="px-6 py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold rounded-lg hover:opacity-90">Process Request</button></div>
-                              </div>
-                          ))}
-                      </div>
-                  )}
-              </div>
-          </div>
-      )}
-
-      {importStatus && (
-          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-6 py-3 rounded-full shadow-lg flex items-center gap-2 animate-fade-in-up">
-              <CheckCircle2 size={18} className="text-emerald-400" />
-              <span className="font-bold text-sm">{importStatus}</span>
-          </div>
-      )}
-    </div>
-  );
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
 };

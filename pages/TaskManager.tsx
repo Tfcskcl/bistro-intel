@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
 import { User, Task } from '../types';
 import { storageService, storageEvents } from '../services/storageService';
-import { CheckSquare, Plus, Trash2, Tag, Filter, CheckCircle2, Circle, X } from 'lucide-react';
+import { CheckSquare, Plus, Trash2, Tag, Filter, CheckCircle2, Circle, X, Calendar } from 'lucide-react';
 
 interface TaskManagerProps {
     user: User;
@@ -185,7 +186,7 @@ export const TaskManager: React.FC<TaskManagerProps> = ({ user }) => {
                                     <p className={`text-sm font-medium ${task.completed ? 'text-slate-500 line-through' : 'text-slate-800 dark:text-slate-200'}`}>
                                         {task.text}
                                     </p>
-                                    <div className="flex flex-wrap gap-2 mt-2">
+                                    <div className="flex flex-wrap gap-2 mt-2 items-center">
                                         {task.tags.map(tagName => {
                                             const tagConfig = AVAILABLE_TAGS.find(t => t.name === tagName);
                                             return (
@@ -197,8 +198,9 @@ export const TaskManager: React.FC<TaskManagerProps> = ({ user }) => {
                                                 </span>
                                             );
                                         })}
-                                        <span className="text-[10px] text-slate-400 flex items-center ml-auto">
-                                            {new Date(task.createdAt).toLocaleDateString()}
+                                        <span className="text-[10px] text-slate-400 flex items-center gap-1 ml-auto bg-slate-50 dark:bg-slate-800/50 px-2 py-0.5 rounded">
+                                            <Calendar size={10} />
+                                            {new Date(task.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                         </span>
                                     </div>
                                 </div>

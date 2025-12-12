@@ -14,7 +14,7 @@ interface ChatAssistantProps {
 }
 
 export const ChatAssistant: React.FC<ChatAssistantProps> = ({ 
-    welcomeMessage = 'Hello! I\'m your BistroIntelligence assistant. I can help you navigate the app or answer questions about your restaurant operations. How can I help?' 
+    welcomeMessage = 'Hello! I\'m your Bistro Chef assistant. I can help you navigate the app or answer questions about your restaurant operations. How can I help?' 
 }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [input, setInput] = useState('');
@@ -69,7 +69,7 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({
                                 <Bot size={20} className="text-white" />
                             </div>
                             <div>
-                                <h3 className="font-bold text-sm leading-none">Bistro AI</h3>
+                                <h3 className="font-bold text-sm leading-none">Bistro Chef</h3>
                                 <span className="text-[10px] text-indigo-100 opacity-80">Powered by Gemini 3 Pro</span>
                             </div>
                         </div>

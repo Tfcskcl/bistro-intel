@@ -1,5 +1,4 @@
 
-
 export interface Ingredient {
   ingredient_id: string;
   name: string;
@@ -29,6 +28,14 @@ export interface NutritionalInfo {
     fat: number;
 }
 
+export interface RecipeComment {
+    id: string;
+    userId: string;
+    userName: string;
+    text: string;
+    date: string;
+}
+
 export interface RecipeCard extends MenuItem {
   yield: number;
   preparation_steps: string[];
@@ -40,6 +47,7 @@ export interface RecipeCard extends MenuItem {
   suggested_selling_price: number;
   tags: string[];
   human_summary?: string;
+  visual_description?: string; // New field for better image generation
   reasoning?: string;
   confidence?: 'High' | 'Medium' | 'Low';
   assignedRestaurantId?: string;
@@ -48,6 +56,12 @@ export interface RecipeCard extends MenuItem {
   cook_time_minutes?: number;
   total_time_minutes?: number;
   nutritional_info?: NutritionalInfo;
+  imageUrl?: string;
+  
+  // Collaboration
+  sharedBy?: string; // Name of the user who shared it
+  sharedDate?: string;
+  comments?: RecipeComment[];
 }
 
 export interface RecipeRequest {
@@ -322,6 +336,7 @@ export interface InventoryItem {
     parLevel: number; // Minimum stock before reorder
     supplier: string;
     lastUpdated: string;
+    expiryDate?: string;
 }
 
 export interface PurchaseOrder {
@@ -363,6 +378,26 @@ export interface KitchenLayout {
 }
 
 // --- CCTV Analytics Types ---
+
+export interface StaffTracking {
+    id: string; // "staff_01"
+    role: string; // "Chef", "Porter"
+    current_zone: string;
+    action: string;
+    uniform_compliant: boolean;
+    hygiene_compliant: boolean; // Masks, Gloves
+    efficiency_score: number; // 0-100
+    alerts: string[];
+    last_seen: string;
+}
+
+export interface TimelineEvent {
+    id: string;
+    time: string;
+    description: string;
+    type: 'normal' | 'violation' | 'alert';
+    zone_id: string;
+}
 
 export interface CCTVEvent {
     event_id: string;
@@ -440,6 +475,8 @@ export interface Recommendation {
 
 // API Output Schema (The full response)
 export interface CCTVAnalysisResult {
+    staff_tracking: StaffTracking[]; // New detailed tracking
+    live_timeline: TimelineEvent[]; // New timeline
     events: CCTVEvent[];
     workflow_correlations: WorkflowCorrelation[];
     inventory_impact: InventoryImpact[];
@@ -460,13 +497,9 @@ export interface CCTVAnalysisResult {
     processing_time_ms: number;
     model_version: string;
     warnings: string[];
-    
-    // Legacy fields mapped for backward compatibility if needed
-    heatmap?: Record<string, number>; 
-    dwell_times?: Record<string, number>;
 }
 
-// Unified AI Schema
+// Unified Schema
 export interface UnifiedSchema {
     workflow_analysis: any;
     sop_compliance: { rate: number; violations: any[] };
@@ -533,13 +566,26 @@ export interface VisitorSession {
     lastActive: string;
     pagesVisited: string[];
     isOnline: boolean;
-    hasAbandonedCheckout: boolean;
+    hasAbandonedCheckout: boolean; // True if they visited pricing/login but didn't convert
+    intentScore: number; // 0-100
+    actions: string[]; // e.g., "Clicked Pricing", "Viewed Demo"
 }
 
 export interface AnalyticsEvent {
     id: string;
     sessionId: string;
-    type: 'PAGE_VIEW' | 'CLICK' | 'CHECKOUT_START' | 'PURCHASE';
+    type: 'PAGE_VIEW' | 'CLICK' | 'CHECKOUT_START' | 'PURCHASE' | 'ABANDON';
     detail: string;
+    timestamp: string;
+}
+
+// --- NEW: System Wide Activity Log ---
+export interface SystemActivity {
+    id: string;
+    userId: string;
+    userName: string;
+    actionType: 'RECIPE' | 'SOP' | 'STRATEGY' | 'CCTV' | 'MENU' | 'LAYOUT' | 'LOGIN' | 'SYSTEM' | 'VISITOR' | 'TASK';
+    description: string;
+    metadata?: any;
     timestamp: string;
 }

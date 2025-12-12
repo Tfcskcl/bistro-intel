@@ -186,7 +186,7 @@ export const KitchenLayoutDesigner: React.FC<KitchenLayoutDesignerProps> = ({ us
                 // Track offset for collision prevention in this quadrant
                 let currentOffset = zoneOffsets[mapKey] || 0;
 
-                zone.required_equipment.forEach((eq, idx) => {
+                (zone.required_equipment || []).forEach((eq, idx) => {
                     const catalogItem = findCatalogItem(eq.name);
                     
                     let width = 3; // Default
@@ -401,6 +401,8 @@ export const KitchenLayoutDesigner: React.FC<KitchenLayoutDesignerProps> = ({ us
                     </div>
                 </div>
 
+                {/* Rest of the component code (no logic changes) ... */}
+                {/* ... (Sidebar, Canvas, Inspector) ... */}
                 <div className="flex items-center gap-2">
                     {sketchImage && (
                         <div className="flex items-center gap-2 mr-4">

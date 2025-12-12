@@ -1,9 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
 import { User, InventoryItem, PurchaseOrder } from '../types';
 import { storageService } from '../services/storageService';
 import { generatePurchaseOrder, forecastInventoryNeeds } from '../services/geminiService';
 import { CREDIT_COSTS } from '../constants';
-import { Package, Search, Plus, Trash2, AlertTriangle, ArrowDown, ArrowUp, ShoppingCart, Loader2, Mail, CheckCircle2, RefreshCw, BarChart3, Edit2, TrendingUp, Sparkles, X } from 'lucide-react';
+import { Package, Search, Plus, Trash2, AlertTriangle, ArrowDown, ArrowUp, ShoppingCart, Loader2, Mail, CheckCircle2, RefreshCw, BarChart3, Edit2, TrendingUp, Sparkles, X, Calendar, Clock, Settings } from 'lucide-react';
 
 interface InventoryManagerProps {
     user: User;
@@ -13,12 +14,15 @@ interface InventoryManagerProps {
 export const InventoryManager: React.FC<InventoryManagerProps> = ({ user, onUserUpdate }) => {
     const [inventory, setInventory] = useState<InventoryItem[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
-    const [filter, setFilter] = useState<'all' | 'low_stock'>('all');
+    const [filter, setFilter] = useState<'all' | 'low_stock' | 'expiring'>('all');
     
+    // Configurable Alert Threshold
+    const [expiryThreshold, setExpiryThreshold] = useState(7);
+
     // Add Item State
     const [showAddModal, setShowAddModal] = useState(false);
     const [newItem, setNewItem] = useState<Partial<InventoryItem>>({
-        name: '', category: 'General', currentStock: 0, unit: 'kg', costPerUnit: 0, parLevel: 0, supplier: ''
+        name: '', category: 'General', currentStock: 0, unit: 'kg', costPerUnit: 0, parLevel: 0, supplier: '', expiryDate: ''
     });
 
     // PO State
@@ -50,13 +54,14 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ user, onUser
             costPerUnit: Number(newItem.costPerUnit),
             parLevel: Number(newItem.parLevel),
             supplier: newItem.supplier || 'General Supplier',
-            lastUpdated: new Date().toISOString()
+            lastUpdated: new Date().toISOString(),
+            expiryDate: newItem.expiryDate
         };
         const updated = [...inventory, item];
         setInventory(updated);
         storageService.saveInventory(user.id, updated);
         setShowAddModal(false);
-        setNewItem({ name: '', category: 'General', currentStock: 0, unit: 'kg', costPerUnit: 0, parLevel: 0, supplier: '' });
+        setNewItem({ name: '', category: 'General', currentStock: 0, unit: 'kg', costPerUnit: 0, parLevel: 0, supplier: '', expiryDate: '' });
         showToast("Item added successfully");
     };
 
@@ -128,21 +133,43 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ user, onUser
         }
     };
 
+    // Helper to determine expiry status
+    const getExpiryStatus = (dateStr?: string) => {
+        if (!dateStr) return 'good';
+        const today = new Date();
+        const expiry = new Date(dateStr);
+        const diffTime = expiry.getTime() - today.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        if (diffDays < 0) return 'expired';
+        if (diffDays <= expiryThreshold) return 'warning'; // Uses configurable threshold
+        return 'good';
+    };
+
     // Derived State
     const lowStockCount = inventory.filter(i => i.currentStock < i.parLevel).length;
+    const expiringCount = inventory.filter(i => {
+        const status = getExpiryStatus(i.expiryDate);
+        return status === 'expired' || status === 'warning';
+    }).length;
     const totalValue = inventory.reduce((acc, i) => acc + (i.currentStock * i.costPerUnit), 0);
     const uniqueSuppliers = Array.from(new Set(inventory.map(i => i.supplier).filter(Boolean)));
 
     const filteredInventory = inventory.filter(i => {
         const matchesSearch = i.name.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesFilter = filter === 'all' || (filter === 'low_stock' && i.currentStock < i.parLevel);
+        const expiryStatus = getExpiryStatus(i.expiryDate);
+        
+        let matchesFilter = true;
+        if (filter === 'low_stock') matchesFilter = i.currentStock < i.parLevel;
+        if (filter === 'expiring') matchesFilter = expiryStatus === 'warning' || expiryStatus === 'expired';
+
         return matchesSearch && matchesFilter;
     });
 
     return (
         <div className="h-[calc(100vh-6rem)] flex flex-col gap-6 relative">
             {/* Header Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
                     <div>
                         <p className="text-sm text-slate-500 dark:text-slate-400 font-bold uppercase">Total Inventory Value</p>
@@ -158,9 +185,36 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ user, onUser
                         <p className={`text-2xl font-bold mt-1 ${lowStockCount > 0 ? 'text-red-600' : 'text-emerald-600'}`}>{lowStockCount}</p>
                     </div>
                     <div className={`p-3 rounded-lg ${lowStockCount > 0 ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}>
-                        <AlertTriangle size={24} />
+                        <ArrowDown size={24} />
                     </div>
                 </div>
+                {/* Expiry Stats Card with Configuration */}
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between relative group">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <p className="text-sm text-slate-500 dark:text-slate-400 font-bold uppercase">Expiring Soon</p>
+                            <p className={`text-2xl font-bold mt-1 ${expiringCount > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>{expiringCount}</p>
+                        </div>
+                        <div className={`p-3 rounded-lg ${expiringCount > 0 ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                            <Clock size={24} />
+                        </div>
+                    </div>
+                    <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
+                        <span className="text-slate-400 flex items-center gap-1"><Settings size={10}/> Alert Threshold:</span>
+                        <div className="flex items-center gap-1">
+                            <input 
+                                type="number" 
+                                min="1" 
+                                max="30"
+                                value={expiryThreshold}
+                                onChange={(e) => setExpiryThreshold(Math.max(1, parseInt(e.target.value) || 7))}
+                                className="w-10 p-1 text-center border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white"
+                            />
+                            <span className="text-slate-500">days</span>
+                        </div>
+                    </div>
+                </div>
+                
                 <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-center gap-3">
                     <p className="text-sm text-slate-500 dark:text-slate-400 font-bold uppercase">Actions</p>
                     <div className="flex gap-2">
@@ -178,7 +232,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ user, onUser
                             className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-3 py-2 rounded text-xs font-bold flex items-center gap-2 hover:opacity-90 disabled:opacity-50"
                         >
                             {isGeneratingPO ? <Loader2 size={12} className="animate-spin" /> : <ShoppingCart size={12} />}
-                            Auto-Order
+                            Order
                         </button>
                     </div>
                     <button 
@@ -212,6 +266,7 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ user, onUser
                         <div className="flex bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-1">
                             <button onClick={() => setFilter('all')} className={`px-3 py-1 text-xs font-bold rounded ${filter === 'all' ? 'bg-slate-100 dark:bg-slate-700' : 'text-slate-500'}`}>All</button>
                             <button onClick={() => setFilter('low_stock')} className={`px-3 py-1 text-xs font-bold rounded ${filter === 'low_stock' ? 'bg-red-100 text-red-700' : 'text-slate-500'}`}>Low Stock</button>
+                            <button onClick={() => setFilter('expiring')} className={`px-3 py-1 text-xs font-bold rounded ${filter === 'expiring' ? 'bg-amber-100 text-amber-700' : 'text-slate-500'}`}>Expiring</button>
                         </div>
                     </div>
                     <button onClick={() => setShowAddModal(true)} className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700 flex items-center gap-2">
@@ -227,36 +282,51 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ user, onUser
                                 <th className="px-6 py-3">Category</th>
                                 <th className="px-6 py-3">Stock Level</th>
                                 <th className="px-6 py-3">Par Level</th>
+                                <th className="px-6 py-3">Expiry Date</th>
                                 <th className="px-6 py-3">Unit Cost</th>
                                 <th className="px-6 py-3">Supplier</th>
                                 <th className="px-6 py-3 text-right">Actions</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                            {filteredInventory.map(item => (
-                                <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                                    <td className="px-6 py-4 font-medium text-slate-800 dark:text-white">{item.name}</td>
-                                    <td className="px-6 py-4 text-slate-500 dark:text-slate-400">
-                                        <span className="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded text-xs">{item.category}</span>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-2">
-                                            <span className={`font-bold ${item.currentStock < item.parLevel ? 'text-red-600' : 'text-emerald-600'}`}>
-                                                {item.currentStock} {item.unit}
-                                            </span>
-                                            {item.currentStock < item.parLevel && <AlertTriangle size={14} className="text-red-500" />}
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 text-slate-500 dark:text-slate-400">{item.parLevel} {item.unit}</td>
-                                    <td className="px-6 py-4 text-slate-600 dark:text-slate-300">₹{item.costPerUnit}</td>
-                                    <td className="px-6 py-4 text-slate-500 dark:text-slate-400">{item.supplier}</td>
-                                    <td className="px-6 py-4 text-right flex justify-end gap-2">
-                                        <button onClick={() => { handleUpdateStock(item.id, 1); showToast(`Received 1 ${item.unit} ${item.name}`); }} className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 rounded text-xs font-bold border border-emerald-200" title="Quick Receive (+1)">+ Receive</button>
-                                        <button onClick={() => handleUpdateStock(item.id, -1)} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded text-slate-500"><ArrowDown size={14}/></button>
-                                        <button onClick={() => handleDelete(item.id)} className="p-1.5 hover:bg-red-50 text-red-500 rounded"><Trash2 size={14}/></button>
-                                    </td>
-                                </tr>
-                            ))}
+                            {filteredInventory.map(item => {
+                                const expiryStatus = getExpiryStatus(item.expiryDate);
+                                return (
+                                    <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                                        <td className="px-6 py-4 font-medium text-slate-800 dark:text-white">{item.name}</td>
+                                        <td className="px-6 py-4 text-slate-500 dark:text-slate-400">
+                                            <span className="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded text-xs">{item.category}</span>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-2">
+                                                <span className={`font-bold ${item.currentStock < item.parLevel ? 'text-red-600' : 'text-emerald-600'}`}>
+                                                    {item.currentStock} {item.unit}
+                                                </span>
+                                                {item.currentStock < item.parLevel && <AlertTriangle size={14} className="text-red-500" />}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 text-slate-500 dark:text-slate-400">{item.parLevel} {item.unit}</td>
+                                        <td className="px-6 py-4">
+                                            {item.expiryDate ? (
+                                                <div className={`flex items-center gap-2 text-xs font-bold px-2 py-1 rounded w-fit ${
+                                                    expiryStatus === 'expired' ? 'bg-red-100 text-red-700' : 
+                                                    expiryStatus === 'warning' ? 'bg-amber-100 text-amber-700' : 'text-slate-500'
+                                                }`}>
+                                                    {(expiryStatus === 'expired' || expiryStatus === 'warning') && <AlertTriangle size={12} />}
+                                                    {new Date(item.expiryDate).toLocaleDateString()}
+                                                </div>
+                                            ) : <span className="text-slate-400">-</span>}
+                                        </td>
+                                        <td className="px-6 py-4 text-slate-600 dark:text-slate-300">₹{item.costPerUnit}</td>
+                                        <td className="px-6 py-4 text-slate-500 dark:text-slate-400">{item.supplier}</td>
+                                        <td className="px-6 py-4 text-right flex justify-end gap-2">
+                                            <button onClick={() => { handleUpdateStock(item.id, 1); showToast(`Received 1 ${item.unit} ${item.name}`); }} className="p-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-600 rounded text-xs font-bold border border-emerald-200" title="Quick Receive (+1)">+ Receive</button>
+                                            <button onClick={() => handleUpdateStock(item.id, -1)} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded text-slate-500"><ArrowDown size={14}/></button>
+                                            <button onClick={() => handleDelete(item.id)} className="p-1.5 hover:bg-red-50 text-red-500 rounded"><Trash2 size={14}/></button>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                         </tbody>
                     </table>
                 </div>
@@ -363,6 +433,18 @@ export const InventoryManager: React.FC<InventoryManagerProps> = ({ user, onUser
                                 <input type="number" placeholder="Cost per Unit" value={newItem.costPerUnit} onChange={e => setNewItem({...newItem, costPerUnit: parseFloat(e.target.value)})} className="w-full p-2 border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
                                 <input type="number" placeholder="Par Level (Min Stock)" value={newItem.parLevel} onChange={e => setNewItem({...newItem, parLevel: parseFloat(e.target.value)})} className="w-full p-2 border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
                             </div>
+                            
+                            {/* Expiry Date Input */}
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Expiry Date (Optional)</label>
+                                <input 
+                                    type="date" 
+                                    value={newItem.expiryDate || ''} 
+                                    onChange={e => setNewItem({...newItem, expiryDate: e.target.value})} 
+                                    className="w-full p-2 border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white" 
+                                />
+                            </div>
+
                             <div className="flex justify-end gap-2 pt-4">
                                 <button onClick={() => setShowAddModal(false)} className="px-4 py-2 text-slate-500 font-bold">Cancel</button>
                                 <button onClick={handleAddItem} className="px-4 py-2 bg-emerald-600 text-white font-bold rounded-lg hover:bg-emerald-700">Add Item</button>

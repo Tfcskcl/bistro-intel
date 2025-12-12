@@ -1,16 +1,14 @@
-
 import React, { useState, useEffect } from 'react';
-import { generateStrategy, generateImplementationPlan, generateABTestStrategy } from '../services/geminiService';
-import { StrategyReport, UserRole, User, ImplementationGuide, PlanType, ABTestResult } from '../types';
-import { Send, Loader2, User as UserIcon, Briefcase, TrendingUp, HelpCircle, Play, LifeBuoy, X, BookOpen, UserCheck, Calendar, Sparkles, Target, AlertTriangle, ArrowUpRight, ArrowDownRight, Map, PieChart as PieChartIcon, ScatterChart as ScatterChartIcon, Wallet, TrendingDown, Users, Star, CheckCircle2, Phone, Award, Video, Building2, Split, BarChart3, Rocket } from 'lucide-react';
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Legend, ScatterChart, Scatter, ZAxis } from 'recharts';
+import { generateStrategy, generateABTestStrategy } from '../services/geminiService';
+import { StrategyReport, UserRole, User, PlanType, ABTestResult } from '../types';
+import { Loader2, User as UserIcon, TrendingUp, AlertTriangle, Users, Star, CheckCircle2, Rocket, Split, Wallet, ArrowRight, Sparkles, TrendingDown, UserCheck, PlusCircle } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from 'recharts';
 import { storageService } from '../services/storageService';
 import { paymentService } from '../services/paymentService';
 import { CREDIT_COSTS } from '../constants';
 
 interface StrategyProps { user: User; onUserUpdate?: (user: User) => void; }
 interface ActionState { [key: number]: 'idle' | 'in_progress' | 'help_requested' | 'completed'; }
-const COLORS = { High: '#ef4444', Medium: '#f59e0b', Low: '#3b82f6', add: '#10b981', remove: '#ef4444' };
 
 const QUICK_PROMPTS = [
     { title: "Boost Customer Footfall", query: "Create a detailed marketing plan to increase customer footfall by 20% in the next 30 days. Focus on social media, local partnerships, and weekday promotions.", icon: Users, color: "text-blue-600 bg-blue-100" },
@@ -33,7 +31,6 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [actionStates, setActionStates] = useState<ActionState>({});
   
   // Payment State
   const [processingService, setProcessingService] = useState<'call' | 'onsite' | null>(null);
@@ -73,10 +70,12 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
       if (abMode) {
           const abData = await generateABTestStrategy(user, textToSend, salesSummary);
           setAbResult(abData);
+          storageService.logActivity(user.id, user.name, 'STRATEGY', `Ran A/B test simulation`);
       } else {
           // Standard Strategy
           const data = await generateStrategy(user, textToSend, salesSummary);
           setReport(data);
+          storageService.logActivity(user.id, user.name, 'STRATEGY', `Generated strategy report`);
       }
     } catch (e: any) {
       setError(e.message);
@@ -114,6 +113,11 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
               setProcessingService(null);
           }
       );
+  };
+
+  const handleAddToTasks = (initiative: string) => {
+      storageService.addTask(user.id, `Strategy Action: ${initiative}`, ['Admin', 'Growth']);
+      alert("Added to Task Manager!");
   };
 
   // Helper for A/B Chart
@@ -206,7 +210,7 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                     <Sparkles className="text-emerald-500" size={20}/> Executive Analysis
                 </h3>
                 <ul className="space-y-3">
-                    {report.summary?.map((s,i) => (
+                    {(Array.isArray(report.summary) ? report.summary : []).map((s,i) => (
                         <li key={i} className="flex gap-3 text-slate-700 dark:text-slate-300 leading-relaxed">
                             <span className="w-1.5 h-1.5 rounded-full bg-slate-400 mt-2 shrink-0"></span>
                             {s}
@@ -220,8 +224,8 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                 <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700">
                     <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">Strategic Initiatives</h3>
                     <div className="space-y-4">
-                        {report.action_plan?.map((action, i) => (
-                            <div key={i} className="p-4 bg-slate-50 dark:bg-slate-900 rounded-lg border-l-4 border-l-emerald-500">
+                        {(Array.isArray(report.action_plan) ? report.action_plan : []).map((action, i) => (
+                            <div key={i} className="p-4 bg-slate-50 dark:bg-slate-900 rounded-lg border-l-4 border-l-emerald-500 group">
                                 <div className="flex justify-between items-start mb-1">
                                     <h4 className="font-bold text-slate-800 dark:text-white text-sm">{action.initiative}</h4>
                                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${action.priority === 'High' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
@@ -232,6 +236,14 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                                     <span>Impact: <strong className="text-slate-700 dark:text-slate-300">{action.impact_estimate}</strong></span>
                                     <span>Cost: <strong className="text-slate-700 dark:text-slate-300">{action.cost_estimate}</strong></span>
                                 </div>
+                                <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-800 flex justify-end">
+                                    <button 
+                                        onClick={() => handleAddToTasks(action.initiative)}
+                                        className="text-xs text-indigo-600 dark:text-indigo-400 font-bold flex items-center gap-1 hover:underline"
+                                    >
+                                        <PlusCircle size={12}/> Add to Tasks
+                                    </button>
+                                </div>
                             </div>
                         ))}
                     </div>
@@ -240,7 +252,7 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                 <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700">
                     <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">Seasonal Menu Engineering</h3>
                     <div className="space-y-3">
-                        {report.seasonal_menu_suggestions?.map((item, i) => (
+                        {(Array.isArray(report.seasonal_menu_suggestions) ? report.seasonal_menu_suggestions : []).map((item, i) => (
                             <div key={i} className="flex items-center justify-between p-3 border-b border-slate-100 dark:border-slate-700 last:border-0">
                                 <div>
                                     <p className="font-bold text-slate-800 dark:text-white text-sm">{item.item}</p>
@@ -259,12 +271,12 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
             <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700">
                 <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-6">Implementation Roadmap</h3>
                 <div className="relative border-l-2 border-slate-200 dark:border-slate-700 ml-4 space-y-8">
-                    {report.roadmap?.map((phase, i) => (
+                    {(Array.isArray(report.roadmap) ? report.roadmap : []).map((phase, i) => (
                         <div key={i} className="relative pl-8">
                             <div className="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-emerald-500 border-4 border-white dark:border-slate-800"></div>
                             <h4 className="font-bold text-slate-800 dark:text-white">{phase.phase_name} <span className="text-xs font-normal text-slate-500 ml-2">({phase.duration})</span></h4>
                             <ul className="mt-2 space-y-1">
-                                {phase.steps?.map((step, j) => (
+                                {(Array.isArray(phase.steps) ? phase.steps : []).map((step, j) => (
                                     <li key={j} className="text-sm text-slate-600 dark:text-slate-300 flex items-center gap-2">
                                         <CheckCircle2 size={12} className="text-emerald-500"/> {step}
                                     </li>
@@ -280,9 +292,10 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
           </div>
         )}
 
-        {/* A/B Test Results View */}
+        {/* A/B Test Results View (Keep existing logic) */}
         {abResult && abMode && (
             <div className="max-w-6xl mx-auto space-y-8 pb-20 animate-fade-in">
+                {/* ... (Existing A/B UI code unchanged) ... */}
                 {/* Comparison Header */}
                 <div className="text-center">
                     <h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-2">Strategy Comparison</h2>
@@ -331,7 +344,7 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                         <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-lg mb-6">
                             <h4 className="text-xs font-bold text-slate-500 uppercase mb-2">Key Steps</h4>
                             <ul className="space-y-2">
-                                {abResult.variant_a.key_steps.map((step, i) => (
+                                {(Array.isArray(abResult.variant_a.key_steps) ? abResult.variant_a.key_steps : []).map((step, i) => (
                                     <li key={i} className="flex gap-2 text-sm text-slate-700 dark:text-slate-300">
                                         <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 shrink-0"></div>
                                         {step}
@@ -369,7 +382,7 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                         <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-lg mb-6">
                             <h4 className="text-xs font-bold text-slate-500 uppercase mb-2">Key Steps</h4>
                             <ul className="space-y-2">
-                                {abResult.variant_b.key_steps.map((step, i) => (
+                                {(Array.isArray(abResult.variant_b.key_steps) ? abResult.variant_b.key_steps : []).map((step, i) => (
                                     <li key={i} className="flex gap-2 text-sm text-slate-700 dark:text-slate-300">
                                         <div className="w-1.5 h-1.5 rounded-full bg-purple-400 mt-1.5 shrink-0"></div>
                                         {step}
@@ -400,7 +413,7 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
         {(report || abResult) && (
             <div className="space-y-4 max-w-5xl mx-auto mt-12 pb-12">
                 <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                    <Award className="text-yellow-500" /> Bistro Expert Connect
+                    <Star className="text-yellow-500" /> Bistro Expert Connect
                 </h3>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -408,93 +421,42 @@ export const Strategy: React.FC<StrategyProps> = ({ user, onUserUpdate }) => {
                     <div className="bg-gradient-to-br from-indigo-900 to-indigo-800 rounded-xl p-6 text-white shadow-lg flex flex-col justify-between relative overflow-hidden">
                         <div className="relative z-10">
                             <div className="flex justify-between items-start mb-4">
-                                <div className="p-3 bg-white/10 rounded-lg backdrop-blur-sm">
-                                    <Video size={24} className="text-indigo-300" />
-                                </div>
-                                <span className="bg-indigo-500/30 border border-indigo-400/30 text-xs font-bold px-2 py-1 rounded-full text-indigo-100">Most Popular</span>
+                                <h4 className="text-xl font-bold">Strategy Call</h4>
+                                <span className="bg-white/20 text-xs font-bold px-2 py-1 rounded">₹99</span>
                             </div>
-                            <h4 className="text-xl font-bold mb-2">Speak to an Expert</h4>
-                            <p className="text-indigo-200 text-sm mb-6 leading-relaxed">
-                                Get a 15-minute strategy call with a verified F&B consultant to refine this plan.
-                            </p>
-                            <div className="flex items-center gap-3 text-sm text-indigo-100 mb-6">
-                                <span className="flex items-center gap-1"><CheckCircle2 size={14}/> Instant Review</span>
-                                <span className="flex items-center gap-1"><CheckCircle2 size={14}/> Q&A Session</span>
-                            </div>
-                        </div>
-                        
-                        <div className="flex items-center justify-between mt-auto relative z-10 border-t border-white/10 pt-4">
-                            <div>
-                                <p className="text-xs text-indigo-300 font-bold uppercase">One-time Fee</p>
-                                <p className="text-2xl font-bold text-white">₹99</p>
-                            </div>
+                            <p className="text-indigo-100 text-sm mb-6">30-min call with an F&B expert to refine this plan.</p>
                             <button 
                                 onClick={() => handleServicePayment('call')}
                                 disabled={processingService === 'call'}
-                                className="px-6 py-2.5 bg-white text-indigo-900 font-bold rounded-lg hover:bg-indigo-50 transition-colors flex items-center gap-2 disabled:opacity-70"
+                                className="w-full py-2 bg-white text-indigo-900 font-bold rounded-lg hover:bg-indigo-50 transition-colors flex items-center justify-center gap-2"
                             >
-                                {processingService === 'call' ? <Loader2 size={16} className="animate-spin" /> : <Phone size={16} />}
-                                Book Call
+                                {processingService === 'call' ? <Loader2 size={16} className="animate-spin" /> : <ArrowRight size={16} />}
+                                Book Now
                             </button>
                         </div>
-                        {/* Decorative Blob */}
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl -mr-10 -mt-10"></div>
                     </div>
 
-                    {/* On-Site Option */}
-                    <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-xl p-6 text-white shadow-lg flex flex-col justify-between relative overflow-hidden">
-                        <div className="relative z-10">
+                    {/* On-site Option */}
+                    <div className="bg-white dark:bg-slate-800 rounded-xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col justify-between">
+                        <div>
                             <div className="flex justify-between items-start mb-4">
-                                <div className="p-3 bg-white/10 rounded-lg backdrop-blur-sm">
-                                    <Building2 size={24} className="text-emerald-400" />
-                                </div>
-                                <span className="bg-emerald-500/30 border border-emerald-400/30 text-xs font-bold px-2 py-1 rounded-full text-emerald-100">Premium</span>
+                                <h4 className="text-xl font-bold text-slate-900 dark:text-white">On-site Rollout</h4>
+                                <span className="bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-bold px-2 py-1 rounded">₹5,000</span>
                             </div>
-                            <h4 className="text-xl font-bold mb-2">On-site Implementation</h4>
-                            <p className="text-slate-300 text-sm mb-6 leading-relaxed">
-                                Our specialists will visit your location to execute this strategy, train staff, and setup campaigns.
-                            </p>
-                            <div className="flex items-center gap-3 text-sm text-slate-300 mb-6">
-                                <span className="flex items-center gap-1"><CheckCircle2 size={14}/> Full Execution</span>
-                                <span className="flex items-center gap-1"><CheckCircle2 size={14}/> Weekly Reports</span>
-                            </div>
-                        </div>
-                        
-                        <div className="flex items-center justify-between mt-auto relative z-10 border-t border-white/10 pt-4">
-                            <div>
-                                <p className="text-xs text-slate-400 font-bold uppercase">Starting At</p>
-                                <p className="text-2xl font-bold text-white">₹5,000</p>
-                            </div>
+                            <p className="text-slate-500 dark:text-slate-400 text-sm mb-6">We send a team to implement this strategy at your location.</p>
                             <button 
                                 onClick={() => handleServicePayment('onsite')}
                                 disabled={processingService === 'onsite'}
-                                className="px-6 py-2.5 bg-emerald-500 text-white font-bold rounded-lg hover:bg-emerald-600 transition-colors flex items-center gap-2 disabled:opacity-70"
+                                className="w-full py-2 bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-bold rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center gap-2"
                             >
-                                {processingService === 'onsite' ? <Loader2 size={16} className="animate-spin" /> : <Briefcase size={16} />}
-                                Book Visit
+                                {processingService === 'onsite' ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                                Request Team
                             </button>
                         </div>
                     </div>
                 </div>
             </div>
         )}
-      </div>
-      
-      {/* Input Area */}
-      <div className="p-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-          <div className="max-w-4xl mx-auto relative">
-              <input 
-                type="text" 
-                value={query} 
-                onChange={(e) => setQuery(e.target.value)} 
-                placeholder={abMode ? "Compare two strategies for... (e.g. increasing lunch sales)" : "Ask a custom strategic question..."}
-                className="w-full pl-4 pr-12 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:ring-2 focus:ring-emerald-500 outline-none dark:text-white placeholder-slate-400"
-                onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-              />
-              <button onClick={() => handleSend()} className="absolute right-2 top-2 p-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors">
-                  <Send size={18} />
-              </button>
-          </div>
       </div>
     </div>
   );

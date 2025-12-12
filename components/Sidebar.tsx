@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { LayoutDashboard, ChefHat, FileText, TrendingUp, Database, CreditCard, LogOut, Clapperboard, RefreshCw, GitMerge, BookOpen, Package, Activity, PenTool, Key, CheckCircle2, ListTodo, ExternalLink } from 'lucide-react';
 import { AppView, User, PlanType, UserRole } from '../types';
@@ -22,21 +23,15 @@ interface MenuItem {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, user, onLogout }) => {
-  // Initialize with env check to avoid flash
   const [apiConnected, setApiConnected] = useState(hasValidApiKey());
   const [hasCustomKey, setHasCustomKey] = useState(false);
 
-  // Check connection on mount and interval
   useEffect(() => {
       const check = async () => {
-          const envKeyValid = hasValidApiKey();
-          
-          if (envKeyValid) {
-              // If env key exists, we are live. No need to check AI Studio.
+          if (hasValidApiKey()) {
               setApiConnected(true);
               return;
           }
-
           const aiStudio = (window as any).aistudio;
           if (aiStudio) {
               try {
@@ -44,31 +39,27 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
                   setHasCustomKey(selected);
                   setApiConnected(selected);
               } catch (e) {
-                  console.error("AI Studio Check Failed", e);
                   setApiConnected(false);
               }
-          } else {
-              setApiConnected(false);
           }
       };
-      
       check();
-      const interval = setInterval(check, 3000);
-      return () => clearInterval(interval);
   }, []);
 
   const handleConnectKey = async () => {
       const aiStudio = (window as any).aistudio;
       if (aiStudio) {
           try {
+              // Open the dialog
               await aiStudio.openSelectKey();
-              const selected = await aiStudio.hasSelectedApiKey();
-              if (selected) {
-                  setHasCustomKey(true);
-                  setApiConnected(true);
-                  // Reload to ensure environment variables are refreshed
-                  setTimeout(() => window.location.reload(), 500);
-              }
+              
+              // RACE CONDITION FIX: 
+              // Do NOT wait or check status again. Assume success per system instructions.
+              setHasCustomKey(true);
+              setApiConnected(true);
+              
+              // Force reload to pick up the new key in the environment
+              window.location.reload();
           } catch(e) {
               console.error("Key selection failed", e);
           }
@@ -142,7 +133,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
       </nav>
 
       <div className="p-4 border-t border-slate-200 dark:border-slate-800 space-y-2 bg-slate-50 dark:bg-slate-900 transition-colors duration-200">
-        {/* API Status Indicator */}
         <div className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
             <div className="flex items-center gap-2">
                 <Key size={14} className="text-slate-400" />
@@ -152,14 +142,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
             {(window as any).aistudio && !apiConnected ? (
                 <button 
                     onClick={handleConnectKey}
-                    className={`flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-bold transition-colors ${
-                        hasCustomKey 
-                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' 
-                        : 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 animate-pulse'
-                    }`}
+                    className="flex items-center gap-1.5 px-2 py-1 rounded text-[10px] font-bold bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 animate-pulse hover:bg-orange-200 transition-colors"
                 >
-                    <div className={`w-1.5 h-1.5 rounded-full ${hasCustomKey ? 'bg-emerald-500' : 'bg-orange-500'}`}></div>
-                    {hasCustomKey ? 'Connected' : 'Connect Key'}
+                    <div className="w-1.5 h-1.5 rounded-full bg-orange-500"></div>
+                    Connect Key
                 </button>
             ) : (
                 <div className="flex items-center gap-1.5">
@@ -196,7 +182,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
         
         <button 
             onClick={() => {
-                if (window.confirm("Start Fresh? This will clear all data and reset the application state.")) {
+                if (window.confirm("Start Fresh? This will clear all data.")) {
                     storageService.clearAllData();
                 }
             }}

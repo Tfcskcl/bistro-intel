@@ -4,7 +4,7 @@ import { User, MenuGenerationRequest, UserRole, MenuStructure } from '../types';
 import { storageService } from '../services/storageService';
 import { generateMenu, cleanAndParseJSON, hasValidApiKey } from '../services/geminiService';
 import { CREDIT_COSTS } from '../constants';
-import { Sparkles, Loader2, Wallet, ArrowRight, BookOpen, Download, LayoutTemplate, Palette, Globe, DollarSign, CloudSun, AlertCircle, GripVertical } from 'lucide-react';
+import { Sparkles, Loader2, Wallet, ArrowRight, BookOpen, Download, LayoutTemplate, Palette, Globe, DollarSign, CloudSun, AlertCircle, GripVertical, Upload, Image as ImageIcon } from 'lucide-react';
 
 interface MenuGeneratorProps {
     user: User;
@@ -42,21 +42,21 @@ interface MenuDesignerProps {
     data: MenuStructure;
     theme: string;
     cuisine: string;
+    logo?: string | null;
     onReorder: (sectionIndex: number, fromIndex: number, toIndex: number) => void;
 }
 
-const MenuDesigner: React.FC<MenuDesignerProps> = ({ data, theme, cuisine, onReorder }) => {
+const MenuDesigner: React.FC<MenuDesignerProps> = ({ data, theme, cuisine, logo, onReorder }) => {
     const bgImage = getMenuBgImage(cuisine);
     const [draggedItem, setDraggedItem] = useState<{ sectionIdx: number, itemIdx: number } | null>(null);
 
     const handleDragStart = (e: React.DragEvent, sectionIdx: number, itemIdx: number) => {
         setDraggedItem({ sectionIdx, itemIdx });
         e.dataTransfer.effectAllowed = "move";
-        // Ghost image styling if needed, usually browser default is fine
     };
 
     const handleDragOver = (e: React.DragEvent) => {
-        e.preventDefault(); // Necessary to allow dropping
+        e.preventDefault(); 
         e.dataTransfer.dropEffect = "move";
     };
 
@@ -156,7 +156,12 @@ const MenuDesigner: React.FC<MenuDesignerProps> = ({ data, theme, cuisine, onReo
             <div className={styles.bgOverlay}></div>
 
             <div className={styles.content}>
-                <div className="text-center">
+                <div className="text-center mb-8">
+                    {logo && (
+                        <div className="mb-6 flex justify-center">
+                            <img src={logo} alt="Restaurant Logo" className="h-24 w-auto object-contain" />
+                        </div>
+                    )}
                     <h1 className={styles.header}>{data.title}</h1>
                     {data.tagline && <p className={styles.tagline}>{data.tagline}</p>}
                 </div>
@@ -225,6 +230,9 @@ export const MenuGenerator: React.FC<MenuGeneratorProps> = ({ user, onUserUpdate
         themeStyle: 'Modern'
     });
 
+    const [logo, setLogo] = useState<string | null>(null);
+    const logoInputRef = useRef<HTMLInputElement>(null);
+
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [generatedResult, setGeneratedResult] = useState<MenuStructure | null>(null);
@@ -236,6 +244,16 @@ export const MenuGenerator: React.FC<MenuGeneratorProps> = ({ user, onUserUpdate
         setHistory(isAdmin ? all : all.filter(r => r.userId === user.id));
         setIsOffline(!hasValidApiKey());
     }, [user.id, isAdmin]);
+
+    const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                if (ev.target?.result) setLogo(ev.target.result as string);
+            };
+            reader.readAsDataURL(e.target.files[0]);
+        }
+    };
 
     const handleItemReorder = (sectionIdx: number, fromIdx: number, toIdx: number) => {
         if (!generatedResult) return;
@@ -353,6 +371,31 @@ export const MenuGenerator: React.FC<MenuGeneratorProps> = ({ user, onUserUpdate
                         )}
 
                         <form onSubmit={handleGenerate} className="space-y-5">
+                            {/* Logo Upload */}
+                            <div 
+                                onClick={() => logoInputRef.current?.click()}
+                                className="border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors group"
+                            >
+                                {logo ? (
+                                    <div className="relative">
+                                        <img src={logo} alt="Logo Preview" className="h-16 w-auto object-contain" />
+                                        <button 
+                                            type="button"
+                                            onClick={(e) => { e.stopPropagation(); setLogo(null); }}
+                                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                        >
+                                            <AlertCircle size={12} />
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <>
+                                        <Upload size={20} className="text-slate-400 mb-2" />
+                                        <p className="text-xs font-bold text-slate-500">Upload Brand Logo</p>
+                                    </>
+                                )}
+                                <input type="file" ref={logoInputRef} className="hidden" accept="image/*" onChange={handleLogoUpload} />
+                            </div>
+
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Brand Identity</label>
                                 <input type="text" value={formData.restaurantName} onChange={e => setFormData({...formData, restaurantName: e.target.value})} className="w-full px-4 py-2 border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white mb-2" placeholder="Restaurant Name" />
@@ -449,6 +492,7 @@ export const MenuGenerator: React.FC<MenuGeneratorProps> = ({ user, onUserUpdate
                                         data={generatedResult} 
                                         theme={formData.themeStyle} 
                                         cuisine={formData.cuisineType} 
+                                        logo={logo}
                                         onReorder={handleItemReorder}
                                     />
                                 </div>

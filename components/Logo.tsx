@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Brain, UtensilsCrossed } from 'lucide-react';
 
@@ -23,7 +24,7 @@ export const Logo: React.FC<LogoProps> = ({ className = "", iconSize = 24, light
       </div>
       <div>
         <h1 className={`font-bold tracking-tight leading-none ${light ? 'text-white' : 'text-slate-900'}`} style={{ fontSize: iconSize * 0.8 }}>
-          Bistro<span className="text-yellow-500">Intel</span>
+          Bistro<span className="text-yellow-500">Chef</span>
         </h1>
         <p className={`text-[10px] tracking-widest uppercase opacity-60 ${light ? 'text-slate-300' : 'text-slate-500'}`}>
             Intelligence for F&B

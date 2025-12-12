@@ -1,10 +1,13 @@
-import { RecipeCard, SOP, AppNotification, UserRole, POSChangeRequest, MenuItem, PlanConfig, PlanType, RecipeRequest, SOPRequest, MarketingRequest, CreditTransaction, SocialStats, KitchenWorkflowRequest, MenuGenerationRequest, InventoryItem, OnboardingState, Task } from '../types';
+
+import { RecipeCard, SOP, AppNotification, UserRole, POSChangeRequest, MenuItem, PlanConfig, PlanType, RecipeRequest, SOPRequest, MarketingRequest, CreditTransaction, SocialStats, KitchenWorkflowRequest, MenuGenerationRequest, InventoryItem, OnboardingState, Task, SystemActivity, VisitorSession, RecipeComment } from '../types';
 import { MOCK_MENU, MOCK_SALES_DATA, MOCK_INGREDIENT_PRICES, MOCK_RECIPES, PLANS as DEFAULT_PLANS } from '../constants';
 import { ingredientService } from './ingredientService';
 
 const getKey = (userId: string, key: string) => `bistro_${userId}_${key}`;
 const PLANS_KEY = 'bistro_system_plans';
 const GLOBAL_NOTIFICATIONS_KEY = 'bistro_global_notifications';
+const GLOBAL_ACTIVITY_KEY = 'bistro_system_activity_log';
+const VISITOR_SESSIONS_KEY = 'bistro_visitor_sessions';
 
 // Unified Event Names
 export const storageEvents = {
@@ -25,10 +28,18 @@ const WELCOME_NOTIFICATION: AppNotification = {
     date: new Date().toISOString()
 };
 
+// Helper to get future date
+const getFutureDate = (days: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    return d.toISOString().split('T')[0];
+};
+
 const MOCK_INVENTORY: InventoryItem[] = [
-    { id: 'inv_1', name: 'Arborio Rice', category: 'Dry Goods', currentStock: 12, unit: 'kg', costPerUnit: 300, parLevel: 10, supplier: 'Metro Cash & Carry', lastUpdated: new Date().toISOString() },
-    { id: 'inv_2', name: 'Truffle Oil', category: 'Pantry', currentStock: 0.5, unit: 'l', costPerUnit: 1800, parLevel: 1, supplier: 'Gourmet Imports', lastUpdated: new Date().toISOString() },
-    { id: 'inv_3', name: 'Chicken Breast', category: 'Meat', currentStock: 15, unit: 'kg', costPerUnit: 250, parLevel: 20, supplier: 'Fresh Meats Co', lastUpdated: new Date().toISOString() },
+    { id: 'inv_1', name: 'Arborio Rice', category: 'Dry Goods', currentStock: 12, unit: 'kg', costPerUnit: 300, parLevel: 10, supplier: 'Metro Cash & Carry', lastUpdated: new Date().toISOString(), expiryDate: getFutureDate(180) },
+    { id: 'inv_2', name: 'Truffle Oil', category: 'Pantry', currentStock: 0.5, unit: 'l', costPerUnit: 1800, parLevel: 1, supplier: 'Gourmet Imports', lastUpdated: new Date().toISOString(), expiryDate: getFutureDate(90) },
+    { id: 'inv_3', name: 'Chicken Breast', category: 'Meat', currentStock: 15, unit: 'kg', costPerUnit: 250, parLevel: 20, supplier: 'Fresh Meats Co', lastUpdated: new Date().toISOString(), expiryDate: getFutureDate(3) }, // Expiring soon
+    { id: 'inv_4', name: 'Heavy Cream', category: 'Dairy', currentStock: 5, unit: 'l', costPerUnit: 220, parLevel: 8, supplier: 'Milky Way', lastUpdated: new Date().toISOString(), expiryDate: getFutureDate(5) },
 ];
 
 export const storageService = {
@@ -57,6 +68,59 @@ export const storageService = {
         }
         keysToRemove.forEach(k => localStorage.removeItem(k));
         window.location.reload();
+    },
+
+    // --- ACTIVITY LOGGING (NEW) ---
+    logActivity: (userId: string, userName: string, actionType: SystemActivity['actionType'], description: string, metadata?: any) => {
+        const activity: SystemActivity = {
+            id: `act_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+            userId,
+            userName,
+            actionType,
+            description,
+            metadata,
+            timestamp: new Date().toISOString()
+        };
+        
+        // Save to global log for Admin
+        const storedLog = localStorage.getItem(GLOBAL_ACTIVITY_KEY);
+        const log: SystemActivity[] = storedLog ? JSON.parse(storedLog) : [];
+        log.unshift(activity); // Add to top
+        if (log.length > 500) log.pop(); // Keep limit
+        localStorage.setItem(GLOBAL_ACTIVITY_KEY, JSON.stringify(log));
+        
+        // Also save to user specific log if needed, but global is enough for now
+        dispatchDataUpdatedEvent();
+    },
+
+    getRecentSystemActivity: (): SystemActivity[] => {
+        const storedLog = localStorage.getItem(GLOBAL_ACTIVITY_KEY);
+        return storedLog ? JSON.parse(storedLog) : [];
+    },
+
+    getUserActivity: (userId: string): SystemActivity[] => {
+        const all = storageService.getRecentSystemActivity();
+        return all.filter(a => a.userId === userId);
+    },
+
+    // --- VISITOR TRACKING (NEW) ---
+    getVisitorSessions: (): VisitorSession[] => {
+        const stored = localStorage.getItem(VISITOR_SESSIONS_KEY);
+        return stored ? JSON.parse(stored) : [];
+    },
+
+    saveVisitorSession: (session: VisitorSession) => {
+        const sessions = storageService.getVisitorSessions();
+        const index = sessions.findIndex(s => s.sessionId === session.sessionId);
+        if (index > -1) {
+            sessions[index] = session;
+        } else {
+            sessions.push(session);
+        }
+        // Keep only recent 100 sessions
+        const recentSessions = sessions.slice(-100);
+        localStorage.setItem(VISITOR_SESSIONS_KEY, JSON.stringify(recentSessions));
+        dispatchDataUpdatedEvent();
     },
 
     // --- ONBOARDING ---
@@ -95,6 +159,7 @@ export const storageService = {
     addCredits: (userId: string, amount: number, description: string) => {
         const current = storageService.getUserCredits(userId);
         storageService.saveUserCredits(userId, current + amount);
+        storageService.logActivity(userId, 'System', 'SYSTEM', `Recharged ${amount} credits`);
     },
 
     // --- INVENTORY ---
@@ -147,8 +212,99 @@ export const storageService = {
     saveRecipe: (userId: string, recipe: RecipeCard) => {
         const recipes = storageService.getSavedRecipes(userId);
         const index = recipes.findIndex(r => r.sku_id === recipe.sku_id);
+        const isNew = index === -1;
+        
         if (index >= 0) recipes[index] = recipe; else recipes.push(recipe);
         storageService.setItem(userId, 'saved_recipes', recipes);
+        
+        // --- AUTOMATION TRIGGERS ---
+        // Retrieve current user details for context
+        const currentUser = JSON.parse(localStorage.getItem('bistro_current_user_cache') || '{}');
+        const userName = currentUser.name || 'User';
+        const restaurantName = currentUser.restaurantName || 'Restaurant';
+
+        // 1. Log Activity (Only if it's new or significantly modified)
+        if (isNew || !recipe.comments) {
+             storageService.logActivity(userId, userName, 'RECIPE', `Saved Recipe: ${recipe.name}`, {
+                purpose: recipe.human_summary || 'Standard Menu Item',
+                restaurant: restaurantName,
+                isNew
+            });
+        }
+
+        if (isNew) {
+            // 2. Auto-Generate SOP Task
+            storageService.addTask(
+                userId, 
+                `Auto-Generate SOP for: ${recipe.name}`, 
+                ['SOP', 'Auto-System']
+            );
+            
+            // 3. Auto-Generate Inventory Task
+            storageService.addTask(
+                userId, 
+                `Update Inventory Master for: ${recipe.name}`, 
+                ['Inventory', 'Auto-System']
+            );
+
+            // Log System Automations
+            storageService.logActivity(userId, 'Bistro System', 'SYSTEM', `Auto-triggered SOP & Inventory tasks for ${recipe.name}`, {
+                restaurant: restaurantName
+            });
+        }
+    },
+
+    // Share recipe with another user (Collaboration)
+    shareRecipeWithUser: (fromUserId: string, fromUserName: string, toUserId: string, recipe: RecipeCard) => {
+        try {
+            const targetRecipes = storageService.getSavedRecipes(toUserId);
+            
+            // Create a shared copy with unique ID to avoid conflicts but trace back origin
+            const sharedRecipe: RecipeCard = {
+                ...recipe,
+                sku_id: `${recipe.sku_id}_shared_${Date.now()}`,
+                sharedBy: fromUserName,
+                sharedDate: new Date().toISOString(),
+                comments: []
+            };
+
+            const updated = [sharedRecipe, ...targetRecipes];
+            storageService.setItem(toUserId, 'saved_recipes', updated);
+            
+            // Send Notification to recipient
+            const notification: AppNotification = {
+                id: `notif_share_${Date.now()}`,
+                title: 'New Recipe Shared',
+                message: `${fromUserName} shared "${recipe.name}" with you.`,
+                type: 'success',
+                read: false,
+                date: new Date().toISOString()
+            };
+            
+            // Since notifications are currently global or by role in this mock, we can just push to global for now
+            // In a real app, this would be user-specific. 
+            // For this demo, we'll assume the 'Header' component filters correctly or we just use global.
+            // Using a hack for demo: Prefix ID with target user ID so we can filter later if needed, 
+            // or just rely on the fact that this is a localstorage demo.
+            storageService.sendSystemNotification(notification);
+
+            return true;
+        } catch (e) {
+            console.error("Share failed", e);
+            return false;
+        }
+    },
+
+    addRecipeComment: (userId: string, recipeId: string, comment: RecipeComment) => {
+        const recipes = storageService.getSavedRecipes(userId);
+        const updatedRecipes = recipes.map(r => {
+            if (r.sku_id === recipeId) {
+                const comments = r.comments || [];
+                return { ...r, comments: [...comments, comment] };
+            }
+            return r;
+        });
+        storageService.setItem(userId, 'saved_recipes', updatedRecipes);
     },
 
     // --- SOPS ---
@@ -161,6 +317,9 @@ export const storageService = {
         const index = sops.findIndex(s => s.sop_id === sop.sop_id);
         if (index >= 0) sops[index] = sop; else sops.push(sop);
         storageService.setItem(userId, 'saved_sops', sops);
+        
+        const user = JSON.parse(localStorage.getItem('bistro_current_user_cache') || '{}');
+        storageService.logActivity(userId, user.name || 'User', 'SOP', `Created SOP: ${sop.title}`);
     },
 
     createTrainingTaskFromDeviation: (userId: string, deviationType: string, explanation: string, staffId: string) => {
@@ -170,6 +329,8 @@ export const storageService = {
             `Corrective Training: ${deviationType} for ${staffId}`,
             ['Urgent', 'Kitchen']
         );
+        const user = JSON.parse(localStorage.getItem('bistro_current_user_cache') || '{}');
+        storageService.logActivity(userId, user.name || 'AI System', 'CCTV', `Flagged ${deviationType} violation`);
     },
 
     // --- TASKS ---
@@ -192,6 +353,17 @@ export const storageService = {
         };
         tasks.unshift(newTask);
         storageService.saveTasks(userId, tasks);
+        
+        // Log task creation to global activity for Admin Dashboard
+        const currentUser = JSON.parse(localStorage.getItem('bistro_current_user_cache') || '{}');
+        const restaurantName = currentUser.restaurantName || 'Unknown';
+        const userName = currentUser.name || 'User';
+
+        storageService.logActivity(userId, userName, 'TASK', `Task Created: ${taskText}`, {
+            restaurant: restaurantName,
+            tags: tags
+        });
+
         // Optional: Notify via system notification
         storageService.sendSystemNotification({
             id: `notif_${Date.now()}`,
@@ -243,6 +415,11 @@ export const storageService = {
             storageService.setItem(userId, 'inventory', MOCK_INVENTORY);
             ingredientService.seedDefaults(userId);
             localStorage.setItem(getKey(userId, 'seeded'), 'true');
+            
+            // Seed some activity
+            const user = JSON.parse(localStorage.getItem('bistro_current_user_cache') || '{}');
+            storageService.logActivity(userId, user.name || 'User', 'LOGIN', 'Account activated');
+            storageService.logActivity(userId, user.name || 'User', 'RECIPE', 'Created first recipe');
         }
     },
 
@@ -261,6 +438,9 @@ export const storageService = {
         const list = stored ? JSON.parse(stored) : [];
         list.push(request);
         localStorage.setItem('bistro_marketing_requests', JSON.stringify(list));
+        
+        const user = JSON.parse(localStorage.getItem('bistro_current_user_cache') || '{}');
+        storageService.logActivity(request.userId, user.name || 'User', 'MENU', `Generated marketing assets`);
     },
     deleteMarketingRequest: (id: string) => {
         const stored = localStorage.getItem('bistro_marketing_requests');
@@ -278,6 +458,9 @@ export const storageService = {
         const list = stored ? JSON.parse(stored) : [];
         list.push(request);
         localStorage.setItem('bistro_kitchen_requests', JSON.stringify(list));
+        
+        const user = JSON.parse(localStorage.getItem('bistro_current_user_cache') || '{}');
+        storageService.logActivity(request.userId, user.name || 'User', 'LAYOUT', `Requested kitchen workflow`);
     },
     updateKitchenWorkflowRequest: (request: KitchenWorkflowRequest) => {
         const stored = localStorage.getItem('bistro_kitchen_requests');
@@ -295,6 +478,9 @@ export const storageService = {
         const list = stored ? JSON.parse(stored) : [];
         list.push(request);
         localStorage.setItem('bistro_menu_requests', JSON.stringify(list));
+        
+        const user = JSON.parse(localStorage.getItem('bistro_current_user_cache') || '{}');
+        storageService.logActivity(request.userId, user.name || 'User', 'MENU', `Generated new menu design`);
     },
 
     getPOSChangeRequests: (userId: string): POSChangeRequest[] => {
