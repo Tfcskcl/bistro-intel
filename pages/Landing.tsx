@@ -2,7 +2,11 @@
 import React, { useState, useEffect } from 'react';
 import { Logo } from '../components/Logo';
 import { ChatAssistant } from '../components/ChatAssistant';
-import { ArrowRight, TrendingUp, Sliders, Sparkles, Star, Brain, FileText, ShoppingBag, PenTool, Clapperboard, UtensilsCrossed, Check, ChevronDown, ChevronUp, Globe, Shield, Zap, Users, Play, BarChart3, ChefHat, Layout, Phone, Mail, MapPin, Send, X, Lock, FileCheck, Loader2, DollarSign, Clock } from 'lucide-react';
+import { 
+    ArrowRight, TrendingUp, Sparkles, Star, Brain, FileText, ShoppingBag, 
+    UtensilsCrossed, Check, Globe, Zap, Users, ChefHat, Phone, Mail, 
+    MapPin, Send, X, Lock, FileCheck, Loader2, Calendar, LayoutTemplate
+} from 'lucide-react';
 import { trackingService } from '../services/trackingService';
 import { generateRecipeCard } from '../services/geminiService';
 import { RecipeCard } from '../types';
@@ -71,6 +75,19 @@ export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
   const [formStatus, setFormStatus] = useState<'idle' | 'sending' | 'sent'>('idle');
   const [contactForm, setContactForm] = useState({ name: '', email: '', phone: '', message: '' });
 
+  // Demo Booking State
+  const [showDemoModal, setShowDemoModal] = useState(false);
+  const [demoForm, setDemoForm] = useState({ 
+      name: '', 
+      email: '', 
+      restaurant: '', 
+      phone: '',
+      date: '',
+      time: '',
+      details: '' 
+  });
+  const [demoStatus, setDemoStatus] = useState<'idle' | 'submitting' | 'success'>('idle');
+
   // Demo Recipe State
   const [demoDishInput, setDemoDishInput] = useState('');
   const [isGeneratingDemo, setIsGeneratingDemo] = useState(false);
@@ -82,11 +99,6 @@ export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
       window.addEventListener('scroll', handleScroll);
       return () => window.removeEventListener('scroll', handleScroll);
   }, []);
-
-  const handleGetStarted = () => {
-      trackingService.trackAction('Clicked Get Started');
-      onGetStarted();
-  };
 
   const scrollToSection = (id: string) => {
       const element = document.getElementById(id);
@@ -102,8 +114,20 @@ export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
       setTimeout(() => {
           setFormStatus('sent');
           setContactForm({ name: '', email: '', phone: '', message: '' });
-          alert(`Thank you, ${contactForm.name}! Your message has been forwarded to info@bistroconnect.in.`);
           setTimeout(() => setFormStatus('idle'), 3000);
+      }, 1500);
+  };
+
+  const handleDemoSubmit = (e: React.FormEvent) => {
+      e.preventDefault();
+      setDemoStatus('submitting');
+      setTimeout(() => {
+          setDemoStatus('success');
+          setTimeout(() => {
+              setShowDemoModal(false);
+              setDemoStatus('idle');
+              setDemoForm({ name: '', email: '', restaurant: '', phone: '', date: '', time: '', details: '' });
+          }, 3000);
       }, 1500);
   };
 
@@ -113,6 +137,7 @@ export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
       
       setIsGeneratingDemo(true);
       try {
+          // Use a dummy user ID for demo purposes
           const result = await generateRecipeCard(
               'demo_guest', 
               { sku_id: 'demo', name: demoDishInput, category: 'main', prep_time_min: 0, current_price: 0, ingredients: [] }, 
@@ -122,7 +147,6 @@ export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
           trackingService.trackAction('Generated Demo Recipe');
       } catch (err) {
           console.error(err);
-          // Fallback handled in service, but just in case
       } finally {
           setIsGeneratingDemo(false);
       }
@@ -138,9 +162,11 @@ export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
           <Logo iconSize={32} light={false} />
           <div className="flex items-center gap-4 md:gap-8">
             <button onClick={() => scrollToSection('how-it-works')} className="hidden md:block text-slate-600 font-bold hover:text-slate-900 transition-colors text-sm">How it Works</button>
-            <button onClick={() => scrollToSection('contact')} className="hidden md:block text-slate-600 font-bold hover:text-slate-900 transition-colors text-sm">Contact</button>
-            <button onClick={handleGetStarted} className="px-6 py-2.5 bg-yellow-400 hover:bg-yellow-500 text-slate-900 font-bold rounded-full transition-all shadow-lg shadow-yellow-400/20 active:scale-95 flex items-center gap-2 text-sm">
-                Get Started <ArrowRight size={16} />
+            <button onClick={() => setShowDemoModal(true)} className="hidden md:block text-slate-600 font-bold hover:text-blue-600 transition-colors text-sm flex items-center gap-1">
+                <Calendar size={14}/> Book Demo
+            </button>
+            <button onClick={onGetStarted} className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-full transition-all shadow-lg active:scale-95 flex items-center gap-2 text-sm">
+                Login <ArrowRight size={16} />
             </button>
           </div>
         </div>
@@ -160,10 +186,10 @@ export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
                 <span>The Kitchen OS for 2025</span>
             </div>
 
-            <h1 className="text-5xl lg:text-8xl font-black tracking-tighter leading-[1] text-slate-900 mb-8 animate-fade-in-up max-w-5xl mx-auto">
-              Smart Kitchens<br/>
+            <h1 className="text-5xl lg:text-7xl font-black tracking-tighter leading-[1.1] text-slate-900 mb-8 animate-fade-in-up max-w-6xl mx-auto">
+              Your Restaurant.<br/>
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-500 to-amber-600 relative">
-                Run on Data.
+                Smarter. Automated. Insight-Driven.
                 <svg className="absolute w-full h-3 -bottom-1 left-0 text-yellow-300 opacity-50 -z-10" viewBox="0 0 100 10" preserveAspectRatio="none">
                     <path d="M0 5 Q 50 10 100 5" stroke="currentColor" strokeWidth="8" fill="none" />
                 </svg>
@@ -203,11 +229,11 @@ export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
             </div>
 
             <div className="flex flex-col sm:flex-row justify-center gap-4 mb-24 animate-fade-in-up" style={{animationDelay: '300ms'}}>
-                <button onClick={handleGetStarted} className="px-10 py-4 bg-yellow-400 text-slate-900 text-lg font-bold rounded-full hover:bg-yellow-500 transition-all shadow-xl flex items-center justify-center gap-2 hover:-translate-y-1 border border-yellow-500/20">
+                <button onClick={onGetStarted} className="px-10 py-4 bg-yellow-400 text-slate-900 text-lg font-bold rounded-full hover:bg-yellow-500 transition-all shadow-xl flex items-center justify-center gap-2 hover:-translate-y-1 border border-yellow-500/20">
                     Get Started for Free
                 </button>
-                <button onClick={() => scrollToSection('how-it-works')} className="px-10 py-4 bg-white text-slate-900 border border-slate-200 text-lg font-bold rounded-full hover:bg-slate-50 transition-all shadow-lg flex items-center justify-center gap-2">
-                    How it Works
+                <button onClick={() => setShowDemoModal(true)} className="px-10 py-4 bg-white text-slate-900 border border-slate-200 text-lg font-bold rounded-full hover:bg-slate-50 transition-all shadow-lg flex items-center justify-center gap-2 group">
+                    <Calendar size={20} className="text-blue-600 group-hover:scale-110 transition-transform" /> Book a Demo
                 </button>
             </div>
 
@@ -285,7 +311,7 @@ export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
           </div>
       </section>
 
-      {/* NEW: How It Works Section */}
+      {/* How It Works Section */}
       <section id="how-it-works" className="py-24 bg-slate-900 text-white overflow-hidden relative">
           <div className="absolute top-0 right-0 w-[50vw] h-[50vw] bg-indigo-600/10 rounded-full blur-[120px] pointer-events-none"></div>
           <div className="max-w-7xl mx-auto px-6 relative z-10">
@@ -319,7 +345,7 @@ export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
               <p className="text-slate-500 text-xs font-bold uppercase tracking-[0.2em] mb-10">Trusted by modern restaurateurs</p>
               <div className="flex flex-wrap justify-center gap-12 md:gap-16 opacity-60 hover:opacity-100 transition-opacity duration-500">
                   <div className="flex items-center gap-2 text-xl font-serif font-bold text-slate-800">
-                      <UtensilsCrossed size={24} className="text-yellow-500"/> Egg Street Fusion Cafe
+                      <UtensilsCrossed size={24} className="text-yellow-500"/> Egg Street Fusion
                   </div>
                   <div className="flex items-center gap-2 text-xl font-sans font-black tracking-tighter text-slate-800">
                       <Zap size={24} className="text-blue-500"/> Cafe Beats
@@ -354,7 +380,7 @@ export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
                           </div>
                           <h3 className="text-3xl font-bold text-slate-900 mb-4">Your 24/7 Business Consultant</h3>
                           <p className="text-slate-600 text-lg mb-8">Ask BistroConnect anything. "How do I increase lunch sales?", "Optimize my burger recipe cost", or "Draft a marketing plan for Diwali".</p>
-                          <button onClick={handleGetStarted} className="px-6 py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-colors">Try AI Chat</button>
+                          <button onClick={onGetStarted} className="px-6 py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-colors">Try AI Chat</button>
                       </div>
                       <div className="absolute right-[-50px] bottom-[-50px] w-[400px] h-[400px] bg-gradient-to-br from-yellow-100 to-amber-50 rounded-full z-0 group-hover:scale-110 transition-transform duration-700"></div>
                       <img src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=800&q=80" className="absolute right-0 bottom-0 w-1/2 h-full object-cover opacity-20 mix-blend-overlay z-0" alt="Strategy"/>
@@ -364,7 +390,7 @@ export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
                   <div className="md:col-span-1 row-span-2 bg-slate-900 rounded-3xl p-8 border border-slate-800 shadow-sm relative overflow-hidden flex flex-col justify-between text-white group hover:shadow-2xl transition-all">
                       <div>
                           <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center mb-6 backdrop-blur-sm">
-                              <PenTool className="text-yellow-400" size={24} />
+                              <LayoutTemplate className="text-yellow-400" size={24} />
                           </div>
                           <h3 className="text-2xl font-bold mb-2">Layout Designer</h3>
                           <p className="text-slate-400">Design efficient commercial kitchens with AI-powered CAD tools.</p>
@@ -398,7 +424,7 @@ export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
           </div>
       </section>
 
-      {/* NEW: Contact Section */}
+      {/* Contact Section */}
       <section id="contact" className="py-24 bg-slate-900 relative overflow-hidden">
           <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=2000&q=80')] bg-cover bg-center opacity-10"></div>
           <div className="max-w-6xl mx-auto px-6 relative z-10">
@@ -677,6 +703,138 @@ export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
                       >
                           Save & Continue
                       </button>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* Book Demo Modal */}
+      {showDemoModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in">
+              <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-scale-in relative">
+                  <button 
+                      onClick={() => setShowDemoModal(false)}
+                      className="absolute top-4 right-4 p-2 hover:bg-slate-100 rounded-full text-slate-400 hover:text-slate-600 transition-colors"
+                  >
+                      <X size={20} />
+                  </button>
+                  
+                  <div className="p-8">
+                      <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-6 text-blue-600">
+                          <Calendar size={24} />
+                      </div>
+                      <h3 className="text-2xl font-bold text-slate-900 mb-2">Book a Live Demo</h3>
+                      <p className="text-slate-600 text-sm mb-6">See how BistroConnect can streamline your kitchen operations. Pick a slot that works for you.</p>
+                      
+                      {demoStatus === 'success' ? (
+                          <div className="bg-emerald-50 text-emerald-800 p-6 rounded-xl text-center border border-emerald-100 animate-fade-in my-8">
+                              <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4 text-emerald-600">
+                                  <Check size={32} />
+                              </div>
+                              <p className="font-bold text-lg">Booking Confirmed!</p>
+                              <p className="text-sm mt-2">We have sent a calendar invite to {demoForm.email}.</p>
+                              <p className="text-xs mt-4 text-emerald-600 font-bold uppercase tracking-wider">See you on {new Date(demoForm.date).toLocaleDateString()}</p>
+                          </div>
+                      ) : (
+                          <form onSubmit={handleDemoSubmit} className="space-y-4">
+                              <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Your Name</label>
+                                      <input 
+                                          required
+                                          value={demoForm.name}
+                                          onChange={e => setDemoForm({...demoForm, name: e.target.value})}
+                                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm"
+                                          placeholder="Jane Doe"
+                                      />
+                                  </div>
+                                  <div>
+                                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Restaurant Name</label>
+                                      <input 
+                                          required
+                                          value={demoForm.restaurant}
+                                          onChange={e => setDemoForm({...demoForm, restaurant: e.target.value})}
+                                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm"
+                                          placeholder="The Tasty Spoon"
+                                      />
+                                  </div>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Email</label>
+                                      <input 
+                                          required
+                                          type="email"
+                                          value={demoForm.email}
+                                          onChange={e => setDemoForm({...demoForm, email: e.target.value})}
+                                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm"
+                                          placeholder="jane@example.com"
+                                      />
+                                  </div>
+                                  <div>
+                                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Phone</label>
+                                      <input 
+                                          required
+                                          type="tel"
+                                          value={demoForm.phone}
+                                          onChange={e => setDemoForm({...demoForm, phone: e.target.value})}
+                                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm"
+                                          placeholder="+91..."
+                                      />
+                                  </div>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Preferred Date</label>
+                                      <input 
+                                          required
+                                          type="date"
+                                          min={new Date().toISOString().split('T')[0]}
+                                          value={demoForm.date}
+                                          onChange={e => setDemoForm({...demoForm, date: e.target.value})}
+                                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm"
+                                      />
+                                  </div>
+                                  <div>
+                                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Time Slot</label>
+                                      <select 
+                                          required
+                                          value={demoForm.time}
+                                          onChange={e => setDemoForm({...demoForm, time: e.target.value})}
+                                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm appearance-none"
+                                      >
+                                          <option value="">Select...</option>
+                                          <option value="10:00 AM">10:00 AM</option>
+                                          <option value="11:30 AM">11:30 AM</option>
+                                          <option value="02:00 PM">02:00 PM</option>
+                                          <option value="04:00 PM">04:00 PM</option>
+                                          <option value="05:30 PM">05:30 PM</option>
+                                      </select>
+                                  </div>
+                              </div>
+
+                              <div>
+                                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Restaurant Details (Optional)</label>
+                                  <textarea 
+                                      value={demoForm.details}
+                                      onChange={e => setDemoForm({...demoForm, details: e.target.value})}
+                                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all text-sm resize-none"
+                                      placeholder="Tell us about your cuisine, location, or challenges..."
+                                      rows={2}
+                                  />
+                              </div>
+
+                              <button 
+                                  type="submit"
+                                  disabled={demoStatus === 'submitting'}
+                                  className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-blue-900/20 flex items-center justify-center gap-2 disabled:opacity-70 mt-4"
+                              >
+                                  {demoStatus === 'submitting' ? <Loader2 className="animate-spin" size={20} /> : 'Schedule Demo'}
+                              </button>
+                          </form>
+                      )}
                   </div>
               </div>
           </div>
