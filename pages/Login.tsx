@@ -1,6 +1,4 @@
-
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowRight, AlertCircle, CheckCircle2, ArrowLeft, Mail, KeyRound, Store, MapPin, ChefHat, ShieldCheck, User as UserIcon, Shield, FileText, Upload, Loader2, Sparkles, Map } from 'lucide-react';
 import { User, UserRole, PlanType } from '../types';
 import { authService } from '../services/authService';
@@ -19,6 +17,7 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
   const [mode, setMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [name, setName] = useState('');
   
   // New fields for restaurant profile
@@ -38,6 +37,14 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+      const savedEmail = localStorage.getItem('bistro_remembered_email');
+      if (savedEmail) {
+          setEmail(savedEmail);
+          setRememberMe(true);
+      }
+  }, []);
 
   const handleMenuUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.files && e.target.files[0]) {
@@ -76,6 +83,13 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
       if (mode === 'login') {
         const user = await authService.login(email, password);
         
+        // Handle Remember Me
+        if (rememberMe) {
+            localStorage.setItem('bistro_remembered_email', email);
+        } else {
+            localStorage.removeItem('bistro_remembered_email');
+        }
+
         // Seed data for known demo accounts AND check if seed flag is missing for others
         const demoEmails = [
             'owner@bistro.com', 
@@ -245,6 +259,22 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
                   placeholder="••••••••"
                 />
               </div>
+            )}
+
+            {/* Remember Me Checkbox */}
+            {mode === 'login' && (
+                <div className="flex items-center gap-2">
+                    <input 
+                        id="remember-me"
+                        type="checkbox"
+                        checked={rememberMe}
+                        onChange={(e) => setRememberMe(e.target.checked)}
+                        className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 accent-emerald-500 cursor-pointer"
+                    />
+                    <label htmlFor="remember-me" className="text-sm text-slate-600 dark:text-slate-400 cursor-pointer select-none">
+                        Remember me
+                    </label>
+                </div>
             )}
 
             {/* Business Details - Signup Only */}

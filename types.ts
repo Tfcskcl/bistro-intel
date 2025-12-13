@@ -276,6 +276,12 @@ export interface User {
   queriesUsed?: number;
   queryLimit?: number; 
   isTrial?: boolean;
+
+  // --- NEW: Tracking Info ---
+  ipAddress?: string;
+  userAgent?: string;
+  lastActiveModule?: string;
+  lastLogin?: string;
 }
 
 export enum AppView {

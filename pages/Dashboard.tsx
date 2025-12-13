@@ -6,7 +6,7 @@ import { storageService, storageEvents } from '../services/storageService';
 import { analyzeUnifiedRestaurantData } from '../services/geminiService';
 import { authService } from '../services/authService';
 import { trackingService } from '../services/trackingService';
-import { Activity, AlertTriangle, DollarSign, ShoppingBag, TrendingUp, Sparkles, Brain, ArrowRight, Utensils, FileText, BarChart3, Clock, Calendar, Users, MapPin, Globe, Zap, List, AlertOctagon, MousePointer2, Smartphone, Monitor, CheckCircle2, ClipboardList, ListTodo } from 'lucide-react';
+import { Activity, AlertTriangle, DollarSign, ShoppingBag, TrendingUp, Sparkles, Brain, ArrowRight, Utensils, FileText, BarChart3, Clock, Calendar, Users, MapPin, Globe, Zap, List, AlertOctagon, MousePointer2, Smartphone, Monitor, CheckCircle2, ClipboardList, ListTodo, Shield, Laptop, Tablet, Lock } from 'lucide-react';
 import { ResponsiveContainer, ComposedChart, Area, Line, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell, Legend, BarChart, Bar } from 'recharts';
 
 // Colors
@@ -315,6 +315,74 @@ const SuperAdminDashboard: React.FC = () => {
                 
                 {/* 1. Operational Oversight (New Section) */}
                 <div className="lg:col-span-2 space-y-6">
+                    {/* ALL USERS DETAILS TABLE */}
+                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
+                        <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+                            <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                                <Users size={18} className="text-blue-500" /> User Registry & Activity
+                            </h3>
+                            <span className="text-xs text-slate-500">{allUsers.length} Registered</span>
+                        </div>
+                        <div className="overflow-x-auto max-h-[400px]">
+                            <table className="w-full text-sm text-left">
+                                <thead className="bg-slate-50 dark:bg-slate-800 text-xs text-slate-500 uppercase font-bold sticky top-0 z-10">
+                                    <tr>
+                                        <th className="px-4 py-3">User / Restaurant</th>
+                                        <th className="px-4 py-3">Plan & Status</th>
+                                        <th className="px-4 py-3">Network Info</th>
+                                        <th className="px-4 py-3">Last Active</th>
+                                        <th className="px-4 py-3">Activity</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                    {allUsers.map((u) => (
+                                        <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 group">
+                                            <td className="px-4 py-3">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-xs text-slate-600 dark:text-slate-300">
+                                                        {u.name.charAt(0)}
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-slate-800 dark:text-white">{u.name}</p>
+                                                        <p className="text-xs text-slate-500">{u.restaurantName || u.email}</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${u.plan.includes('PRO') ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-600'}`}>
+                                                    {u.plan.replace('_', ' ')}
+                                                </span>
+                                                <p className="text-[10px] text-slate-400 mt-1">{u.credits} Credits</p>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <div className="flex items-center gap-1 text-xs text-slate-600 dark:text-slate-400">
+                                                    <Lock size={10} className="text-emerald-500" />
+                                                    <span className="font-mono">{u.ipAddress || '---'}</span>
+                                                </div>
+                                                <div className="flex items-center gap-1 text-[10px] text-slate-400 mt-0.5">
+                                                    {u.userAgent?.includes('Mobile') ? <Smartphone size={10}/> : <Monitor size={10}/>}
+                                                    {u.userAgent || 'Unknown'}
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <span className="text-xs text-slate-600 dark:text-slate-300">
+                                                    {u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : 'Never'}
+                                                </span>
+                                                <p className="text-[10px] text-slate-400">{u.lastLogin ? new Date(u.lastLogin).toLocaleTimeString() : ''}</p>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <span className="flex items-center gap-1 text-xs bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded w-fit">
+                                                    <Activity size={10} className="text-blue-500" /> 
+                                                    {u.lastActiveModule || 'None'}
+                                                </span>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
                     {/* Task Volume Chart */}
                     <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
                         <h3 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2 mb-4">
@@ -336,16 +404,16 @@ const SuperAdminDashboard: React.FC = () => {
                     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
                         <div className="p-4 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
                             <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                                <Utensils size={18} className="text-emerald-500" /> Recipe Automation Audit
+                                <Utensils size={18} className="text-emerald-500" /> Real-time Activity Stream
                             </h3>
                         </div>
-                        <div className="overflow-x-auto">
+                        <div className="overflow-x-auto max-h-[300px]">
                             <table className="w-full text-sm text-left">
-                                <thead className="bg-slate-50 dark:bg-slate-800 text-xs text-slate-500 uppercase font-bold">
+                                <thead className="bg-slate-50 dark:bg-slate-800 text-xs text-slate-500 uppercase font-bold sticky top-0">
                                     <tr>
                                         <th className="px-4 py-3">Restaurant / User</th>
                                         <th className="px-4 py-3">Action</th>
-                                        <th className="px-4 py-3">Purpose & Automation</th>
+                                        <th className="px-4 py-3">Context</th>
                                         <th className="px-4 py-3 text-right">Time</th>
                                     </tr>
                                 </thead>
@@ -353,21 +421,21 @@ const SuperAdminDashboard: React.FC = () => {
                                     {recentRecipeActivity.map((log) => (
                                         <tr key={log.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
                                             <td className="px-4 py-3">
-                                                <p className="font-bold text-slate-800 dark:text-white">{log.metadata?.restaurant}</p>
+                                                <p className="font-bold text-slate-800 dark:text-white">{log.metadata?.restaurant || 'System'}</p>
                                                 <p className="text-xs text-slate-500">{log.userName}</p>
                                             </td>
                                             <td className="px-4 py-3 text-slate-700 dark:text-slate-300">
+                                                <span className={`text-[10px] uppercase font-bold mr-2 px-1.5 py-0.5 rounded ${log.actionType === 'LOGIN' ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-600'}`}>
+                                                    {log.actionType}
+                                                </span>
                                                 {log.description}
                                             </td>
                                             <td className="px-4 py-3">
-                                                <p className="text-xs text-slate-500 italic mb-1">"{log.metadata?.purpose || 'No notes'}"</p>
+                                                {log.metadata?.purpose && <p className="text-xs text-slate-500 italic mb-1">"{log.metadata.purpose}"</p>}
                                                 {log.metadata?.isNew && (
                                                     <div className="flex gap-2">
                                                         <span className="text-[10px] bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 px-1.5 py-0.5 rounded flex items-center gap-1 border border-blue-200 dark:border-blue-800">
                                                             <ClipboardList size={10} /> Auto-SOP
-                                                        </span>
-                                                        <span className="text-[10px] bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 px-1.5 py-0.5 rounded flex items-center gap-1 border border-purple-200 dark:border-purple-800">
-                                                            <List size={10} /> Auto-Inventory
                                                         </span>
                                                     </div>
                                                 )}
@@ -378,7 +446,7 @@ const SuperAdminDashboard: React.FC = () => {
                                         </tr>
                                     ))}
                                     {recentRecipeActivity.length === 0 && (
-                                        <tr><td colSpan={4} className="p-4 text-center text-slate-500">No recent recipe activity.</td></tr>
+                                        <tr><td colSpan={4} className="p-4 text-center text-slate-500">No recent activity.</td></tr>
                                     )}
                                 </tbody>
                             </table>

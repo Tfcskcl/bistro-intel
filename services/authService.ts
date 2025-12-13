@@ -19,6 +19,10 @@ const saveMockUser = (user: User, password?: string) => {
     localStorage.setItem(MOCK_DB_USERS_KEY, JSON.stringify(users));
 };
 
+const getMockIP = () => {
+    return `${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`;
+};
+
 const DEMO_USERS: (User & {password: string})[] = [
   {
     id: 'demo_owner', 
@@ -29,7 +33,11 @@ const DEMO_USERS: (User & {password: string})[] = [
     plan: PlanType.PRO_PLUS,
     restaurantName: "The Golden Spoon",
     credits: 2600,
-    setupComplete: true
+    setupComplete: true,
+    ipAddress: '192.168.1.10',
+    userAgent: 'Chrome (Mac)',
+    lastActiveModule: 'Dashboard',
+    lastLogin: new Date().toISOString()
   },
   {
     id: 'demo_admin', 
@@ -40,7 +48,11 @@ const DEMO_USERS: (User & {password: string})[] = [
     plan: PlanType.PRO,
     restaurantName: "Urban Spices",
     credits: 500,
-    setupComplete: true
+    setupComplete: true,
+    ipAddress: '192.168.1.15',
+    userAgent: 'Safari (iOS)',
+    lastActiveModule: 'Inventory',
+    lastLogin: new Date().toISOString()
   },
   {
     id: 'super_admin', 
@@ -51,7 +63,11 @@ const DEMO_USERS: (User & {password: string})[] = [
     plan: PlanType.PRO_PLUS,
     restaurantName: "BistroConnect Platform",
     credits: 99999,
-    setupComplete: true
+    setupComplete: true,
+    ipAddress: '10.0.0.1',
+    userAgent: 'Admin Console',
+    lastActiveModule: 'Admin',
+    lastLogin: new Date().toISOString()
   }
 ];
 
@@ -98,9 +114,19 @@ export const authService = {
     const user = Object.values(mockUsers).find(u => u.email === email && u.password === password);
     if (!user) throw new Error("Invalid credentials");
     
-    const safeUser = { ...user };
+    const safeUser = { 
+        ...user, 
+        lastLogin: new Date().toISOString(),
+        // Keep existing IP if not present, in real world we'd update it
+        ipAddress: user.ipAddress || getMockIP(),
+        userAgent: navigator.userAgent.includes('Mobile') ? 'Mobile Web' : 'Desktop Web'
+    };
+    
     delete (safeUser as any).password;
     safeUser.credits = storageService.getUserCredits(safeUser.id) || safeUser.credits;
+    
+    // Update DB record for login timestamp
+    saveMockUser(safeUser, password); // Re-save with password to persist update
     
     localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(safeUser));
     notifyObservers(safeUser);
@@ -127,13 +153,20 @@ export const authService = {
   
   signup: async (u: User, p: string) => { 
       const uid = `usr_${Date.now()}`;
-      const newUser = {...u, id: uid};
+      const newUser: User = {
+          ...u, 
+          id: uid,
+          ipAddress: getMockIP(), // Mock an IP
+          userAgent: navigator.userAgent.includes('Mobile') ? 'Mobile Web' : 'Desktop Web',
+          lastActiveModule: 'Dashboard',
+          lastLogin: new Date().toISOString()
+      };
       saveMockUser(newUser, p);
       storageService.saveUserCredits(uid, u.credits);
       localStorage.setItem(STORAGE_USER_KEY, JSON.stringify(newUser));
       notifyObservers(newUser);
       
-      storageService.logActivity(uid, newUser.name, 'LOGIN', 'New account created');
+      storageService.logActivity(uid, newUser.name, 'LOGIN', 'New account created from ' + newUser.ipAddress);
       
       return newUser;
   },
@@ -144,7 +177,13 @@ export const authService = {
       const users = getMockUsers();
       return Object.values(users).map(u => {
           const { password, ...rest } = u;
-          return { ...rest, credits: storageService.getUserCredits(rest.id) || rest.credits };
+          return { 
+              ...rest, 
+              credits: storageService.getUserCredits(rest.id) || rest.credits,
+              // Fallbacks if older data exists
+              ipAddress: rest.ipAddress || 'Unknown',
+              lastActiveModule: rest.lastActiveModule || 'Inactive'
+          };
       });
   }
 };
