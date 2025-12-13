@@ -11,7 +11,7 @@ import {
     DollarSign, TrendingUp, Clock, Scale, Utensils, AlertTriangle, 
     FileDown, Share2, MoreHorizontal, Sparkles, Image as ImageIcon,
     Printer, Upload, FileText, CheckCircle2, MessageSquare, Send, Users, UserPlus,
-    Copy, Link, Mail, Globe, Check, Lock
+    Copy, Link, Mail, Globe, Check, Lock, Edit3, X
 } from 'lucide-react';
 import { 
     PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, Legend 
@@ -28,6 +28,7 @@ export const RecipeHub: React.FC<{ user: User }> = ({ user }) => {
     const [viewMode, setViewMode] = useState<'list' | 'create' | 'detail'>('list');
     const [recipes, setRecipes] = useState<RecipeCard[]>([]);
     const [selectedRecipe, setSelectedRecipe] = useState<RecipeCard | null>(null);
+    const [isEditing, setIsEditing] = useState(false);
     
     // Create Mode State
     const [dishName, setDishName] = useState('');
@@ -55,6 +56,11 @@ export const RecipeHub: React.FC<{ user: User }> = ({ user }) => {
             setAllUsers(users.filter(u => u.id !== user.id)); 
         });
     }, [user.id]);
+
+    useEffect(() => {
+        // Reset edit mode when recipe changes
+        setIsEditing(false);
+    }, [selectedRecipe?.sku_id]);
 
     const loadRecipes = () => {
         const saved = storageService.getSavedRecipes(user.id);
@@ -90,6 +96,7 @@ export const RecipeHub: React.FC<{ user: User }> = ({ user }) => {
             const recipe = await generateRecipeCard(user.id, item, requirements);
             setSelectedRecipe(recipe);
             setViewMode('detail');
+            setIsEditing(true); // Auto-enable edit mode for new generations
         } catch (e: any) {
             setError(e.message || "Failed to generate recipe.");
         } finally {
@@ -101,6 +108,7 @@ export const RecipeHub: React.FC<{ user: User }> = ({ user }) => {
         if (selectedRecipe) {
             storageService.saveRecipe(user.id, selectedRecipe);
             loadRecipes();
+            setIsEditing(false);
             alert("Recipe saved to library!");
         }
     };
@@ -142,6 +150,14 @@ export const RecipeHub: React.FC<{ user: User }> = ({ user }) => {
             if (input.parentElement) {
                 input.parentElement.replaceChild(span, input);
             }
+        });
+        
+        const textareas = clone.querySelectorAll('textarea');
+        textareas.forEach((ta) => {
+            const p = document.createElement('p');
+            p.textContent = (ta as HTMLTextAreaElement).value;
+            p.className = "whitespace-pre-wrap text-slate-900";
+            if(ta.parentElement) ta.parentElement.replaceChild(p, ta);
         });
 
         const win = window.open('', '', 'width=900,height=650');
@@ -264,14 +280,17 @@ export const RecipeHub: React.FC<{ user: User }> = ({ user }) => {
         return { newFoodCost: parseFloat(newFoodCost.toFixed(2)), newSellingPrice };
     };
 
-    const handleIngredientCostChange = (index: number, newCost: number) => {
+    const handleIngredientChange = (index: number, field: string, value: any) => {
         if (!selectedRecipe) return;
         
         const updatedIngredients = [...selectedRecipe.ingredients];
-        updatedIngredients[index] = { 
-            ...updatedIngredients[index], 
-            cost_per_serving: isNaN(newCost) ? 0 : newCost 
-        };
+        
+        if (field === 'cost_per_serving') {
+             const cost = isNaN(parseFloat(value)) ? 0 : parseFloat(value);
+             updatedIngredients[index] = { ...updatedIngredients[index], cost_per_serving: cost };
+        } else {
+             updatedIngredients[index] = { ...updatedIngredients[index], [field]: value };
+        }
 
         const { newFoodCost, newSellingPrice } = recalculateCosts(updatedIngredients);
 
@@ -281,6 +300,63 @@ export const RecipeHub: React.FC<{ user: User }> = ({ user }) => {
             food_cost_per_serving: newFoodCost,
             suggested_selling_price: newSellingPrice
         });
+    };
+
+    const handleAddIngredient = () => {
+        if (!selectedRecipe) return;
+        const newIng = {
+            ingredient_id: `ing_${Date.now()}`,
+            name: '',
+            qty: '',
+            cost_per_serving: 0,
+            unit: 'unit'
+        };
+        const updatedIngredients = [...selectedRecipe.ingredients, newIng];
+        setSelectedRecipe({ ...selectedRecipe, ingredients: updatedIngredients });
+    };
+
+    const handleRemoveIngredient = (index: number) => {
+        if (!selectedRecipe) return;
+        const updatedIngredients = selectedRecipe.ingredients.filter((_, i) => i !== index);
+        const { newFoodCost, newSellingPrice } = recalculateCosts(updatedIngredients);
+        
+        setSelectedRecipe({
+            ...selectedRecipe,
+            ingredients: updatedIngredients,
+            food_cost_per_serving: newFoodCost,
+            suggested_selling_price: newSellingPrice
+        });
+    };
+
+    // --- Edit Handlers ---
+    const updateField = (field: keyof RecipeCard, value: any) => {
+        if (selectedRecipe) {
+            setSelectedRecipe({ ...selectedRecipe, [field]: value });
+        }
+    };
+
+    const handleAddStep = () => {
+        if (selectedRecipe) {
+            setSelectedRecipe({
+                ...selectedRecipe,
+                preparation_steps: [...selectedRecipe.preparation_steps, "New step"]
+            });
+        }
+    };
+
+    const handleRemoveStep = (idx: number) => {
+        if (selectedRecipe) {
+            const newSteps = selectedRecipe.preparation_steps.filter((_, i) => i !== idx);
+            setSelectedRecipe({ ...selectedRecipe, preparation_steps: newSteps });
+        }
+    };
+
+    const handleStepChange = (idx: number, val: string) => {
+        if (selectedRecipe) {
+            const newSteps = [...selectedRecipe.preparation_steps];
+            newSteps[idx] = val;
+            setSelectedRecipe({ ...selectedRecipe, preparation_steps: newSteps });
+        }
     };
 
     const handleBillUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -326,7 +402,7 @@ export const RecipeHub: React.FC<{ user: User }> = ({ user }) => {
     };
 
     const costBreakdownData = selectedRecipe?.ingredients?.map((ing) => ({
-        name: ing.name,
+        name: ing.name || 'Unknown',
         value: ing.cost_per_serving || 0
     })).sort((a, b) => b.value - a.value).slice(0, 6) || [];
 
@@ -557,30 +633,80 @@ export const RecipeHub: React.FC<{ user: User }> = ({ user }) => {
                                 <button onClick={() => setViewMode('list')} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-full transition-colors">
                                     <ArrowLeft size={20} className="text-slate-600 dark:text-slate-300" />
                                 </button>
-                                <div>
-                                    <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                                        {selectedRecipe.name}
-                                        {selectedRecipe.sharedBy && (
-                                            <span className="text-[10px] bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 px-2 py-0.5 rounded-full font-normal">
-                                                Shared by {selectedRecipe.sharedBy}
-                                            </span>
-                                        )}
-                                    </h2>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2">
-                                        <span className="uppercase">{selectedRecipe.category}</span> • Yield: {selectedRecipe.yield} Servings
-                                    </p>
-                                </div>
+                                
+                                {isEditing ? (
+                                    <div className="flex flex-col gap-2">
+                                        <input 
+                                            value={selectedRecipe.name}
+                                            onChange={(e) => updateField('name', e.target.value)}
+                                            className="text-xl font-bold bg-white dark:bg-slate-800 border border-emerald-300 dark:border-emerald-600 rounded px-2 py-1 outline-none focus:ring-2 focus:ring-emerald-500"
+                                        />
+                                        <div className="flex gap-2">
+                                            <select 
+                                                value={selectedRecipe.category}
+                                                onChange={(e) => updateField('category', e.target.value)}
+                                                className="text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded px-2 py-1"
+                                            >
+                                                <option value="main">Main</option>
+                                                <option value="snack">Snack</option>
+                                                <option value="beverage">Beverage</option>
+                                                <option value="dessert">Dessert</option>
+                                            </select>
+                                            <div className="flex items-center gap-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded px-2 py-1">
+                                                <span className="text-xs text-slate-500">Yield:</span>
+                                                <input 
+                                                    type="number"
+                                                    value={selectedRecipe.yield}
+                                                    onChange={(e) => updateField('yield', parseInt(e.target.value) || 1)}
+                                                    className="w-12 text-xs font-bold outline-none bg-transparent"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div>
+                                        <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                            {selectedRecipe.name}
+                                            {selectedRecipe.sharedBy && (
+                                                <span className="text-[10px] bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 px-2 py-0.5 rounded-full font-normal">
+                                                    Shared by {selectedRecipe.sharedBy}
+                                                </span>
+                                            )}
+                                        </h2>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                                            <span className="uppercase">{selectedRecipe.category}</span> • Yield: {selectedRecipe.yield} Servings
+                                        </p>
+                                    </div>
+                                )}
                             </div>
+                            
                             <div className="flex gap-2">
-                                <button onClick={() => setShowShareModal(true)} className="px-4 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 font-bold rounded-lg flex items-center gap-2 transition-colors">
-                                    <Share2 size={18} /> Share
+                                <button 
+                                    onClick={() => setIsEditing(!isEditing)}
+                                    className={`px-3 py-2 rounded-lg flex items-center gap-2 font-bold transition-colors ${
+                                        isEditing 
+                                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' 
+                                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
+                                    }`}
+                                >
+                                    {isEditing ? <Check size={18} /> : <Edit3 size={18} />}
+                                    {isEditing ? 'Done' : 'Edit'}
                                 </button>
-                                <button onClick={handleExportCSV} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg" title="Export to Excel">
-                                    <FileDown size={20} />
-                                </button>
-                                <button onClick={handlePrint} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg" title="Download PDF / Print">
-                                    <Printer size={20} />
-                                </button>
+                                
+                                {!isEditing && (
+                                    <>
+                                        <button onClick={() => setShowShareModal(true)} className="px-4 py-2 bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 font-bold rounded-lg flex items-center gap-2 transition-colors">
+                                            <Share2 size={18} /> Share
+                                        </button>
+                                        <button onClick={handleExportCSV} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg" title="Export to Excel">
+                                            <FileDown size={20} />
+                                        </button>
+                                        <button onClick={handlePrint} className="p-2 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg" title="Download PDF / Print">
+                                            <Printer size={20} />
+                                        </button>
+                                    </>
+                                )}
+                                
                                 <button onClick={handleSave} className="px-4 py-2 bg-emerald-600 text-white font-bold rounded-lg hover:bg-emerald-700 transition-colors flex items-center gap-2">
                                     <Save size={16} /> Save
                                 </button>
@@ -651,18 +777,41 @@ export const RecipeHub: React.FC<{ user: User }> = ({ user }) => {
                                                     : '0.0'}%
                                             </p>
                                         </div>
-                                        <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border border-purple-100 dark:border-purple-800 flex flex-col justify-center">
+                                        <div className={`p-4 bg-purple-50 dark:bg-purple-900/20 rounded-xl border flex flex-col justify-center ${isEditing ? 'border-purple-300 dark:border-purple-600' : 'border-purple-100 dark:border-purple-800'}`}>
                                             <p className="text-xs font-bold text-purple-800 dark:text-purple-400 uppercase mb-1">Time</p>
-                                            <div className="flex items-baseline gap-1">
-                                                <p className="text-2xl font-black text-purple-700 dark:text-purple-300">
-                                                    {selectedRecipe.total_time_minutes || (selectedRecipe.prep_time_min + (selectedRecipe.cook_time_minutes || 0))}m
-                                                </p>
-                                                {(selectedRecipe.prep_time_minutes || selectedRecipe.cook_time_minutes) && (
-                                                    <span className="text-xs text-purple-600 dark:text-purple-400">
-                                                        ({selectedRecipe.prep_time_minutes || selectedRecipe.prep_time_min} prep / {selectedRecipe.cook_time_minutes || 0} cook)
-                                                    </span>
-                                                )}
-                                            </div>
+                                            {isEditing ? (
+                                                <div className="flex gap-2">
+                                                    <div>
+                                                        <span className="text-[10px] text-slate-500">Prep</span>
+                                                        <input 
+                                                            type="number" 
+                                                            value={selectedRecipe.prep_time_min}
+                                                            onChange={e => updateField('prep_time_min', parseInt(e.target.value) || 0)}
+                                                            className="w-12 bg-white dark:bg-slate-800 border rounded text-xs p-1"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <span className="text-[10px] text-slate-500">Cook</span>
+                                                        <input 
+                                                            type="number" 
+                                                            value={selectedRecipe.cook_time_minutes || 0}
+                                                            onChange={e => updateField('cook_time_minutes', parseInt(e.target.value) || 0)}
+                                                            className="w-12 bg-white dark:bg-slate-800 border rounded text-xs p-1"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-baseline gap-1">
+                                                    <p className="text-2xl font-black text-purple-700 dark:text-purple-300">
+                                                        {selectedRecipe.total_time_minutes || (selectedRecipe.prep_time_min + (selectedRecipe.cook_time_minutes || 0))}m
+                                                    </p>
+                                                    {(selectedRecipe.prep_time_minutes || selectedRecipe.cook_time_minutes) && (
+                                                        <span className="text-xs text-purple-600 dark:text-purple-400">
+                                                            ({selectedRecipe.prep_time_minutes || selectedRecipe.prep_time_min} prep / {selectedRecipe.cook_time_minutes || 0} cook)
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
                                         
                                         {/* Nutritional Info Section */}
@@ -737,13 +886,30 @@ export const RecipeHub: React.FC<{ user: User }> = ({ user }) => {
                                                         <th className="px-6 py-3">Item</th>
                                                         <th className="px-6 py-3">Qty</th>
                                                         <th className="px-6 py-3 text-right">Cost</th>
+                                                        {isEditing && <th className="px-6 py-3 w-10"></th>}
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                                                     {selectedRecipe.ingredients.map((ing, i) => (
                                                         <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 group">
-                                                            <td className="px-6 py-3 font-medium text-slate-800 dark:text-white">{ing.name}</td>
-                                                            <td className="px-6 py-3 text-slate-600 dark:text-slate-300">{ing.qty}</td>
+                                                            <td className="px-6 py-3 font-medium text-slate-800 dark:text-white">
+                                                                {isEditing ? (
+                                                                    <input 
+                                                                        value={ing.name}
+                                                                        onChange={(e) => handleIngredientChange(i, 'name', e.target.value)}
+                                                                        className="w-full bg-transparent border-b border-slate-300 dark:border-slate-600 focus:border-emerald-500 outline-none"
+                                                                    />
+                                                                ) : ing.name}
+                                                            </td>
+                                                            <td className="px-6 py-3 text-slate-600 dark:text-slate-300">
+                                                                {isEditing ? (
+                                                                    <input 
+                                                                        value={ing.qty}
+                                                                        onChange={(e) => handleIngredientChange(i, 'qty', e.target.value)}
+                                                                        className="w-full bg-transparent border-b border-slate-300 dark:border-slate-600 focus:border-emerald-500 outline-none"
+                                                                    />
+                                                                ) : ing.qty}
+                                                            </td>
                                                             <td className="px-6 py-3 text-right font-mono text-slate-600 dark:text-slate-300">
                                                                 <div className="flex items-center justify-end gap-1">
                                                                     <span>₹</span>
@@ -752,15 +918,33 @@ export const RecipeHub: React.FC<{ user: User }> = ({ user }) => {
                                                                         step="0.1"
                                                                         value={ing.cost_per_serving || ''}
                                                                         placeholder="0.00"
-                                                                        onChange={(e) => handleIngredientCostChange(i, parseFloat(e.target.value))}
-                                                                        className="w-20 bg-transparent text-right outline-none border-b border-transparent focus:border-emerald-500 transition-colors text-slate-800 dark:text-white"
+                                                                        onChange={(e) => handleIngredientChange(i, 'cost_per_serving', e.target.value)}
+                                                                        className={`w-20 bg-transparent text-right outline-none transition-colors text-slate-800 dark:text-white ${isEditing ? 'border-b border-slate-300 dark:border-slate-600 focus:border-emerald-500' : 'border-transparent'}`}
+                                                                        readOnly={!isEditing}
                                                                     />
                                                                 </div>
                                                             </td>
+                                                            {isEditing && (
+                                                                <td className="px-6 py-3 text-center">
+                                                                    <button onClick={() => handleRemoveIngredient(i)} className="text-red-400 hover:text-red-600">
+                                                                        <X size={16} />
+                                                                    </button>
+                                                                </td>
+                                                            )}
                                                         </tr>
                                                     ))}
                                                 </tbody>
                                             </table>
+                                            {isEditing && (
+                                                <div className="p-3 bg-slate-50 dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700">
+                                                    <button 
+                                                        onClick={handleAddIngredient}
+                                                        className="w-full py-2 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg text-slate-500 hover:text-emerald-600 hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-all text-xs font-bold flex items-center justify-center gap-2"
+                                                    >
+                                                        <Plus size={14} /> Add Ingredient
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
 
                                         {/* Cost Breakdown Visual */}
@@ -840,54 +1024,101 @@ export const RecipeHub: React.FC<{ user: User }> = ({ user }) => {
                                             <div className="space-y-4">
                                                 <div>
                                                     <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Equipment Needed</p>
-                                                    <div className="flex flex-wrap gap-2">
-                                                        {selectedRecipe.equipment_needed.map((item, i) => (
-                                                            <span key={i} className="px-2 py-1 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs rounded border border-slate-200 dark:border-slate-600 font-medium">
-                                                                {item}
-                                                            </span>
-                                                        ))}
-                                                        {(!selectedRecipe.equipment_needed || selectedRecipe.equipment_needed.length === 0) && (
-                                                            <span className="text-sm text-slate-400 italic">Standard kitchen equipment</span>
-                                                        )}
-                                                    </div>
+                                                    {isEditing ? (
+                                                        <input 
+                                                            value={selectedRecipe.equipment_needed.join(', ')}
+                                                            onChange={(e) => updateField('equipment_needed', e.target.value.split(',').map(s => s.trim()))}
+                                                            className="w-full border border-emerald-300 dark:border-emerald-600 bg-emerald-50/50 dark:bg-slate-800 rounded p-2 text-sm"
+                                                            placeholder="Comma separated equipment..."
+                                                        />
+                                                    ) : (
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {selectedRecipe.equipment_needed.map((item, i) => (
+                                                                <span key={i} className="px-2 py-1 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs rounded border border-slate-200 dark:border-slate-600 font-medium">
+                                                                    {item}
+                                                                </span>
+                                                            ))}
+                                                            {(!selectedRecipe.equipment_needed || selectedRecipe.equipment_needed.length === 0) && (
+                                                                <span className="text-sm text-slate-400 italic">Standard kitchen equipment</span>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                 </div>
                                                 
                                                 <div>
                                                     <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Gourmet Plating & Presentation</p>
-                                                    <div className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
-                                                        <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-line">
-                                                            {selectedRecipe.portioning_guideline || "No specific presentation guidelines."}
-                                                        </p>
-                                                    </div>
+                                                    {isEditing ? (
+                                                        <textarea 
+                                                            value={selectedRecipe.portioning_guideline || ''}
+                                                            onChange={(e) => updateField('portioning_guideline', e.target.value)}
+                                                            className="w-full border border-emerald-300 dark:border-emerald-600 bg-emerald-50/50 dark:bg-slate-800 rounded p-2 text-sm min-h-[80px]"
+                                                        />
+                                                    ) : (
+                                                        <div className="bg-slate-50 dark:bg-slate-900/50 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
+                                                            <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed whitespace-pre-line">
+                                                                {selectedRecipe.portioning_guideline || "No specific presentation guidelines."}
+                                                            </p>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
 
                                         {/* Instructions */}
                                         <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 print:break-inside-avoid">
-                                            <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
-                                                <Utensils size={18} /> Preparation Steps
-                                            </h3>
+                                            <div className="flex justify-between items-center mb-4">
+                                                <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                                                    <Utensils size={18} /> Preparation Steps
+                                                </h3>
+                                                {isEditing && (
+                                                    <button onClick={handleAddStep} className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded hover:bg-emerald-200 transition-colors flex items-center gap-1">
+                                                        <Plus size={12} /> Add Step
+                                                    </button>
+                                                )}
+                                            </div>
                                             <div className="space-y-4">
                                                 {selectedRecipe.preparation_steps.map((step, i) => (
                                                     <div key={i} className="flex gap-4">
                                                         <span className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center text-xs font-bold mt-0.5">
                                                             {i + 1}
                                                         </span>
-                                                        <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">{step}</p>
+                                                        {isEditing ? (
+                                                            <div className="flex-1 flex gap-2">
+                                                                <textarea 
+                                                                    value={step} 
+                                                                    onChange={(e) => handleStepChange(i, e.target.value)}
+                                                                    className="flex-1 border border-emerald-300 dark:border-emerald-600 bg-emerald-50/50 dark:bg-slate-800 rounded p-2 text-sm"
+                                                                    rows={2}
+                                                                />
+                                                                <button onClick={() => handleRemoveStep(i)} className="text-red-400 hover:text-red-600 self-center">
+                                                                    <X size={16} />
+                                                                </button>
+                                                            </div>
+                                                        ) : (
+                                                            <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">{step}</p>
+                                                        )}
                                                     </div>
                                                 ))}
                                             </div>
                                         </div>
 
                                         {/* AI Insights */}
-                                        <div className="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/10 dark:to-purple-900/10 rounded-xl border border-indigo-100 dark:border-indigo-800 p-6 print:break-inside-avoid">
+                                        <div className={`rounded-xl border p-6 print:break-inside-avoid ${isEditing ? 'bg-white dark:bg-slate-900 border-emerald-300 dark:border-emerald-600' : 'bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-900/10 dark:to-purple-900/10 border-indigo-100 dark:border-indigo-800'}`}>
                                             <h3 className="font-bold text-indigo-900 dark:text-indigo-300 mb-2 text-sm uppercase flex items-center gap-2">
                                                 <Sparkles size={14} /> Chef's Notes
                                             </h3>
-                                            <p className="text-sm text-indigo-800 dark:text-indigo-200 leading-relaxed italic">
-                                                "{selectedRecipe.human_summary}"
-                                            </p>
+                                            
+                                            {isEditing ? (
+                                                <textarea 
+                                                    value={selectedRecipe.human_summary || ''}
+                                                    onChange={(e) => updateField('human_summary', e.target.value)}
+                                                    className="w-full border border-emerald-300 dark:border-emerald-600 bg-emerald-50/50 dark:bg-slate-800 rounded p-2 text-sm min-h-[100px]"
+                                                />
+                                            ) : (
+                                                <p className="text-sm text-indigo-800 dark:text-indigo-200 leading-relaxed italic">
+                                                    "{selectedRecipe.human_summary}"
+                                                </p>
+                                            )}
                                             
                                             {selectedRecipe.allergens && selectedRecipe.allergens.length > 0 && (
                                                 <div className="mt-4 pt-4 border-t border-indigo-200/50">
@@ -904,50 +1135,52 @@ export const RecipeHub: React.FC<{ user: User }> = ({ user }) => {
                                         </div>
 
                                         {/* Team Comments Section */}
-                                        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 print:hidden">
-                                            <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
-                                                <MessageSquare size={18} /> Team Feedback & Notes
-                                            </h3>
-                                            
-                                            <div className="space-y-4 mb-4 max-h-60 overflow-y-auto custom-scrollbar">
-                                                {(!selectedRecipe.comments || selectedRecipe.comments.length === 0) ? (
-                                                    <p className="text-sm text-slate-400 italic text-center py-4">No comments yet. Start the discussion!</p>
-                                                ) : (
-                                                    selectedRecipe.comments.map((comment) => (
-                                                        <div key={comment.id} className="flex gap-3">
-                                                            <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-600 dark:text-slate-300 shrink-0">
-                                                                {comment.userName.charAt(0)}
-                                                            </div>
-                                                            <div className="flex-1 bg-slate-50 dark:bg-slate-900 rounded-lg p-3 border border-slate-100 dark:border-slate-700">
-                                                                <div className="flex justify-between items-baseline mb-1">
-                                                                    <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{comment.userName}</span>
-                                                                    <span className="text-[10px] text-slate-400">{new Date(comment.date).toLocaleDateString()}</span>
+                                        {!isEditing && (
+                                            <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 print:hidden">
+                                                <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                                                    <MessageSquare size={18} /> Team Feedback & Notes
+                                                </h3>
+                                                
+                                                <div className="space-y-4 mb-4 max-h-60 overflow-y-auto custom-scrollbar">
+                                                    {(!selectedRecipe.comments || selectedRecipe.comments.length === 0) ? (
+                                                        <p className="text-sm text-slate-400 italic text-center py-4">No comments yet. Start the discussion!</p>
+                                                    ) : (
+                                                        selectedRecipe.comments.map((comment) => (
+                                                            <div key={comment.id} className="flex gap-3">
+                                                                <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-600 dark:text-slate-300 shrink-0">
+                                                                    {comment.userName.charAt(0)}
                                                                 </div>
-                                                                <p className="text-sm text-slate-600 dark:text-slate-400">{comment.text}</p>
+                                                                <div className="flex-1 bg-slate-50 dark:bg-slate-900 rounded-lg p-3 border border-slate-100 dark:border-slate-700">
+                                                                    <div className="flex justify-between items-baseline mb-1">
+                                                                        <span className="text-xs font-bold text-slate-700 dark:text-slate-200">{comment.userName}</span>
+                                                                        <span className="text-[10px] text-slate-400">{new Date(comment.date).toLocaleDateString()}</span>
+                                                                    </div>
+                                                                    <p className="text-sm text-slate-600 dark:text-slate-400">{comment.text}</p>
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    ))
-                                                )}
-                                            </div>
+                                                        ))
+                                                    )}
+                                                </div>
 
-                                            <div className="flex gap-2">
-                                                <input 
-                                                    type="text" 
-                                                    value={newComment}
-                                                    onChange={(e) => setNewComment(e.target.value)}
-                                                    placeholder="Add a note for the kitchen team..."
-                                                    className="flex-1 px-4 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                                                    onKeyDown={(e) => e.key === 'Enter' && handlePostComment()}
-                                                />
-                                                <button 
-                                                    onClick={handlePostComment}
-                                                    disabled={!newComment.trim()}
-                                                    className="p-2 bg-slate-900 dark:bg-emerald-600 text-white rounded-lg hover:opacity-90 disabled:opacity-50 transition-colors"
-                                                >
-                                                    <Send size={18} />
-                                                </button>
+                                                <div className="flex gap-2">
+                                                    <input 
+                                                        type="text" 
+                                                        value={newComment}
+                                                        onChange={(e) => setNewComment(e.target.value)}
+                                                        placeholder="Add a note for the kitchen team..."
+                                                        className="flex-1 px-4 py-2 text-sm border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                                                        onKeyDown={(e) => e.key === 'Enter' && handlePostComment()}
+                                                    />
+                                                    <button 
+                                                        onClick={handlePostComment}
+                                                        disabled={!newComment.trim()}
+                                                        className="p-2 bg-slate-900 dark:bg-emerald-600 text-white rounded-lg hover:opacity-90 disabled:opacity-50 transition-colors"
+                                                    >
+                                                        <Send size={18} />
+                                                    </button>
+                                                </div>
                                             </div>
-                                        </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
