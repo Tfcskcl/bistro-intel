@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import { User, MenuGenerationRequest, UserRole, MenuStructure } from '../types';
 import { storageService } from '../services/storageService';
@@ -12,6 +13,7 @@ interface MenuGeneratorProps {
 }
 
 const getMenuBgImage = (cuisine: string = '') => {
+    // ... (rest of image logic remains same)
     const term = cuisine.toLowerCase();
     const map: Record<string, string> = {
         'italian': 'https://images.unsplash.com/photo-1498579150354-977475b7ea0b?auto=format&fit=crop&w=1200&q=60',
@@ -37,7 +39,7 @@ const getMenuBgImage = (cuisine: string = '') => {
     return map[key || ''] || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1200&q=60';
 };
 
-// Sub-component: Menu Designer Renderer
+// ... (MenuDesigner component remains the same)
 interface MenuDesignerProps {
     data: MenuStructure;
     theme: string;
@@ -239,6 +241,10 @@ export const MenuGenerator: React.FC<MenuGeneratorProps> = ({ user, onUserUpdate
     const [history, setHistory] = useState<MenuGenerationRequest[]>([]);
     const [isOffline, setIsOffline] = useState(false);
 
+    // Calc costs
+    const isFree = !storageService.shouldChargeCredits(user.id, 'menus');
+    const cost = isFree ? 0 : CREDIT_COSTS.MENU_GEN;
+
     useEffect(() => {
         const all = storageService.getAllMenuGenerationRequests();
         setHistory(isAdmin ? all : all.filter(r => r.userId === user.id));
@@ -272,7 +278,11 @@ export const MenuGenerator: React.FC<MenuGeneratorProps> = ({ user, onUserUpdate
         e.preventDefault();
         setError(null);
         if (!formData.restaurantName) { setError("Name required"); return; }
-        if (!isAdmin && user.credits < CREDIT_COSTS.MENU_GEN) { setError("Insufficient credits"); return; }
+        
+        if (!isAdmin && cost > 0 && user.credits < cost) {
+            setError(`Insufficient credits. Need ${cost} CR.`);
+            return;
+        }
 
         setLoading(true);
         setGeneratedResult(null);
@@ -287,21 +297,20 @@ export const MenuGenerator: React.FC<MenuGeneratorProps> = ({ user, onUserUpdate
 
         try {
             if (!isAdmin && onUserUpdate) {
-                storageService.deductCredits(user.id, CREDIT_COSTS.MENU_GEN, 'Menu Generation');
-                onUserUpdate({ ...user, credits: user.credits - CREDIT_COSTS.MENU_GEN });
+                if (cost > 0) {
+                    storageService.deductCredits(user.id, cost, 'Menu Generation (Paid)');
+                    onUserUpdate({ ...user, credits: user.credits - cost });
+                }
+                storageService.incrementUsage(user.id, 'menus');
             }
+            
             const responseText = await generateMenu(request);
             
-            // Try to parse the response
             try {
                 const parsedMenu = cleanAndParseJSON<MenuStructure>(responseText);
                 setGeneratedResult(parsedMenu);
-                // Check if result was mock
-                if (parsedMenu.tagline === "Generated Offline Mode") {
-                    setIsOffline(true);
-                }
+                if (parsedMenu.tagline === "Generated Offline Mode") setIsOffline(true);
             } catch (jsonErr) {
-                // If JSON fails, it might be raw mock text
                 throw new Error("Failed to parse menu layout. API Key might be invalid.");
             }
 
@@ -314,6 +323,7 @@ export const MenuGenerator: React.FC<MenuGeneratorProps> = ({ user, onUserUpdate
         }
     };
 
+    // ... handlePrint ...
     const handlePrint = () => {
         const printContent = document.getElementById('menu-print-area');
         if (printContent) {
@@ -336,11 +346,7 @@ export const MenuGenerator: React.FC<MenuGeneratorProps> = ({ user, onUserUpdate
                 `);
                 win.document.close();
                 win.focus();
-                // Allow styles to load
-                setTimeout(() => {
-                    win.print();
-                    win.close();
-                }, 1000);
+                setTimeout(() => { win.print(); win.close(); }, 1000);
             }
         }
     };
@@ -470,7 +476,8 @@ export const MenuGenerator: React.FC<MenuGeneratorProps> = ({ user, onUserUpdate
                             {error && <div className="text-red-500 text-xs bg-red-50 p-2 rounded">{error}</div>}
                             
                             <button type="submit" disabled={loading} className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl flex justify-center gap-2 transition-colors">
-                                {loading ? <Loader2 className="animate-spin" /> : <Sparkles />} Generate Designer Menu
+                                {loading ? <Loader2 className="animate-spin" /> : <Sparkles />} 
+                                {isFree ? 'Generate Menu (Free Quota)' : `Generate Designer Menu (${cost} CR)`}
                             </button>
                         </form>
                     </div>

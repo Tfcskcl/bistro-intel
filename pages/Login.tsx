@@ -125,7 +125,8 @@ export const Login: React.FC<LoginProps> = ({ onLogin, onBack }) => {
           isTrial: true,
           queriesUsed: 0,
           queryLimit: 10,
-          credits: 50 // Updated: Default starting credits for 3-day trial
+          credits: 50, // Updated: Default starting credits for 3-day trial
+          usage: { recipes: 0, menus: 0, sops: 0, lastReset: new Date().toISOString() }
         };
         const user = await authService.signup(newUser, password);
         

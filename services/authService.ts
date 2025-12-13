@@ -1,4 +1,5 @@
 
+
 import { User, UserRole, PlanType } from '../types';
 import { PLANS } from '../constants';
 import { storageService } from './storageService';
@@ -23,6 +24,8 @@ const getMockIP = () => {
     return `${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}`;
 };
 
+const defaultUsage = { recipes: 0, menus: 0, sops: 0, lastReset: new Date().toISOString() };
+
 const DEMO_USERS: (User & {password: string})[] = [
   {
     id: 'demo_owner', 
@@ -37,7 +40,8 @@ const DEMO_USERS: (User & {password: string})[] = [
     ipAddress: '192.168.1.10',
     userAgent: 'Chrome (Mac)',
     lastActiveModule: 'Dashboard',
-    lastLogin: new Date().toISOString()
+    lastLogin: new Date().toISOString(),
+    usage: defaultUsage
   },
   {
     id: 'demo_admin', 
@@ -52,7 +56,8 @@ const DEMO_USERS: (User & {password: string})[] = [
     ipAddress: '192.168.1.15',
     userAgent: 'Safari (iOS)',
     lastActiveModule: 'Inventory',
-    lastLogin: new Date().toISOString()
+    lastLogin: new Date().toISOString(),
+    usage: defaultUsage
   },
   {
     id: 'super_admin', 
@@ -67,7 +72,8 @@ const DEMO_USERS: (User & {password: string})[] = [
     ipAddress: '10.0.0.1',
     userAgent: 'Admin Console',
     lastActiveModule: 'Admin',
-    lastLogin: new Date().toISOString()
+    lastLogin: new Date().toISOString(),
+    usage: defaultUsage
   }
 ];
 
@@ -82,6 +88,12 @@ export const authService = {
     if (stored) {
         const user = JSON.parse(stored);
         user.credits = storageService.getUserCredits(user.id) || user.credits;
+        user.usage = storageService.getUserUsage(user.id) || defaultUsage;
+        // Fix for missing opsCenterAccessExpiry
+        const mockUser = getMockUsers()[user.id];
+        if (mockUser && mockUser.opsCenterAccessExpiry) {
+            user.opsCenterAccessExpiry = mockUser.opsCenterAccessExpiry;
+        }
         callback(user);
     } else {
         callback(null);
@@ -106,7 +118,14 @@ export const authService = {
 
   getCurrentUser: (): User | null => {
       const stored = localStorage.getItem(STORAGE_USER_KEY);
-      return stored ? JSON.parse(stored) : null;
+      if (stored) {
+          const user = JSON.parse(stored);
+          // Refresh credit/usage data from source of truth
+          user.credits = storageService.getUserCredits(user.id);
+          user.usage = storageService.getUserUsage(user.id);
+          return user;
+      }
+      return null;
   },
 
   login: async (email: string, password: string): Promise<User> => {
@@ -119,7 +138,8 @@ export const authService = {
         lastLogin: new Date().toISOString(),
         // Keep existing IP if not present, in real world we'd update it
         ipAddress: user.ipAddress || getMockIP(),
-        userAgent: navigator.userAgent.includes('Mobile') ? 'Mobile Web' : 'Desktop Web'
+        userAgent: navigator.userAgent.includes('Mobile') ? 'Mobile Web' : 'Desktop Web',
+        usage: storageService.getUserUsage(user.id) // Load current usage
     };
     
     delete (safeUser as any).password;
@@ -159,7 +179,8 @@ export const authService = {
           ipAddress: getMockIP(), // Mock an IP
           userAgent: navigator.userAgent.includes('Mobile') ? 'Mobile Web' : 'Desktop Web',
           lastActiveModule: 'Dashboard',
-          lastLogin: new Date().toISOString()
+          lastLogin: new Date().toISOString(),
+          usage: defaultUsage
       };
       saveMockUser(newUser, p);
       storageService.saveUserCredits(uid, u.credits);
@@ -182,7 +203,8 @@ export const authService = {
               credits: storageService.getUserCredits(rest.id) || rest.credits,
               // Fallbacks if older data exists
               ipAddress: rest.ipAddress || 'Unknown',
-              lastActiveModule: rest.lastActiveModule || 'Inactive'
+              lastActiveModule: rest.lastActiveModule || 'Inactive',
+              usage: storageService.getUserUsage(rest.id)
           };
       });
   }

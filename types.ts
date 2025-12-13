@@ -216,6 +216,8 @@ export enum UserRole {
 
 export enum PlanType {
   FREE = 'FREE',
+  BASIC = 'BASIC',
+  GROWTH = 'GROWTH',
   PRO = 'PRO',
   PRO_PLUS = 'PRO_PLUS'
 }
@@ -228,6 +230,11 @@ export interface PlanConfig {
     features: string[];
     color: string;
     monthlyCredits: number;
+    limits: {
+        recipes: number;
+        menus: number;
+        sops: number;
+    }
 }
 
 export interface CreditTransaction {
@@ -249,6 +256,13 @@ export interface SocialStats {
     lastSync: string;
 }
 
+export interface MonthlyUsage {
+    recipes: number;
+    menus: number;
+    sops: number;
+    lastReset: string; // ISO Date
+}
+
 export interface User {
   id: string;
   name: string;
@@ -268,6 +282,8 @@ export interface User {
 
   // Usage Tracking & Credits
   credits: number;
+  usage: MonthlyUsage; // New: Track monthly consumption against limits
+  opsCenterAccessExpiry?: string; // New: Date until Ops Center is unlocked
   
   // Setup Status
   setupComplete?: boolean;

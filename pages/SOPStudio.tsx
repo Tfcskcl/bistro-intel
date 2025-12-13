@@ -4,7 +4,7 @@ import { User, SOP, SOPRequest, UserRole } from '../types';
 import { generateSOP, suggestSOPsFromImage } from '../services/geminiService';
 import { storageService } from '../services/storageService';
 import { CREDIT_COSTS } from '../constants';
-import { FileText, Loader2, Sparkles, Save, Search, AlertCircle, CheckCircle2, Clock, Wallet, BookOpen, Printer, Share2, User as UserIcon, X, Copy, Mail, Key, Link, Upload, Camera, CheckSquare, Square } from 'lucide-react';
+import { FileText, Loader2, Sparkles, Save, Search, AlertCircle, CheckCircle2, Clock, Wallet, BookOpen, Printer, Share2, User as UserIcon, X, Copy, Mail, Key, Link, Upload, Camera, CheckSquare, Square, ArrowRight } from 'lucide-react';
 
 interface SOPStudioProps {
   user: User;
@@ -34,6 +34,10 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
   const [suggestedTopics, setSuggestedTopics] = useState<string[]>([]);
   const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
 
+  // Check quota status
+  const isFree = !storageService.shouldChargeCredits(user.id, 'sops');
+  const unitCost = isFree ? 0 : CREDIT_COSTS.SOP;
+
   useEffect(() => {
     loadSavedSOPs();
     if (isAdmin) loadRequests();
@@ -58,11 +62,15 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
 
     if (topicsToProcess.length === 0) return;
 
-    const totalCost = topicsToProcess.length * CREDIT_COSTS.SOP;
+    // Calc total cost based on how many are remaining in quota vs paid
+    let estimatedCost = 0;
     
-    if (!isAdmin && user.credits < totalCost) {
-        setError(`Insufficient credits. Need ${totalCost} CR for ${topicsToProcess.length} SOP(s).`);
-        return;
+    if (!isAdmin && unitCost > 0) {
+        estimatedCost = topicsToProcess.length * unitCost;
+        if (user.credits < estimatedCost) {
+            setError(`Insufficient credits. Need ${estimatedCost} CR for ${topicsToProcess.length} SOP(s).`);
+            return;
+        }
     }
 
     setIsGenerating(true);
@@ -79,7 +87,11 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
 
           try {
               if (!isAdmin) {
-                  storageService.deductCredits(user.id, CREDIT_COSTS.SOP, `SOP Gen: ${currentTopic}`);
+                  const charge = storageService.shouldChargeCredits(user.id, 'sops') ? CREDIT_COSTS.SOP : 0;
+                  if (charge > 0) {
+                      storageService.deductCredits(user.id, charge, `SOP Gen: ${currentTopic}`);
+                  }
+                  storageService.incrementUsage(user.id, 'sops');
               }
 
               const sop = await generateSOP(currentTopic);
@@ -173,7 +185,8 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
 
   // derived state for UI
   const isBulkMode = selectedTopics.length > 0;
-  const cost = isBulkMode ? selectedTopics.length * CREDIT_COSTS.SOP : CREDIT_COSTS.SOP;
+  // Estimate cost for display (not perfect for bulk if quota runs out midway, but sufficient)
+  const displayCost = isBulkMode ? selectedTopics.length * unitCost : unitCost;
 
   return (
     <div className="h-[calc(100vh-6rem)] flex flex-col gap-6 relative">
@@ -235,214 +248,204 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
                                         onClick={() => toggleTopicSelection(suggestion)}
                                         className={`px-3 py-2.5 text-sm rounded-lg border text-left flex items-center gap-3 transition-all ${
                                             isSelected 
-                                            ? 'bg-blue-600 text-white border-blue-600 shadow-md' 
-                                            : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-blue-400'
+                                            ? 'bg-blue-100 dark:bg-blue-900/40 border-blue-300 dark:border-blue-700 text-blue-800 dark:text-blue-200' 
+                                            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:border-blue-300 text-slate-700 dark:text-slate-300'
                                         }`}
                                      >
-                                         {isSelected ? <CheckSquare size={16} className="shrink-0" /> : <Square size={16} className="shrink-0 opacity-50" />}
-                                         <span className="truncate">{suggestion}</span>
+                                        {isSelected ? <CheckSquare size={16} className="text-blue-600 dark:text-blue-400 shrink-0"/> : <Square size={16} className="text-slate-400 shrink-0"/>}
+                                        <span className="truncate">{suggestion}</span>
                                      </button>
                                  );
                              })}
                          </div>
                      </div>
                  )}
-
-                 {/* Manual Input */}
-                 <div className={`transition-opacity ${isBulkMode ? 'opacity-50 pointer-events-none' : 'opacity-100'}`}>
-                   <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Or Enter Topic Manually</label>
-                   <input 
-                        type="text" 
-                        value={topic} 
-                        onChange={(e) => setTopic(e.target.value)} 
-                        disabled={isBulkMode}
-                        placeholder={isBulkMode ? "Bulk mode active..." : "e.g. Closing Checklist"} 
-                        className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none" 
-                    />
-                 </div>
-
-                 {error && (
-                    <div className="p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-xs rounded-lg flex items-start gap-2">
-                        <AlertCircle size={14} className="mt-0.5 shrink-0"/> {error}
-                    </div>
-                 )}
-
-                 {/* Action Button */}
-                 <button 
-                    onClick={handleGenerate} 
-                    disabled={isGenerating || (!topic && selectedTopics.length === 0)} 
-                    className="w-full py-4 bg-slate-900 dark:bg-emerald-600 text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:opacity-90 disabled:opacity-50 transition-all shadow-lg"
-                 >
-                   {isGenerating ? (
-                       <>
-                        <Loader2 className="animate-spin" size={20} />
-                        <span className="text-sm">{generationProgress || 'Processing...'}</span>
-                       </>
-                   ) : (
-                       <>
-                        <Sparkles size={20} /> 
-                        {isBulkMode ? `Generate ${selectedTopics.length} SOPs (${cost} CR)` : `Generate SOP (${cost} CR)`}
-                       </>
-                   )}
-                 </button>
                </div>
             </div>
 
-            {/* Right Panel: Content */}
-            <div className="flex-1 p-8 overflow-y-auto bg-slate-50/50 dark:bg-slate-950/50">
-               {generatedSOP ? (
-                 <div className="max-w-4xl mx-auto bg-white dark:bg-slate-900 p-8 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 animate-fade-in-up">
-                    <div className="flex justify-between items-start mb-8 border-b border-slate-100 dark:border-slate-800 pb-4">
-                       <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{generatedSOP.title}</h1>
-                       <div className="flex gap-2">
-                           <button onClick={() => handleCopyLink(generatedSOP)} className="px-4 py-2 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-bold rounded-lg flex items-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-800">
-                               <Link size={18} /> Share
-                           </button>
-                           <button onClick={handleSave} className="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg flex items-center gap-2 hover:bg-blue-700 transition-colors">
-                               <Save size={18} /> Save to Library
-                           </button>
-                       </div>
-                    </div>
-                    {/* Render SOP Details */}
-                    <div className="space-y-8">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-lg">
-                                <h3 className="font-bold text-slate-800 dark:text-white mb-2 text-sm uppercase">Scope</h3>
-                                <p className="text-sm text-slate-600 dark:text-slate-300">{generatedSOP.scope}</p>
-                            </div>
-                            <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-lg">
-                                <h3 className="font-bold text-slate-800 dark:text-white mb-2 text-sm uppercase">Prerequisites</h3>
-                                <p className="text-sm text-slate-600 dark:text-slate-300">{generatedSOP.prerequisites}</p>
+            {/* Right Panel: Generator & Preview */}
+            <div className="flex-1 p-6 lg:p-8 overflow-y-auto flex flex-col">
+                {generatedSOP ? (
+                    <div className="flex-1 max-w-3xl mx-auto w-full animate-fade-in">
+                        <div className="flex justify-between items-center mb-6">
+                            <h2 className="text-2xl font-bold text-slate-900 dark:text-white">{generatedSOP.title}</h2>
+                            <div className="flex gap-2">
+                                <button onClick={() => setGeneratedSOP(null)} className="px-4 py-2 text-slate-500 font-bold hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">Back</button>
+                                <button onClick={handleSave} className="px-6 py-2 bg-emerald-600 text-white font-bold rounded-lg hover:bg-emerald-700 flex items-center gap-2">
+                                    <Save size={18}/> Save to Library
+                                </button>
                             </div>
                         </div>
-
-                        <div>
-                            <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
-                                <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 w-6 h-6 rounded-full flex items-center justify-center text-xs">1</span>
-                                Procedure
-                            </h3>
-                            <div className="space-y-3">
-                                {generatedSOP.stepwise_procedure?.map((s,i)=>(
-                                    <div key={i} className="flex gap-4 text-sm p-4 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm">
-                                        <div className="flex flex-col items-center gap-1 min-w-[3rem]">
-                                            <span className="font-bold text-slate-400 text-xs">Step</span>
-                                            <span className="font-black text-xl text-slate-800 dark:text-white">{s.step_no}</span>
-                                        </div>
-                                        <div className="flex-1 border-l border-slate-100 dark:border-slate-800 pl-4">
-                                            <p className="text-slate-800 dark:text-slate-200 font-medium leading-relaxed">{s.action}</p>
-                                            <div className="flex flex-wrap gap-2 mt-2 text-xs text-slate-500">
-                                                <span className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded border border-slate-200 dark:border-slate-700 font-semibold">{s.responsible_role}</span>
-                                                {s.time_limit && <span className="flex items-center gap-1 bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 px-2 py-1 rounded"><Clock size={10}/> {s.time_limit}</span>}
+                        <div className="bg-white dark:bg-slate-800 p-8 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-8">
+                            <div>
+                                <h3 className="text-sm font-bold text-slate-400 uppercase mb-2">Scope</h3>
+                                <p className="text-slate-700 dark:text-slate-300">{generatedSOP.scope}</p>
+                            </div>
+                            
+                            <div>
+                                <h3 className="text-sm font-bold text-slate-400 uppercase mb-3">Step-by-Step Procedure</h3>
+                                <div className="space-y-4">
+                                    {generatedSOP.stepwise_procedure.map((step, i) => (
+                                        <div key={i} className="flex gap-4">
+                                            <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center font-bold text-sm shrink-0">
+                                                {step.step_no}
+                                            </div>
+                                            <div>
+                                                <p className="text-slate-800 dark:text-white font-medium">{step.action}</p>
+                                                <p className="text-xs text-slate-500 mt-1">Role: {step.responsible_role} {step.time_limit ? `• ${step.time_limit}` : ''}</p>
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    ))}
+                                </div>
                             </div>
-                        </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            <div>
-                                <h3 className="font-bold text-slate-800 dark:text-white mb-3 text-sm uppercase border-b border-slate-100 dark:border-slate-800 pb-2">Equipment Needed</h3>
-                                <ul className="space-y-2">
-                                    {generatedSOP.materials_equipment?.map((m,i)=> (
-                                        <li key={i} className="text-sm text-slate-600 dark:text-slate-300 flex items-center gap-2">
-                                            <div className="w-1.5 h-1.5 bg-slate-400 rounded-full"></div> {m}
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                            <div>
-                                <h3 className="font-bold text-slate-800 dark:text-white mb-3 text-sm uppercase border-b border-slate-100 dark:border-slate-800 pb-2">Key Performance Indicators</h3>
-                                <ul className="space-y-2">
-                                    {generatedSOP.kpis?.map((k,i)=> (
-                                        <li key={i} className="text-sm text-slate-600 dark:text-slate-300 flex items-center gap-2">
-                                            <CheckCircle2 size={14} className="text-emerald-500"/> {k}
-                                        </li>
-                                    ))}
-                                </ul>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-lg border border-red-100 dark:border-red-900/30">
+                                    <h4 className="text-xs font-bold text-red-700 dark:text-red-400 uppercase mb-2 flex items-center gap-2">
+                                        <AlertCircle size={14}/> Critical Control Points
+                                    </h4>
+                                    <ul className="list-disc pl-4 space-y-1 text-sm text-red-800 dark:text-red-200">
+                                        {generatedSOP.critical_control_points.map((pt, i) => <li key={i}>{pt}</li>)}
+                                    </ul>
+                                </div>
+                                <div className="bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-lg border border-emerald-100 dark:border-emerald-900/30">
+                                    <h4 className="text-xs font-bold text-emerald-700 dark:text-emerald-400 uppercase mb-2 flex items-center gap-2">
+                                        <CheckCircle2 size={14}/> Checklist
+                                    </h4>
+                                    <ul className="space-y-1 text-sm text-emerald-800 dark:text-emerald-200">
+                                        {generatedSOP.monitoring_checklist.map((pt, i) => (
+                                            <li key={i} className="flex items-center gap-2">
+                                                <div className="w-3 h-3 rounded-full border border-emerald-400"></div> {pt}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
                             </div>
                         </div>
                     </div>
-                 </div>
-               ) : (
-                 <div className="h-full flex flex-col items-center justify-center text-slate-400 opacity-60">
-                    <BookOpen size={64} className="mb-6 text-slate-300 dark:text-slate-600" />
-                    <h3 className="text-lg font-bold text-slate-500 dark:text-slate-400 mb-1">Standardize Your Operations</h3>
-                    <p className="text-sm max-w-xs text-center">Use AI to generate detailed procedures for any task, or upload a photo to get started.</p>
-                 </div>
-               )}
+                ) : (
+                    <div className="flex-1 flex flex-col items-center justify-center max-w-2xl mx-auto w-full text-center">
+                        <div className="mb-8">
+                            <h2 className="text-3xl font-black text-slate-900 dark:text-white mb-2">Build Your Operations Manual</h2>
+                            <p className="text-slate-500 dark:text-slate-400">Generate professional SOPs, checklists, and training guides instantly.</p>
+                        </div>
+
+                        <div className="w-full relative mb-6">
+                            <input 
+                                value={topic}
+                                onChange={(e) => { setTopic(e.target.value); setSelectedTopics([]); }}
+                                disabled={isGenerating || isBulkMode}
+                                placeholder={isBulkMode ? `${selectedTopics.length} topics selected for generation` : "e.g. Closing Checklist for Bar, Food Safety Protocol..."}
+                                className="w-full px-6 py-4 text-lg rounded-full border border-slate-300 dark:border-slate-700 shadow-sm focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 outline-none bg-white dark:bg-slate-800 text-slate-900 dark:text-white disabled:bg-slate-100 dark:disabled:bg-slate-900 disabled:text-slate-500"
+                            />
+                            {isBulkMode && (
+                                <div className="absolute right-2 top-2 bottom-2 flex items-center">
+                                    <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full text-xs font-bold mr-2">
+                                        Bulk Mode
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+
+                        {error && (
+                            <div className="mb-6 p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg text-sm flex items-center gap-2">
+                                <AlertCircle size={16} /> {error}
+                            </div>
+                        )}
+
+                        <button 
+                            onClick={handleGenerate}
+                            disabled={isGenerating || (!topic && !isBulkMode)}
+                            className="w-full md:w-auto px-10 py-4 bg-slate-900 dark:bg-emerald-600 text-white font-bold rounded-full hover:bg-slate-800 dark:hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 shadow-xl shadow-slate-900/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+                        >
+                            {isGenerating ? (
+                                <>
+                                    <Loader2 className="animate-spin" size={20} />
+                                    {generationProgress || 'Generating...'}
+                                </>
+                            ) : (
+                                <>
+                                    <Sparkles size={20} />
+                                    {isBulkMode 
+                                        ? `Generate ${selectedTopics.length} SOPs (${displayCost} CR)`
+                                        : `Generate SOP (${displayCost} CR)`
+                                    }
+                                </>
+                            )}
+                        </button>
+                    </div>
+                )}
             </div>
           </div>
         )}
+
         {viewMode === 'saved' && (
-           <div className="p-6 h-full flex flex-col">
-              <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-xl font-bold text-slate-800 dark:text-white">SOP Library</h2>
-                  <div className="relative">
-                      <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"/>
-                      <input 
-                        type="text" 
-                        placeholder="Search SOPs..." 
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-9 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 w-64"
-                      />
-                  </div>
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 overflow-y-auto pb-10">
-                 {savedSOPs.filter(s => s.title.toLowerCase().includes(searchQuery.toLowerCase())).map((sop, idx) => (
-                     <div key={idx} className="relative bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-5 hover:border-blue-500 dark:hover:border-blue-500 cursor-pointer group transition-all shadow-sm hover:shadow-md flex flex-col h-full">
-                        <div className="flex-1" onClick={() => {setGeneratedSOP(sop); setViewMode('create');}}>
-                            <div className="flex justify-between items-start mb-2">
-                                <div className="p-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg">
-                                    <FileText size={20} />
+            <div className="flex-1 p-6 overflow-hidden flex flex-col">
+                <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-xl font-bold text-slate-800 dark:text-white">SOP Library</h2>
+                    <div className="relative w-64">
+                        <Search className="absolute left-3 top-2.5 text-slate-400" size={16}/>
+                        <input 
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Search procedures..."
+                            className="w-full pl-10 pr-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                    </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-20">
+                    {savedSOPs
+                        .filter(s => s.title.toLowerCase().includes(searchQuery.toLowerCase()))
+                        .map((sop) => (
+                        <div key={sop.sop_id} className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 transition-all shadow-sm hover:shadow-md group flex flex-col">
+                            <div className="flex justify-between items-start mb-4">
+                                <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-blue-600 dark:text-blue-400">
+                                    <BookOpen size={24} />
                                 </div>
-                                <span className="text-[10px] bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 px-2 py-1 rounded font-mono">
-                                    {sop.sop_id.split('_')[1] || 'REF'}
-                                </span>
+                                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button 
+                                        onClick={() => handleCopyLink(sop)}
+                                        className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded text-slate-500"
+                                        title="Copy Link"
+                                    >
+                                        <Link size={16} />
+                                    </button>
+                                    <button className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded text-slate-500" title="Print">
+                                        <Printer size={16} />
+                                    </button>
+                                </div>
                             </div>
-                            <h4 className="font-bold text-lg text-slate-800 dark:text-white mb-2 line-clamp-2">{sop.title}</h4>
-                            <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-3 mb-4">{sop.scope}</p>
-                        </div>
-                        
-                        <div className="pt-4 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center mt-auto">
-                            <span className="text-xs font-bold text-slate-400">{sop.stepwise_procedure?.length || 0} Steps</span>
-                            <div className="flex gap-2">
+                            <h3 className="font-bold text-slate-800 dark:text-white mb-2 line-clamp-1">{sop.title}</h3>
+                            <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-3 mb-4 flex-1">{sop.scope}</p>
+                            
+                            <div className="pt-4 border-t border-slate-100 dark:border-slate-700 flex justify-between items-center text-xs">
+                                <span className="text-slate-400">{sop.stepwise_procedure.length} Steps</span>
                                 <button 
-                                    onClick={(e) => { e.stopPropagation(); handleCopyLink(sop); }}
-                                    className="p-2 bg-slate-50 dark:bg-slate-700 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 rounded-lg transition-colors"
-                                    title="Share Link"
+                                    onClick={() => { setGeneratedSOP(sop); setViewMode('create'); }}
+                                    className="font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
                                 >
-                                    <Link size={16} />
-                                </button>
-                                <button 
-                                    onClick={(e) => { e.stopPropagation(); /* Print logic */ }}
-                                    className="p-2 bg-slate-50 dark:bg-slate-700 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 rounded-lg transition-colors"
-                                    title="Print"
-                                >
-                                    <Printer size={16} />
+                                    View Details <ArrowRight size={12}/>
                                 </button>
                             </div>
                         </div>
-                     </div>
-                 ))}
-                 {savedSOPs.length === 0 && (
-                     <div className="col-span-full text-center py-12 text-slate-400">
-                         <FileText size={48} className="mx-auto mb-4 opacity-20" />
-                         <p>No SOPs found. Create your first one!</p>
-                     </div>
-                 )}
-              </div>
-           </div>
+                    ))}
+                    {savedSOPs.length === 0 && (
+                        <div className="col-span-full text-center py-20 text-slate-400">
+                            <FileText size={48} className="mx-auto mb-4 opacity-50"/>
+                            <p>No saved SOPs yet.</p>
+                        </div>
+                    )}
+                </div>
+            </div>
         )}
       </div>
 
+      {/* Copy Toast */}
       {copyStatus && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white px-6 py-3 rounded-full shadow-lg flex items-center gap-2 animate-fade-in-up">
-            <CheckCircle2 size={18} className="text-emerald-400" />
-            <span className="font-bold text-sm">{copyStatus}</span>
-        </div>
+          <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 bg-slate-900 text-white px-4 py-2 rounded-full shadow-lg text-sm font-bold animate-fade-in-up flex items-center gap-2">
+              <CheckCircle2 size={16} className="text-emerald-400" /> {copyStatus}
+          </div>
       )}
     </div>
   );

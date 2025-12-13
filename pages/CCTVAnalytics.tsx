@@ -1,13 +1,15 @@
 
-import React, { useState, useRef } from 'react';
-import { User, CCTVAnalysisResult } from '../types';
+
+import React, { useState, useRef, useEffect } from 'react';
+import { User, CCTVAnalysisResult, UserRole } from '../types';
 import { analyzeStaffMovement } from '../services/geminiService';
 import { storageService } from '../services/storageService';
 import { CREDIT_COSTS } from '../constants';
+import { authService } from '../services/authService';
 import { 
     Eye, Upload, Activity, AlertTriangle, CheckCircle2, 
     ShieldAlert, Users, Clock, PlayCircle, Loader2, 
-    Video, MousePointer2, Camera, UserX, Info, Wifi, X, Router, HelpCircle
+    Video, MousePointer2, Camera, UserX, Info, Wifi, X, Router, HelpCircle, Lock
 } from 'lucide-react';
 
 interface CCTVAnalyticsProps {
@@ -27,6 +29,7 @@ export const CCTVAnalytics: React.FC<CCTVAnalyticsProps> = ({ user }) => {
         theft: true
     });
     const [error, setError] = useState<string | null>(null);
+    const [hasAccess, setHasAccess] = useState(false);
     
     // Connect Modal State
     const [showConnectModal, setShowConnectModal] = useState(false);
@@ -35,6 +38,42 @@ export const CCTVAnalytics: React.FC<CCTVAnalyticsProps> = ({ user }) => {
     const [showEzvizHelp, setShowEzvizHelp] = useState(false);
 
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        // Check access expiry
+        if (user.role === UserRole.SUPER_ADMIN || user.role === UserRole.OWNER) {
+            // Pro+ users might have it enabled by default, but based on prompt, 
+            // "Operational Center: 500 credits for 15 days".
+            // We check the opsCenterAccessExpiry field
+            if (user.opsCenterAccessExpiry) {
+                const expiry = new Date(user.opsCenterAccessExpiry);
+                if (expiry > new Date()) {
+                    setHasAccess(true);
+                }
+            }
+        }
+    }, [user]);
+
+    const activateAccess = async () => {
+        if (user.credits < CREDIT_COSTS.OPS_CENTER_ACCESS) {
+            alert(`Insufficient credits. Need ${CREDIT_COSTS.OPS_CENTER_ACCESS} CR to unlock for 15 days.`);
+            return;
+        }
+
+        if (confirm(`Unlock Operations Center for 15 days? This will deduct ${CREDIT_COSTS.OPS_CENTER_ACCESS} credits.`)) {
+            const success = storageService.deductCredits(user.id, CREDIT_COSTS.OPS_CENTER_ACCESS, "Ops Center Access (15 Days)");
+            if (success) {
+                // Calculate expiry
+                const expiryDate = new Date();
+                expiryDate.setDate(expiryDate.getDate() + 15);
+                const updatedUser = { ...user, opsCenterAccessExpiry: expiryDate.toISOString(), credits: user.credits - CREDIT_COSTS.OPS_CENTER_ACCESS };
+                
+                await authService.updateUser(updatedUser);
+                setHasAccess(true);
+                alert("Operations Center Unlocked!");
+            }
+        }
+    };
 
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -105,6 +144,33 @@ export const CCTVAnalytics: React.FC<CCTVAnalyticsProps> = ({ user }) => {
         if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
+    if (!hasAccess) {
+        return (
+            <div className="h-[calc(100vh-6rem)] flex flex-col items-center justify-center bg-slate-950 rounded-xl relative overflow-hidden">
+                <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1556910103-1c02745a30bf?auto=format&fit=crop&w=1600&q=20')] bg-cover opacity-10"></div>
+                <div className="relative z-10 text-center p-8 max-w-lg">
+                    <div className="w-20 h-20 bg-slate-900 rounded-full flex items-center justify-center mx-auto mb-6 border border-slate-700 shadow-2xl">
+                        <Lock size={40} className="text-red-500" />
+                    </div>
+                    <h2 className="text-3xl font-black text-white mb-2">Operations Center Locked</h2>
+                    <p className="text-slate-400 mb-8">
+                        Gain real-time visibility into your kitchen operations. AI surveillance analysis for hygiene, efficiency, and safety compliance.
+                    </p>
+                    <div className="flex flex-col gap-4">
+                        <button 
+                            onClick={activateAccess}
+                            className="w-full py-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-lg shadow-red-900/30 transition-all flex items-center justify-center gap-2"
+                        >
+                            <Activity size={20} />
+                            Unlock for 15 Days ({CREDIT_COSTS.OPS_CENTER_ACCESS} Credits)
+                        </button>
+                        <p className="text-xs text-slate-500">Requires Pro+ Plan or Credits</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="h-[calc(100vh-6rem)] flex flex-col gap-6 relative">
             <div className="flex justify-between items-center">
@@ -114,6 +180,11 @@ export const CCTVAnalytics: React.FC<CCTVAnalyticsProps> = ({ user }) => {
                     </h2>
                     <p className="text-slate-500 dark:text-slate-400 text-sm">Real-time vision analytics for compliance and efficiency.</p>
                 </div>
+                {user.opsCenterAccessExpiry && (
+                    <div className="px-3 py-1 bg-slate-100 dark:bg-slate-800 rounded-lg text-xs font-mono text-slate-500">
+                        Access expires: {new Date(user.opsCenterAccessExpiry).toLocaleDateString()}
+                    </div>
+                )}
             </div>
 
             {/* RTSP Connection Modal */}

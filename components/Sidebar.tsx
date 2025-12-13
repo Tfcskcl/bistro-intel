@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, ChefHat, FileText, TrendingUp, Database, CreditCard, LogOut, Clapperboard, RefreshCw, GitMerge, BookOpen, Package, Activity, PenTool, Key, CheckCircle2, ListTodo, ExternalLink, X, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, ChefHat, FileText, TrendingUp, Database, CreditCard, LogOut, Clapperboard, RefreshCw, GitMerge, BookOpen, Package, Activity, PenTool, Key, CheckCircle2, ListTodo, ExternalLink, X, Eye, EyeOff, ShieldCheck, Map } from 'lucide-react';
 import { AppView, User, PlanType, UserRole } from '../types';
 import { Logo } from './Logo';
 import { storageService } from '../services/storageService';
@@ -17,7 +17,7 @@ interface MenuItem {
     id: AppView;
     label: string;
     icon: React.ElementType;
-    requiredPlan?: PlanType;
+    requiredPlan?: PlanType[];
     allowedRoles?: UserRole[];
     externalLink?: string;
 }
@@ -58,9 +58,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
       if (aiStudio) {
           try {
               await aiStudio.openSelectKey();
-              // Assume success immediately to update UI
               setApiConnected(true);
-              // Trigger a small timeout to allow env var propagation if needed without full reload
               setTimeout(() => {
                  window.location.reload(); 
               }, 500);
@@ -68,7 +66,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
               console.error("Key selection failed", e);
           }
       } else {
-          // Open Manual Entry Modal if AI Studio is not available
           setShowKeyModal(true);
       }
   };
@@ -82,23 +79,48 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
       }
   };
 
+  // Helper to check plan access
+  // Basic: Recipes, Menu Gen
+  // Growth: + Tasks, SOP
+  // Pro: + Inventory, Strategy, Video, Layout, Workflow (Everything except CCTV)
+  // Pro+: All (CCTV included)
+  const isFeatureAllowed = (id: AppView): boolean => {
+      const plan = user.plan;
+      if (user.role === UserRole.SUPER_ADMIN || plan === PlanType.PRO_PLUS) return true;
+
+      // Always allowed
+      if ([AppView.DASHBOARD, AppView.BILLING, AppView.INTEGRATIONS].includes(id)) return true;
+
+      // Basic & Free Access
+      if (plan === PlanType.BASIC || plan === PlanType.FREE) {
+          return [AppView.RECIPES, AppView.MENU_GENERATOR].includes(id);
+      }
+
+      // Growth Access
+      if (plan === PlanType.GROWTH) {
+          return [AppView.RECIPES, AppView.MENU_GENERATOR, AppView.TASKS, AppView.SOP].includes(id);
+      }
+
+      // Pro Access (Everything except CCTV)
+      if (plan === PlanType.PRO) {
+          return id !== AppView.CCTV_ANALYTICS;
+      }
+
+      return false;
+  };
+
   const menuItems: MenuItem[] = [
     { id: AppView.DASHBOARD, label: 'Dashboard', icon: LayoutDashboard },
-    { id: AppView.TASKS, label: 'Task Manager', icon: ListTodo, allowedRoles: [UserRole.OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN] },
-    { id: AppView.INVENTORY, label: 'Inventory Manager', icon: Package, allowedRoles: [UserRole.OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN] },
-    { id: AppView.RECIPES, label: 'Recipe & Costing', icon: ChefHat, allowedRoles: [UserRole.OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN] },
-    { id: AppView.MENU_GENERATOR, label: 'Menu Generator', icon: BookOpen, allowedRoles: [UserRole.OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN] },
-    { id: AppView.LAYOUT_DESIGN, label: 'Kitchen Designer', icon: PenTool, allowedRoles: [UserRole.OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN] },
-    { id: AppView.SOP, label: 'SOP Studio', icon: FileText, allowedRoles: [UserRole.OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN] },
-    { 
-        id: AppView.CCTV_ANALYTICS, 
-        label: 'Operations Center', 
-        icon: Activity, 
-        allowedRoles: [UserRole.OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN]
-    },
-    { id: AppView.VIDEO, label: 'Marketing Studio', icon: Clapperboard, allowedRoles: [UserRole.OWNER, UserRole.ADMIN, UserRole.SUPER_ADMIN] },
-    { id: AppView.STRATEGY, label: 'Strategy AI', icon: TrendingUp, allowedRoles: [UserRole.OWNER, UserRole.SUPER_ADMIN] },
-    { id: AppView.INTEGRATIONS, label: 'Data & Integrations', icon: Database, allowedRoles: [UserRole.OWNER, UserRole.SUPER_ADMIN, UserRole.ADMIN] },
+    { id: AppView.TASKS, label: 'Task Manager', icon: ListTodo },
+    { id: AppView.INVENTORY, label: 'Inventory Manager', icon: Package },
+    { id: AppView.RECIPES, label: 'Recipe & Costing', icon: ChefHat },
+    { id: AppView.MENU_GENERATOR, label: 'Menu Generator', icon: BookOpen },
+    { id: AppView.LAYOUT_DESIGN, label: 'Kitchen Designer', icon: PenTool },
+    { id: AppView.SOP, label: 'SOP Studio', icon: FileText },
+    { id: AppView.CCTV_ANALYTICS, label: 'Operations Center', icon: Activity },
+    { id: AppView.VIDEO, label: 'Marketing Studio', icon: Clapperboard },
+    { id: AppView.STRATEGY, label: 'Strategy AI', icon: TrendingUp },
+    { id: AppView.INTEGRATIONS, label: 'Data & Integrations', icon: Database },
     { id: AppView.BILLING, label: 'Plans & Billing', icon: CreditCard, allowedRoles: [UserRole.OWNER] },
   ];
 
@@ -116,11 +138,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, onChangeView, use
         </div>
       </div>
       
-      <nav className="flex-1 p-4 space-y-2 overflow-y-auto custom-scrollbar">
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto custom-scrollbar">
         {menuItems.map((item) => {
-          if (item.allowedRoles && !item.allowedRoles.includes(user.role)) {
-              return null;
-          }
+          if (item.allowedRoles && !item.allowedRoles.includes(user.role)) return null;
+          if (!isFeatureAllowed(item.id)) return null;
 
           const Icon = item.icon;
           const isActive = currentView === item.id;

@@ -1,9 +1,10 @@
 
 
+
 import { MenuItem, Ingredient, PlanType, RecipeCard } from './types';
 
 export const SYSTEM_INSTRUCTION = `
-You are BistroAssist — an expert F&B operations and menu-engineering assistant built for BistroIntelligence.
+You are BistroAssist — an expert F&B operations and menu-engineering assistant built for BistroConnect iNsight.
 You read and write JSON, CSV and plain text. You produce: standardized recipe cards, costed ingredient sheets, SOPs, training modules, purchase lists, and strategy/analytics from restaurant data.
 Always:
 • Return STRICT machine-readable JSON. 
@@ -16,7 +17,7 @@ Always:
 
 export const UNIFIED_SYSTEM_PROMPT = `
 SYSTEM:
-You are the unified AI engine for BistroConnect Insight — an AI-operated Restaurant OS.
+You are the unified AI engine for BistroConnect iNsight — an AI-operated Restaurant OS.
 
 Your responsibilities:
 1. Analyze CCTV staff movement and track actions inside kitchen zones.
@@ -42,7 +43,7 @@ Follow these rules:
 `;
 
 export const CCTV_SYSTEM_PROMPT = `
-You are the BistroConnect Insight Operational Brain for F&B. 
+You are the BistroConnect iNsight Operational Brain for F&B. 
 Your role: receive short video clips/frames (staff movement) and kitchen workflow context (SOP, recipe steps, order stream, raw material inventory events), then produce a unified, structured analysis that correlates movement patterns with workflow steps and inventory interactions.
 
 Goals:
@@ -54,7 +55,7 @@ Goals:
 `;
 
 export const CCTV_INTEGRATION_PROMPT = `
-You are the Camera Integration Assistant for BistroConnect Insight.
+You are the Camera Integration Assistant for BistroConnect iNsight.
 Your job is to help users add and configure CCTV cameras inside restaurant kitchens and connect them to our AI-based operational analytics engine.
 `;
 
@@ -67,7 +68,7 @@ Do NOT return JSON. Return formatted text.
 `;
 
 export const APP_CONTEXT = `
-You are BistroAssist, the AI assistant for BistroIntelligence.
+You are BistroAssist, the AI assistant for BistroConnect iNsight.
 You serve as a knowledgeable guide for restaurant owners, chefs, and managers.
 Your capabilities include:
 - Explaining app features (Recipe Hub, SOP Studio, Strategy AI, etc.)
@@ -77,15 +78,16 @@ Tone: Professional, helpful, concise, and industry-focused.
 `;
 
 export const CREDIT_COSTS = {
-    RECIPE: 10,
+    RECIPE: 30, // Updated
     SOP: 15,
-    STRATEGY: 12,
+    STRATEGY: 50, // Updated
     VIDEO: 50,
     IMAGE: 20,
     EXPERT_CONNECT: 50,
     WORKFLOW: 50,
-    MENU_GEN: 40,
-    LAYOUT: 60
+    MENU_GEN: 20, // Updated
+    LAYOUT: 100, // Updated
+    OPS_CENTER_ACCESS: 500 // New: 500 Credits for 15 days
 };
 
 export const RECHARGE_RATE = 10; // INR per credit
@@ -93,31 +95,53 @@ export const MIN_RECHARGE_CREDITS = 20;
 
 export const PLANS = {
   [PlanType.FREE]: {
-    name: 'Basic Starter',
-    description: 'Entry-level plan for single outlets.',
-    price: 199,
-    quarterlyPrice: 539, // Approx 10% discount
-    features: ['25 Credits / Month', 'Recipe Costing (10cr)', 'Standard SOPs (15cr)', 'Strategy Add-on Available'],
+    name: 'Free Trial',
+    price: 0,
+    quarterlyPrice: 0,
+    features: ['3 Days Access', '50 Credits', 'Try Recipes & Menu Gen'],
     color: 'slate',
-    monthlyCredits: 25
+    monthlyCredits: 50,
+    limits: { recipes: 3, menus: 1, sops: 1 }
+  },
+  [PlanType.BASIC]: {
+    name: 'Basic Starter',
+    description: 'Essential tools for recipe development.',
+    price: 99,
+    quarterlyPrice: 299,
+    features: ['170 Credits / Month', 'Menu Generator (3 Free/mo)', 'Recipe Costing (5 Free/mo)', 'Single User'],
+    color: 'slate',
+    monthlyCredits: 170,
+    limits: { recipes: 5, menus: 3, sops: 0 }
+  },
+  [PlanType.GROWTH]: {
+    name: 'Growth',
+    description: 'Perfect for independent cafes & restaurants.',
+    price: 2499,
+    quarterlyPrice: 6999,
+    features: ['650 Credits / Month', 'Menu Gen (5 Free/mo)', 'Recipes (30 Free/mo)', 'SOP Studio (10 Free/mo)'],
+    color: 'emerald',
+    monthlyCredits: 650,
+    limits: { recipes: 30, menus: 5, sops: 10 }
   },
   [PlanType.PRO]: {
-    name: 'Pro Growth',
-    description: 'For growing restaurants needing regular operational updates.',
-    price: 3999,
-    quarterlyPrice: 10799, 
-    features: ['500 Credits / Month', 'Advanced Recipe Gen', 'SOP Studio Access', 'Strategy Add-on Available', 'Priority Support'],
-    color: 'emerald',
-    monthlyCredits: 500
+    name: 'Pro Brand',
+    description: 'Automation for brands with 4-5 outlets.',
+    price: 9999,
+    quarterlyPrice: 27999,
+    features: ['5,000 Credits / Month', 'Unlimited Recipes', 'Full Automation Access', 'Ops Center Add-on Available'],
+    color: 'purple',
+    monthlyCredits: 5000,
+    limits: { recipes: 999, menus: 20, sops: 50 }
   },
   [PlanType.PRO_PLUS]: {
-    name: 'Pro+ Operations',
-    description: 'High-volume intelligence for scaling F&B brands.',
+    name: 'Pro + Operations',
+    description: 'Complete managed service for scaling brands.',
     price: 24999,
-    quarterlyPrice: 67499,
-    features: ['2600 Credits / Month', 'Included AI Strategy', 'Multi-outlet Management', 'Dedicated Account Manager'],
-    color: 'purple',
-    monthlyCredits: 2600
+    quarterlyPrice: 69999,
+    features: ['15,000 Credits / Month', 'Ops Center Included', 'Multi-Outlet Portal', 'Dedicated Management Team'],
+    color: 'amber',
+    monthlyCredits: 15000,
+    limits: { recipes: 9999, menus: 999, sops: 999 }
   }
 };
 

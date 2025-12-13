@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { PlanType, User, PlanConfig } from '../types';
 import { Check, Star, Loader2, ShieldCheck, Zap, AlertCircle, X, CreditCard, Calendar, Clock, FileText, Download, Wallet, Plus, ArrowRight } from 'lucide-react';
@@ -13,8 +14,10 @@ interface BillingProps {
 
 const PLAN_HIERARCHY: Record<PlanType, number> = {
     [PlanType.FREE]: 0,
-    [PlanType.PRO]: 1,
-    [PlanType.PRO_PLUS]: 2
+    [PlanType.BASIC]: 1,
+    [PlanType.GROWTH]: 2,
+    [PlanType.PRO]: 3,
+    [PlanType.PRO_PLUS]: 4
 };
 
 export const Billing: React.FC<BillingProps> = ({ user }) => {
@@ -246,11 +249,14 @@ export const Billing: React.FC<BillingProps> = ({ user }) => {
             </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto mt-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-7xl mx-auto mt-8">
             {(Object.entries(currentPlans) as [string, PlanConfig][]).map(([key, plan]) => {
                 const planType = key as PlanType;
+                // Hide Free plan from upgrade list if user is already paid, but keep logic generic
+                if (planType === PlanType.FREE && user.plan !== PlanType.FREE) return null;
+
                 const isCurrent = !user.isTrial && user.plan === planType;
-                const isPopular = planType === PlanType.PRO;
+                const isPopular = planType === PlanType.GROWTH;
                 const displayPrice = isQuarterly ? plan.quarterlyPrice : plan.price;
 
                 return (
@@ -267,31 +273,31 @@ export const Billing: React.FC<BillingProps> = ({ user }) => {
                         <div className="mb-6 text-center">
                             <h3 className={`text-lg font-bold ${planType === PlanType.PRO_PLUS ? 'text-purple-600 dark:text-purple-400' : 'text-slate-800 dark:text-white'}`}>{plan.name}</h3>
                             <div className="mt-4 flex items-baseline justify-center">
-                                <span className="text-4xl font-black tracking-tight text-slate-900 dark:text-white">₹{displayPrice.toLocaleString()}</span>
-                                <span className="ml-1 text-sm font-medium text-slate-500 dark:text-slate-400">/{isQuarterly ? 'qtr' : 'mo'}</span>
+                                <span className="text-3xl font-black tracking-tight text-slate-900 dark:text-white">₹{displayPrice.toLocaleString()}</span>
+                                <span className="ml-1 text-xs font-medium text-slate-500 dark:text-slate-400">/{isQuarterly ? 'qtr' : 'mo'}</span>
                             </div>
-                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-3 min-h-[32px] leading-relaxed px-4">
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-3 min-h-[32px] leading-relaxed px-2">
                                 {plan.description}
                             </p>
                         </div>
 
-                        <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 mb-6">
+                        <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 mb-6">
                             <div className="flex justify-between items-center mb-2">
-                                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Monthly Allowance</span>
-                                <span className="text-xs font-bold bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-full">{plan.monthlyCredits} CR</span>
+                                <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">Monthly Allowance</span>
+                                <span className="text-[10px] font-bold bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-2 py-0.5 rounded-full">{plan.monthlyCredits} CR</span>
                             </div>
                             <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 overflow-hidden">
-                                <div className="bg-emerald-500 h-full rounded-full" style={{ width: `${Math.min(100, (plan.monthlyCredits / 2600) * 100)}%` }}></div>
+                                <div className="bg-emerald-500 h-full rounded-full" style={{ width: `${Math.min(100, (plan.monthlyCredits / 15000) * 100)}%` }}></div>
                             </div>
                         </div>
 
-                        <ul className="flex-1 space-y-3 mb-8 px-2">
+                        <ul className="flex-1 space-y-3 mb-8 px-1">
                             {plan.features.map((feature, i) => (
                                 <li key={i} className="flex items-start">
-                                    <div className="p-0.5 bg-emerald-100 dark:bg-emerald-900/30 rounded-full mr-3 shrink-0 mt-0.5">
-                                        <Check className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                                    <div className="p-0.5 bg-emerald-100 dark:bg-emerald-900/30 rounded-full mr-2 shrink-0 mt-0.5">
+                                        <Check className="h-2.5 w-2.5 text-emerald-600 dark:text-emerald-400" />
                                     </div>
-                                    <span className="text-sm text-slate-600 dark:text-slate-300 leading-snug">{feature}</span>
+                                    <span className="text-xs text-slate-600 dark:text-slate-300 leading-snug">{feature}</span>
                                 </li>
                             ))}
                         </ul>
@@ -299,15 +305,15 @@ export const Billing: React.FC<BillingProps> = ({ user }) => {
                         <button
                             onClick={() => handlePlanAction(planType, displayPrice)}
                             disabled={isCurrent || processingPlan === planType}
-                            className={`w-full py-3 px-4 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${
+                            className={`w-full py-3 px-4 rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-sm ${
                                 isCurrent 
                                 ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-default border border-transparent'
-                                : planType === PlanType.PRO 
+                                : planType === PlanType.GROWTH 
                                     ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:shadow-lg hover:scale-[1.02]'
                                     : 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white border-2 border-slate-200 dark:border-slate-700 hover:border-slate-900 dark:hover:border-slate-500'
                             }`}
                         >
-                            {processingPlan === planType ? <Loader2 className="animate-spin" size={18} /> : isCurrent ? 'Current Plan' : (user.plan === PlanType.FREE ? 'Upgrade' : 'Switch')}
+                            {processingPlan === planType ? <Loader2 className="animate-spin" size={16} /> : isCurrent ? 'Current Plan' : (user.plan === PlanType.FREE ? 'Upgrade' : 'Switch')}
                         </button>
                     </div>
                 );

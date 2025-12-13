@@ -1,12 +1,13 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { StatCard } from '../components/StatCard';
-import { User, AppView, UserRole, SystemActivity, VisitorSession } from '../types';
+import { User, AppView, UserRole, SystemActivity, VisitorSession, PlanType } from '../types';
 import { storageService, storageEvents } from '../services/storageService';
 import { analyzeUnifiedRestaurantData } from '../services/geminiService';
 import { authService } from '../services/authService';
 import { trackingService } from '../services/trackingService';
-import { Activity, AlertTriangle, DollarSign, ShoppingBag, TrendingUp, Sparkles, Brain, ArrowRight, Utensils, FileText, BarChart3, Clock, Calendar, Users, MapPin, Globe, Zap, List, AlertOctagon, MousePointer2, Smartphone, Monitor, CheckCircle2, ClipboardList, ListTodo, Shield, Laptop, Tablet, Lock } from 'lucide-react';
+import { Activity, AlertTriangle, DollarSign, ShoppingBag, TrendingUp, Sparkles, Brain, ArrowRight, Utensils, FileText, BarChart3, Clock, Calendar, Users, MapPin, Globe, Zap, List, AlertOctagon, MousePointer2, Smartphone, Monitor, CheckCircle2, ClipboardList, ListTodo, Shield, Laptop, Tablet, Lock, Store } from 'lucide-react';
 import { ResponsiveContainer, ComposedChart, Area, Line, XAxis, YAxis, Tooltip, CartesianGrid, PieChart, Pie, Cell, Legend, BarChart, Bar } from 'recharts';
 
 // Colors
@@ -97,6 +98,68 @@ const SystemIntelligence = ({ unifiedData }: { unifiedData: any }) => (
     </div>
 );
 
+const MultiOutletPortal: React.FC<{ user: User }> = ({ user }) => {
+    // Mock Outlet Data
+    const outlets = [
+        { id: '1', name: user.restaurantName || 'Main Hub', sales: 45000, efficiency: 92, status: 'Online', alerts: 0 },
+        { id: '2', name: 'Downtown Express', sales: 28500, efficiency: 88, status: 'Online', alerts: 2 },
+        { id: '3', name: 'Westside Cloud Kitchen', sales: 32000, efficiency: 76, status: 'Warning', alerts: 5 },
+    ];
+
+    return (
+        <div className="space-y-6">
+            <div className="bg-gradient-to-r from-slate-900 to-slate-800 text-white p-6 rounded-2xl shadow-xl flex justify-between items-center relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl -mr-10 -mt-10"></div>
+                <div className="relative z-10">
+                    <h2 className="text-2xl font-bold flex items-center gap-2"><Store className="text-emerald-400"/> Enterprise Operations Portal</h2>
+                    <p className="text-slate-400 mt-1">Real-time oversight for 3 active outlets</p>
+                </div>
+                <div className="relative z-10 text-right">
+                    <p className="text-xs uppercase font-bold text-slate-400">Network Revenue (Today)</p>
+                    <p className="text-3xl font-black">₹1,05,500</p>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-6">
+                {outlets.map(outlet => (
+                    <div key={outlet.id} className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-all flex items-center justify-between group">
+                        <div className="flex items-center gap-4">
+                            <div className={`p-3 rounded-lg ${outlet.status === 'Online' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
+                                <Store size={24} />
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-lg text-slate-900 dark:text-white">{outlet.name}</h3>
+                                <div className="flex items-center gap-2 text-xs text-slate-500">
+                                    <span className={`w-2 h-2 rounded-full ${outlet.status === 'Online' ? 'bg-emerald-500' : 'bg-amber-500'} animate-pulse`}></span>
+                                    {outlet.status}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-8">
+                            <div className="text-right">
+                                <p className="text-xs text-slate-500 uppercase font-bold">Sales</p>
+                                <p className="text-lg font-bold text-slate-900 dark:text-white">₹{outlet.sales.toLocaleString()}</p>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-xs text-slate-500 uppercase font-bold">Efficiency</p>
+                                <p className={`text-lg font-bold ${outlet.efficiency > 85 ? 'text-emerald-600' : 'text-amber-600'}`}>{outlet.efficiency}%</p>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-xs text-slate-500 uppercase font-bold">Alerts</p>
+                                <p className={`text-lg font-bold ${outlet.alerts > 0 ? 'text-red-600' : 'text-slate-400'}`}>{outlet.alerts}</p>
+                            </div>
+                            <button className="p-2 bg-slate-100 dark:bg-slate-800 rounded-full hover:bg-blue-50 dark:hover:bg-blue-900/30 text-slate-400 hover:text-blue-600 transition-colors">
+                                <ArrowRight size={20} />
+                            </button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+};
+
 // --- DASHBOARD VARIANTS ---
 
 const TenantDashboard: React.FC<{ user: User, onChangeView: (v: AppView) => void }> = ({ user, onChangeView }) => {
@@ -126,6 +189,9 @@ const TenantDashboard: React.FC<{ user: User, onChangeView: (v: AppView) => void
     const totalRevenue = sales.reduce((acc, curr) => acc + curr.revenue, 0);
     const totalOrders = sales.reduce((acc, curr) => acc + curr.items_sold, 0);
 
+    // If Pro+, show multi-outlet portal view option
+    const [showMultiOutlet, setShowMultiOutlet] = useState(false);
+
     return (
         <div className="space-y-8 pb-12">
             <div className="flex flex-col md:flex-row justify-between items-end gap-4">
@@ -135,106 +201,124 @@ const TenantDashboard: React.FC<{ user: User, onChangeView: (v: AppView) => void
                     </h1>
                     <p className="text-slate-500 dark:text-slate-400 mt-1">Here's your operational overview.</p>
                 </div>
-                <div className="flex bg-white dark:bg-slate-900 rounded-lg p-1 border border-slate-200 dark:border-slate-800 shadow-sm">
-                    <button onClick={() => setTimeRange('7d')} className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${timeRange === '7d' ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow' : 'text-slate-500 dark:text-slate-400'}`}>Last 7 Days</button>
-                    <button onClick={() => setTimeRange('30d')} className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${timeRange === '30d' ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow' : 'text-slate-500 dark:text-slate-400'}`}>Last 30 Days</button>
-                </div>
-            </div>
-
-            <QuickActions onChangeView={onChangeView} />
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <StatCard label="Total Revenue" value={`₹${totalRevenue.toLocaleString()}`} trend="+12.5%" trendUp={true} icon={DollarSign} colorClass="bg-emerald-100 text-emerald-600" />
-                <StatCard label="Total Orders" value={totalOrders.toString()} trend="+8.2%" trendUp={true} icon={ShoppingBag} colorClass="bg-blue-100 text-blue-600" />
-                <StatCard label="Food Cost" value="32.4%" trend="-1.2%" trendUp={true} icon={TrendingUp} colorClass="bg-amber-100 text-amber-600" />
-                <StatCard label="Avg. Ticket Size" value={`₹${totalOrders ? (totalRevenue/totalOrders).toFixed(0) : 0}`} trend="+3.1%" trendUp={true} icon={BarChart3} colorClass="bg-purple-100 text-purple-600" />
-            </div>
-            
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 space-y-6">
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm h-[350px]">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2"><TrendingUp className="text-emerald-500" size={20}/> Revenue Trend</h3>
-                        </div>
-                        <ResponsiveContainer width="100%" height="85%">
-                            <ComposedChart data={sales.length ? sales : [{date:'1', revenue:0, items_sold: 0}]}>
-                                <defs><linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/><stop offset="95%" stopColor="#10b981" stopOpacity={0}/></linearGradient></defs>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.5} />
-                                <XAxis dataKey="date" hide axisLine={false} tickLine={false} />
-                                <YAxis yAxisId="left" hide />
-                                <YAxis yAxisId="right" orientation="right" hide />
-                                <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
-                                <Area yAxisId="left" type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorRevenue)" name="Revenue (₹)" />
-                                <Line yAxisId="right" type="monotone" dataKey="items_sold" stroke="#3b82f6" strokeWidth={2} dot={{r:3, fill:'#3b82f6'}} name="Items Sold" />
-                            </ComposedChart>
-                        </ResponsiveContainer>
-                    </div>
-                    <OperationalPulse unifiedData={unifiedData} />
-                </div>
-                
-                <div className="space-y-6">
-                    <SystemIntelligence unifiedData={unifiedData} />
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm min-h-[300px]">
-                        <h3 className="font-bold text-slate-800 dark:text-white mb-4">Sales by Category</h3>
-                        <div className="h-[200px]">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <PieChart>
-                                    <Pie data={MOCK_CATEGORY_DATA} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
-                                        {MOCK_CATEGORY_DATA.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
-                                    </Pie>
-                                    <Tooltip />
-                                    <Legend verticalAlign="bottom" height={36} iconType="circle" />
-                                </PieChart>
-                            </ResponsiveContainer>
-                        </div>
+                <div className="flex gap-4">
+                    {user.plan === PlanType.PRO_PLUS && (
+                        <button 
+                            onClick={() => setShowMultiOutlet(!showMultiOutlet)}
+                            className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${showMultiOutlet ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'}`}
+                        >
+                            <Store size={16} /> {showMultiOutlet ? 'Detailed View' : 'Multi-Outlet View'}
+                        </button>
+                    )}
+                    <div className="flex bg-white dark:bg-slate-900 rounded-lg p-1 border border-slate-200 dark:border-slate-800 shadow-sm">
+                        <button onClick={() => setTimeRange('7d')} className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${timeRange === '7d' ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow' : 'text-slate-500 dark:text-slate-400'}`}>Last 7 Days</button>
+                        <button onClick={() => setTimeRange('30d')} className={`px-4 py-1.5 rounded-md text-xs font-bold transition-all ${timeRange === '30d' ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow' : 'text-slate-500 dark:text-slate-400'}`}>Last 30 Days</button>
                     </div>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                    <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2"><Sparkles className="text-yellow-500" size={20} /> Top Selling Items</h3>
-                    <div className="space-y-4">
-                        {MOCK_TOP_ITEMS.map((item, idx) => (
-                            <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-xs text-slate-600 dark:text-slate-300">#{idx + 1}</div>
-                                    <div>
-                                        <p className="font-bold text-sm text-slate-800 dark:text-white">{item.name}</p>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400">{item.qty} orders</p>
+            {showMultiOutlet && user.plan === PlanType.PRO_PLUS ? (
+                <MultiOutletPortal user={user} />
+            ) : (
+                <>
+                    <QuickActions onChangeView={onChangeView} />
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <StatCard label="Total Revenue" value={`₹${totalRevenue.toLocaleString()}`} trend="+12.5%" trendUp={true} icon={DollarSign} colorClass="bg-emerald-100 text-emerald-600" />
+                        <StatCard label="Total Orders" value={totalOrders.toString()} trend="+8.2%" trendUp={true} icon={ShoppingBag} colorClass="bg-blue-100 text-blue-600" />
+                        <StatCard label="Food Cost" value="32.4%" trend="-1.2%" trendUp={true} icon={TrendingUp} colorClass="bg-amber-100 text-amber-600" />
+                        <StatCard label="Avg. Ticket Size" value={`₹${totalOrders ? (totalRevenue/totalOrders).toFixed(0) : 0}`} trend="+3.1%" trendUp={true} icon={BarChart3} colorClass="bg-purple-100 text-purple-600" />
+                    </div>
+                    
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div className="lg:col-span-2 space-y-6">
+                            <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm h-[350px]">
+                                <div className="flex justify-between items-center mb-6">
+                                    <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2"><TrendingUp className="text-emerald-500" size={20}/> Revenue Trend</h3>
+                                </div>
+                                <ResponsiveContainer width="100%" height="85%">
+                                    <ComposedChart data={sales.length ? sales : [{date:'1', revenue:0, items_sold: 0}]}>
+                                        <defs><linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/><stop offset="95%" stopColor="#10b981" stopOpacity={0}/></linearGradient></defs>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" opacity={0.5} />
+                                        <XAxis dataKey="date" hide axisLine={false} tickLine={false} />
+                                        <YAxis yAxisId="left" hide />
+                                        <YAxis yAxisId="right" orientation="right" hide />
+                                        <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
+                                        <Area yAxisId="left" type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorRevenue)" name="Revenue (₹)" />
+                                        <Line yAxisId="right" type="monotone" dataKey="items_sold" stroke="#3b82f6" strokeWidth={2} dot={{r:3, fill:'#3b82f6'}} name="Items Sold" />
+                                    </ComposedChart>
+                                </ResponsiveContainer>
+                            </div>
+                            <OperationalPulse unifiedData={unifiedData} />
+                        </div>
+                        
+                        <div className="space-y-6">
+                            <SystemIntelligence unifiedData={unifiedData} />
+                            <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm min-h-[300px]">
+                                <h3 className="font-bold text-slate-800 dark:text-white mb-4">Sales by Category</h3>
+                                <div className="h-[200px]">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <PieChart>
+                                            <Pie data={MOCK_CATEGORY_DATA} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                                                {MOCK_CATEGORY_DATA.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                                            </Pie>
+                                            <Tooltip />
+                                            <Legend verticalAlign="bottom" height={36} iconType="circle" />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                            <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2"><Sparkles className="text-yellow-500" size={20} /> Top Selling Items</h3>
+                            <div className="space-y-4">
+                                {MOCK_TOP_ITEMS.map((item, idx) => (
+                                    <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center font-bold text-xs text-slate-600 dark:text-slate-300">#{idx + 1}</div>
+                                            <div>
+                                                <p className="font-bold text-sm text-slate-800 dark:text-white">{item.name}</p>
+                                                <p className="text-xs text-slate-500 dark:text-slate-400">{item.qty} orders</p>
+                                            </div>
+                                        </div>
+                                        <span className="font-bold text-emerald-600 dark:text-emerald-400 text-sm">₹{item.revenue.toLocaleString()}</span>
                                     </div>
-                                </div>
-                                <span className="font-bold text-emerald-600 dark:text-emerald-400 text-sm">₹{item.revenue.toLocaleString()}</span>
+                                ))}
                             </div>
-                        ))}
-                    </div>
-                </div>
+                        </div>
 
-                <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                    <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2"><Clock className="text-blue-500" size={20} /> Recent Activity</h3>
-                    <div className="space-y-0 relative">
-                        <div className="absolute top-2 bottom-2 left-3.5 w-0.5 bg-slate-100 dark:bg-slate-800"></div>
-                        {recentActivity.length === 0 ? (
-                            <p className="text-sm text-slate-500 pl-8">No recent activity logged.</p>
-                        ) : recentActivity.map((activity, idx) => (
-                            <div key={idx} className="flex gap-4 p-3 relative hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg transition-colors">
-                                <div className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300`}>
-                                    {activity.actionType === 'RECIPE' ? <Utensils size={14}/> : activity.actionType === 'CCTV' ? <Activity size={14}/> : <Zap size={14}/>}
-                                </div>
-                                <div>
-                                    <p className="text-sm font-bold text-slate-800 dark:text-white">{activity.description}</p>
-                                    <span className="text-[10px] text-slate-400 mt-1 block">{new Date(activity.timestamp).toLocaleTimeString()} • {activity.actionType}</span>
-                                </div>
+                        <div className="bg-white dark:bg-slate-900 p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                            <h3 className="font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2"><Clock className="text-blue-500" size={20} /> Recent Activity</h3>
+                            <div className="space-y-0 relative">
+                                <div className="absolute top-2 bottom-2 left-3.5 w-0.5 bg-slate-100 dark:bg-slate-800"></div>
+                                {recentActivity.length === 0 ? (
+                                    <p className="text-sm text-slate-500 pl-8">No recent activity logged.</p>
+                                ) : recentActivity.map((activity, idx) => (
+                                    <div key={idx} className="flex gap-4 p-3 relative hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg transition-colors">
+                                        <div className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300`}>
+                                            {activity.actionType === 'RECIPE' ? <Utensils size={14}/> : activity.actionType === 'CCTV' ? <Activity size={14}/> : <Zap size={14}/>}
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-bold text-slate-800 dark:text-white">{activity.description}</p>
+                                            <span className="text-[10px] text-slate-400 mt-1 block">{new Date(activity.timestamp).toLocaleTimeString()} • {activity.actionType}</span>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
-                        ))}
+                        </div>
                     </div>
-                </div>
-            </div>
+                </>
+            )}
         </div>
     );
 };
 
 const SuperAdminDashboard: React.FC = () => {
+    // ... (No changes to Super Admin dashboard logic)
+    // For brevity, using the same implementation but it's preserved in full context
     const [allUsers, setAllUsers] = useState<User[]>([]);
     const [liveVisitors, setLiveVisitors] = useState<VisitorSession[]>([]);
     const [abandonmentAlerts, setAbandonmentAlerts] = useState<VisitorSession[]>([]);

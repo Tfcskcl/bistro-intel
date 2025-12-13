@@ -1,4 +1,5 @@
 
+
 import { RecipeCard, SOP, AppNotification, UserRole, POSChangeRequest, MenuItem, PlanConfig, PlanType, RecipeRequest, SOPRequest, MarketingRequest, CreditTransaction, SocialStats, KitchenWorkflowRequest, MenuGenerationRequest, InventoryItem, OnboardingState, Task, SystemActivity, VisitorSession, RecipeComment } from '../types';
 import { MOCK_MENU, MOCK_SALES_DATA, MOCK_INGREDIENT_PRICES, MOCK_RECIPES, PLANS as DEFAULT_PLANS } from '../constants';
 import { ingredientService } from './ingredientService';
@@ -138,13 +139,53 @@ export const storageService = {
         return stored ? JSON.parse(stored) : DEFAULT_PLANS;
     },
 
-    // --- CREDITS ---
+    // --- CREDITS & USAGE ---
     getUserCredits: (userId: string): number => {
         return storageService.getItem<number>(userId, 'credits_balance', 0);
     },
 
     saveUserCredits: (userId: string, credits: number) => {
         storageService.setItem(userId, 'credits_balance', credits);
+    },
+
+    getUserUsage: (userId: string): { recipes: number; menus: number; sops: number; lastReset: string } => {
+        const defaultUsage = { recipes: 0, menus: 0, sops: 0, lastReset: new Date().toISOString() };
+        return storageService.getItem(userId, 'monthly_usage', defaultUsage);
+    },
+
+    incrementUsage: (userId: string, type: 'recipes' | 'menus' | 'sops') => {
+        const usage = storageService.getUserUsage(userId);
+        
+        // Reset check (simple month check)
+        const lastReset = new Date(usage.lastReset);
+        const now = new Date();
+        if (lastReset.getMonth() !== now.getMonth()) {
+            usage.recipes = 0;
+            usage.menus = 0;
+            usage.sops = 0;
+            usage.lastReset = now.toISOString();
+        }
+
+        usage[type] += 1;
+        storageService.setItem(userId, 'monthly_usage', usage);
+        return usage[type];
+    },
+
+    // Logic to verify if credit deduction is needed or if package covers it
+    shouldChargeCredits: (userId: string, type: 'recipes' | 'menus' | 'sops'): boolean => {
+        const user = JSON.parse(localStorage.getItem('bistro_current_user_cache') || '{}');
+        const plan = DEFAULT_PLANS[user.plan as PlanType] || DEFAULT_PLANS[PlanType.FREE];
+        const usage = storageService.getUserUsage(userId);
+        
+        // Reset check
+        const lastReset = new Date(usage.lastReset);
+        const now = new Date();
+        if (lastReset.getMonth() !== now.getMonth()) {
+            return false; // New month = start fresh within limit
+        }
+
+        const limit = plan.limits[type];
+        return usage[type] >= limit;
     },
 
     deductCredits: (userId: string, amount: number, description: string): boolean => {
@@ -282,10 +323,6 @@ export const storageService = {
             };
             
             // Since notifications are currently global or by role in this mock, we can just push to global for now
-            // In a real app, this would be user-specific. 
-            // For this demo, we'll assume the 'Header' component filters correctly or we just use global.
-            // Using a hack for demo: Prefix ID with target user ID so we can filter later if needed, 
-            // or just rely on the fact that this is a localstorage demo.
             storageService.sendSystemNotification(notification);
 
             return true;
