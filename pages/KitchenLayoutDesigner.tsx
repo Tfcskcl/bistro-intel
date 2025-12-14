@@ -118,6 +118,78 @@ export const KitchenLayoutDesigner: React.FC<KitchenLayoutDesignerProps> = ({ us
         return null;
     }
 
+    const checkCollision = (item: {x: number, y: number, width: number, height: number}, existingItems: PlacedItem[]) => {
+        for (const existing of existingItems) {
+            if (
+                item.x < existing.x + existing.width &&
+                item.x + item.width > existing.x &&
+                item.y < existing.y + existing.height &&
+                item.y + item.height > existing.y
+            ) {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    const placeItemSmartly = (itemWidth: number, itemHeight: number, zoneHint: string, zoneName: string, existingItems: PlacedItem[]): {x: number, y: number} => {
+        const maxX = kitchenDims.length;
+        const maxY = kitchenDims.width;
+        const padding = 1;
+
+        // Determine preferred quadrant/area based on hints
+        let startX = padding;
+        let startY = padding;
+        
+        const text = (zoneHint + " " + zoneName).toLowerCase();
+
+        if (text.includes('dish') || text.includes('wash') || text.includes('scullery') || text.includes('bottom-right') || text.includes('southeast')) {
+            startX = maxX - itemWidth - padding;
+            startY = maxY - itemHeight - padding;
+        } else if (text.includes('cook') || text.includes('hot') || text.includes('center')) {
+            startX = Math.max(padding, Math.floor(maxX / 2) - Math.floor(itemWidth / 2));
+            startY = Math.max(padding, Math.floor(maxY / 2) - Math.floor(itemHeight / 2));
+        } else if (text.includes('storage') || text.includes('cold') || text.includes('top-left') || text.includes('northwest')) {
+            startX = padding;
+            startY = padding;
+        } else if (text.includes('prep') || text.includes('top-right') || text.includes('northeast')) {
+            startX = maxX - itemWidth - padding;
+            startY = padding;
+        } else if (text.includes('service') || text.includes('pass') || text.includes('bottom-left') || text.includes('southwest')) {
+            startX = padding;
+            startY = maxY - itemHeight - padding;
+        }
+
+        // Scan grid around preferred spot to find nearest free space
+        let bestX = startX;
+        let bestY = startY;
+        let minDist = Infinity;
+        let found = false;
+
+        // Optimized scan: Check grid points
+        for (let y = padding; y <= maxY - itemHeight; y += 1) {
+            for (let x = padding; x <= maxX - itemWidth; x += 1) {
+                const potential = { x, y, width: itemWidth, height: itemHeight };
+                if (!checkCollision(potential, existingItems)) {
+                    // Calculate distance to preferred start point
+                    const dist = Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2));
+                    // Add slight randomization or bias to avoid perfect linear stacking if distances are equal
+                    if (dist < minDist) {
+                        minDist = dist;
+                        bestX = x;
+                        bestY = y;
+                        found = true;
+                    }
+                }
+            }
+        }
+        
+        if (found) return { x: bestX, y: bestY };
+        
+        // Fallback: Just return 0,0 (user can move it)
+        return { x: 0, y: 0 }; 
+    };
+
     const handleAIGenerate = async () => {
         if (!cuisine) {
             setError("Please specify a cuisine type.");
@@ -141,7 +213,6 @@ export const KitchenLayoutDesigner: React.FC<KitchenLayoutDesignerProps> = ({ us
 
             const area = kitchenDims.length * kitchenDims.width;
             
-            // Pass the sketch image if available for multimodal analysis
             const rawLayout = await generateKitchenLayout(
                 cuisine, 
                 kitchenType, 
@@ -153,52 +224,43 @@ export const KitchenLayoutDesigner: React.FC<KitchenLayoutDesignerProps> = ({ us
             // CONVERT AI RESPONSE TO COORDINATES
             const newItems: PlacedItem[] = [];
             const zones = rawLayout.zones || [];
-            
-            // Layout Strategy: Quadrants
-            // Extended mapping to catch more AI variations
-            const zoneMap: Record<string, {startX: number, startY: number, color: string, cat: any}> = {
-                'Storage': { startX: 1, startY: 1, color: 'bg-blue-100 border-blue-300', cat: 'refrigeration' },
-                'Cold': { startX: 1, startY: 1, color: 'bg-blue-100 border-blue-300', cat: 'refrigeration' },
-                
-                'Prep': { startX: kitchenDims.length / 2 + 1, startY: 1, color: 'bg-emerald-100 border-emerald-300', cat: 'prep' },
-                
-                'Cook': { startX: 1, startY: kitchenDims.width / 2 + 1, color: 'bg-red-100 border-red-300', cat: 'cooking' },
-                'Hot': { startX: 1, startY: kitchenDims.width / 2 + 1, color: 'bg-red-100 border-red-300', cat: 'cooking' },
-                
-                'Dish': { startX: kitchenDims.length - 6, startY: kitchenDims.width - 6, color: 'bg-cyan-100 border-cyan-300', cat: 'washing' },
-                'Wash': { startX: kitchenDims.length - 6, startY: kitchenDims.width - 6, color: 'bg-cyan-100 border-cyan-300', cat: 'washing' },
-                'Scullery': { startX: kitchenDims.length - 6, startY: kitchenDims.width - 6, color: 'bg-cyan-100 border-cyan-300', cat: 'washing' },
-                
-                'Service': { startX: kitchenDims.length / 2 - 3, startY: kitchenDims.width / 2, color: 'bg-amber-100 border-amber-300', cat: 'service' },
-                'Pass': { startX: kitchenDims.length / 2 - 3, startY: kitchenDims.width / 2, color: 'bg-amber-100 border-amber-300', cat: 'service' }
-            };
-
-            const zoneOffsets: Record<string, number> = {};
             let globalIdx = 0;
 
-            zones.forEach((zone) => {
-                if (!zone.name) return; // Skip if invalid
+            // Sort zones to ensure major zones (Cook, Prep) get priority placement if needed
+            // But simple iteration usually works fine with the smart placer
+            
+            for (const zone of zones) {
+                if (!zone.name) continue; 
                 
-                // Fuzzy match zone name to our map
-                const mapKey = Object.keys(zoneMap).find(k => zone.name.includes(k)) || 'Prep';
-                const config = zoneMap[mapKey];
+                const zHint = zone.placement_hint || "";
                 
-                // Track offset for collision prevention in this quadrant
-                let currentOffset = zoneOffsets[mapKey] || 0;
+                // Determine category for coloring
+                let cat: any = 'cooking';
+                const zNameLower = zone.name.toLowerCase();
+                if (zNameLower.includes('stor') || zNameLower.includes('cold')) cat = 'refrigeration';
+                else if (zNameLower.includes('prep')) cat = 'prep';
+                else if (zNameLower.includes('wash') || zNameLower.includes('dish')) cat = 'washing';
+                else if (zNameLower.includes('serv') || zNameLower.includes('pass')) cat = 'service';
+                else if (zNameLower.includes('tabl') || zNameLower.includes('seat')) cat = 'furniture';
 
-                (zone.required_equipment || []).forEach((eq, idx) => {
+                // Find catalog colors for this category as fallback
+                const fallbackItem = EQUIPMENT_CATALOG[cat as keyof typeof EQUIPMENT_CATALOG]?.[0];
+                const fallbackColor = fallbackItem ? fallbackItem.color : 'bg-gray-100 border-gray-300';
+
+                const equipmentList = zone.required_equipment || [];
+                
+                for (const eq of equipmentList) {
                     const catalogItem = findCatalogItem(eq.name);
                     
-                    let width = 3; // Default
-                    let height = 3; // Default
-                    let color = config.color;
+                    let width = 3; 
+                    let height = 3; 
+                    let color = fallbackColor;
 
                     if (catalogItem) {
                         width = catalogItem.width;
                         height = catalogItem.height;
                         color = catalogItem.color;
                     } else if (eq.dimensions) {
-                        // Parse "3x3" or "3x4" string
                         const parts = eq.dimensions.toLowerCase().split('x');
                         if (parts.length === 2) {
                             width = parseInt(parts[0]) || 3;
@@ -206,24 +268,15 @@ export const KitchenLayoutDesigner: React.FC<KitchenLayoutDesignerProps> = ({ us
                         }
                     }
                     
-                    // Place items in a grid pattern starting from the zone's anchor point
-                    // Add a small offset based on current count to avoid stacking
-                    let x = config.startX + (currentOffset % 3) * 4; 
-                    let y = config.startY + Math.floor(currentOffset / 3) * 4;
-                    currentOffset++;
-
-                    // Bounds check
-                    if (x > kitchenDims.length - width) x = kitchenDims.length - width;
-                    if (y > kitchenDims.width - height) y = kitchenDims.width - height;
-                    if (x < 0) x = 0;
-                    if (y < 0) y = 0;
+                    // Smart Placement Logic
+                    const pos = placeItemSmartly(width, height, zHint, zone.name, newItems);
 
                     newItems.push({
                         id: `ai_${Date.now()}_${globalIdx++}`,
                         name: eq.name,
-                        category: config.cat,
-                        x: x,
-                        y: y,
+                        category: cat,
+                        x: pos.x,
+                        y: pos.y,
                         width: width,
                         height: height,
                         rotation: 0,
@@ -233,11 +286,8 @@ export const KitchenLayoutDesigner: React.FC<KitchenLayoutDesignerProps> = ({ us
                         },
                         color: color
                     });
-                });
-                
-                // Save offset for next zone if it maps to same quadrant
-                zoneOffsets[mapKey] = currentOffset;
-            });
+                }
+            }
 
             if (newItems.length > 0) {
                 setPlacedItems(newItems);
@@ -314,14 +364,31 @@ export const KitchenLayoutDesigner: React.FC<KitchenLayoutDesignerProps> = ({ us
     };
 
     const handleAddItem = (itemTemplate: any) => {
+        // Try to place new manual item in center or nearest free spot
+        const newItemWidth = itemTemplate.width;
+        const newItemHeight = itemTemplate.height;
+        
+        // Default center
+        let bestX = Math.floor(kitchenDims.length / 2) - Math.floor(newItemWidth/2);
+        let bestY = Math.floor(kitchenDims.width / 2) - Math.floor(newItemHeight/2);
+        
+        const potential = { x: bestX, y: bestY, width: newItemWidth, height: newItemHeight };
+        
+        if (checkCollision(potential, placedItems)) {
+            // If center taken, use smart placer with "center" hint
+            const pos = placeItemSmartly(newItemWidth, newItemHeight, "center", "", placedItems);
+            bestX = pos.x;
+            bestY = pos.y;
+        }
+
         const newItem: PlacedItem = {
             id: `manual_${Date.now()}`,
             name: itemTemplate.name,
             category: activeCategory as any,
-            x: Math.floor(kitchenDims.length / 2) - 1, // Center default
-            y: Math.floor(kitchenDims.width / 2) - 1,
-            width: itemTemplate.width,
-            height: itemTemplate.height,
+            x: bestX,
+            y: bestY,
+            width: newItemWidth,
+            height: newItemHeight,
             rotation: 0,
             color: itemTemplate.color,
             specs: itemTemplate.specs || { power: 'Standard', water: 'None' }
@@ -401,8 +468,6 @@ export const KitchenLayoutDesigner: React.FC<KitchenLayoutDesignerProps> = ({ us
                     </div>
                 </div>
 
-                {/* Rest of the component code (no logic changes) ... */}
-                {/* ... (Sidebar, Canvas, Inspector) ... */}
                 <div className="flex items-center gap-2">
                     {sketchImage && (
                         <div className="flex items-center gap-2 mr-4">

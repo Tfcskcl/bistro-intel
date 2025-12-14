@@ -1,5 +1,5 @@
 
-import { GoogleGenAI, Type, Schema } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import { 
     RecipeCard, 
     SOP, 
@@ -253,11 +253,9 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
 
         // --- Generate Reference Image ---
         try {
-            // Use the specific visual description if available, otherwise fallback
             const visualDesc = finalResult.visual_description || finalResult.human_summary || '';
             const platingDetails = finalResult.portioning_guideline || '';
             
-            // Construct a very specific prompt using the AI generated details AND original user requirements to capture specific requests
             const imagePrompt = `
                 Professional high-end food photography of ${finalResult.name}.
                 Visual Description: ${visualDesc}.
@@ -365,14 +363,13 @@ export const generateStrategy = async (user: User, query: string, salesContext: 
         `;
 
         const response = await client.models.generateContent({
-            model: "gemini-3-pro-preview", // Use Pro for reasoning
+            model: "gemini-3-pro-preview",
             contents: { parts: [{ text: SYSTEM_INSTRUCTION }, { text: prompt }] },
             config: { responseMimeType: "application/json" }
         });
 
         const result = cleanAndParseJSON<any>(response.text || "{}");
         
-        // Robust merge with type checking to prevent "map is not a function" errors
         return {
             summary: Array.isArray(result.summary) ? result.summary : fallback.summary,
             causes: Array.isArray(result.causes) ? result.causes : fallback.causes,
@@ -416,8 +413,6 @@ export const generateABTestStrategy = async (user: User, query: string, salesCon
     });
 };
 
-// --- MULTIMODAL SERVICES ---
-
 export const generateKitchenWorkflow = async (description: string): Promise<string> => {
     return safeGenerate("Workflow", "# Demo Workflow\n1. Step 1\n2. Step 2", async () => {
         const client = createAIClient();
@@ -439,7 +434,6 @@ export const generateKitchenWorkflow = async (description: string): Promise<stri
 };
 
 export const generateMenu = async (request: MenuGenerationRequest): Promise<string> => {
-    // Richer Fallback
     const fallback = JSON.stringify({
         title: request.restaurantName,
         tagline: "Generated Offline Mode",
@@ -527,8 +521,6 @@ export const generateMenu = async (request: MenuGenerationRequest): Promise<stri
 };
 
 export const generateMarketingVideo = async (imageFrames: string[], prompt: string, aspectRatio: string): Promise<string> => {
-    // Mock Video Generation - In real app, this would call Veo or similar
-    // Since we cannot actually generate MP4s in this environment, return a placeholder video URL
     return "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4";
 };
 
@@ -563,7 +555,6 @@ export const generateMarketingImage = async (prompt: string, aspectRatio: string
 };
 
 export const analyzeUnifiedRestaurantData = async (data: any): Promise<UnifiedSchema> => {
-    // Mock for dashboard summary
     return {
         workflow_analysis: { efficiency: 88, issues: [] },
         sop_compliance: { rate: 0.92, violations: [] },
@@ -631,7 +622,6 @@ export const analyzeStaffMovement = async (prompt: string, zones: string[], imag
 
         const result = cleanAndParseJSON<CCTVAnalysisResult>(response.text || "{}");
         
-        // Robust merge to ensure arrays are present even if AI omits them
         return {
             ...fallback,
             ...result,
@@ -663,7 +653,8 @@ export const generateKitchenLayout = async (cuisine: string, type: string, area:
                     data: cleanBase64
                 }
             });
-            parts.push({ text: "Analyze this hand-drawn sketch and convert it into a structured layout." });
+            // Improved Prompt for Sketch Analysis
+            parts.push({ text: "Analyze this hand-drawn sketch carefully. Identify the zones drawn (e.g., 'Cook line', 'Dishwashing', 'Storage') and their relative positions. Convert this visual layout into a structured list of zones with `placement_hint` (e.g., 'top-left', 'center', 'bottom-right'). List the required equipment for each zone." });
         }
 
         const response = await client.models.generateContent({
@@ -678,7 +669,6 @@ export const generateKitchenLayout = async (cuisine: string, type: string, area:
 };
 
 export const generatePurchaseOrder = async (supplier: string, items: InventoryItem[]): Promise<PurchaseOrder> => {
-    // Mock logic
     const poItems = items.map(i => ({
         name: i.name,
         qty: Math.max(1, i.parLevel - i.currentStock),
@@ -720,7 +710,6 @@ export const forecastInventoryNeeds = async (inventory: InventoryItem[], context
 };
 
 export const verifyLocationWithMaps = async (query: string): Promise<string> => {
-    // Uses the Google Maps Grounding tool via Gemini
     return safeGenerate("Maps", "Location verified (Mock)", async () => {
         const client = createAIClient();
         if (!client) throw new Error("No Client");
@@ -729,7 +718,7 @@ export const verifyLocationWithMaps = async (query: string): Promise<string> => 
             model: "gemini-2.5-flash",
             contents: { parts: [{ text: `Verify if "${query}" is a valid location for a restaurant. Provide a 1-sentence summary of the area.` }] },
             config: {
-                tools: [{ googleSearch: {} }] // Using Search as proxy for Maps grounding in this simplified service
+                tools: [{ googleSearch: {} }] 
             }
         });
 

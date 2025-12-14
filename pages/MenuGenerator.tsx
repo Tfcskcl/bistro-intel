@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useRef } from 'react';
 import { User, MenuGenerationRequest, UserRole, MenuStructure } from '../types';
 import { storageService } from '../services/storageService';
@@ -13,7 +12,6 @@ interface MenuGeneratorProps {
 }
 
 const getMenuBgImage = (cuisine: string = '') => {
-    // ... (rest of image logic remains same)
     const term = cuisine.toLowerCase();
     const map: Record<string, string> = {
         'italian': 'https://images.unsplash.com/photo-1498579150354-977475b7ea0b?auto=format&fit=crop&w=1200&q=60',
@@ -39,7 +37,6 @@ const getMenuBgImage = (cuisine: string = '') => {
     return map[key || ''] || 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1200&q=60';
 };
 
-// ... (MenuDesigner component remains the same)
 interface MenuDesignerProps {
     data: MenuStructure;
     theme: string;
@@ -145,7 +142,6 @@ const MenuDesigner: React.FC<MenuDesignerProps> = ({ data, theme, cuisine, logo,
 
     return (
         <div id="menu-print-area" className={styles.wrapper}>
-            {/* Background Image */}
             <div 
                 className={`absolute inset-0 z-0 ${styles.hideBg ? 'hidden' : ''}`}
                 style={{ 
@@ -246,10 +242,14 @@ export const MenuGenerator: React.FC<MenuGeneratorProps> = ({ user, onUserUpdate
     const cost = isFree ? 0 : CREDIT_COSTS.MENU_GEN;
 
     useEffect(() => {
-        const all = storageService.getAllMenuGenerationRequests();
-        setHistory(isAdmin ? all : all.filter(r => r.userId === user.id));
+        loadHistory();
         setIsOffline(!hasValidApiKey());
     }, [user.id, isAdmin]);
+
+    const loadHistory = async () => {
+        const all = await storageService.getAllMenuGenerationRequestsAsync();
+        setHistory(isAdmin ? all : all.filter(r => r.userId === user.id));
+    };
 
     const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -315,7 +315,8 @@ export const MenuGenerator: React.FC<MenuGeneratorProps> = ({ user, onUserUpdate
             }
 
             const finalRequest = { ...request, generatedMenu: responseText };
-            storageService.saveMenuGenerationRequest(finalRequest);
+            await storageService.saveMenuGenerationRequestAsync(finalRequest);
+            loadHistory();
         } catch (err: any) {
             setError(err.message);
         } finally {
@@ -323,7 +324,6 @@ export const MenuGenerator: React.FC<MenuGeneratorProps> = ({ user, onUserUpdate
         }
     };
 
-    // ... handlePrint ...
     const handlePrint = () => {
         const printContent = document.getElementById('menu-print-area');
         if (printContent) {

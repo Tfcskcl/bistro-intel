@@ -35,8 +35,8 @@ export const KitchenWorkflow: React.FC<KitchenWorkflowProps> = ({ user, onUserUp
         refreshData();
     }, [user.id, isAdmin]);
 
-    const refreshData = () => {
-        const all = storageService.getAllKitchenWorkflowRequests();
+    const refreshData = async () => {
+        const all = await storageService.getAllKitchenWorkflowRequestsAsync();
         if (isAdmin) {
             setRequests(all.sort((a,b) => new Date(b.requestDate).getTime() - new Date(a.requestDate).getTime()));
         } else {
@@ -94,8 +94,8 @@ export const KitchenWorkflow: React.FC<KitchenWorkflowProps> = ({ user, onUserUp
             requestDate: new Date().toISOString()
         };
 
-        storageService.saveKitchenWorkflowRequest(newReq);
-        refreshData();
+        await storageService.saveKitchenWorkflowRequestAsync(newReq);
+        await refreshData();
         setIsSubmitting(false);
         setView('list');
         setTitle('');
@@ -129,7 +129,7 @@ export const KitchenWorkflow: React.FC<KitchenWorkflowProps> = ({ user, onUserUp
         }
     };
 
-    const approveRequest = () => {
+    const approveRequest = async () => {
         if (!selectedRequest) return;
         const updated: KitchenWorkflowRequest = {
             ...selectedRequest,
@@ -137,13 +137,13 @@ export const KitchenWorkflow: React.FC<KitchenWorkflowProps> = ({ user, onUserUp
             adminResponse: adminDraft,
             completedDate: new Date().toISOString()
         };
-        storageService.updateKitchenWorkflowRequest(updated);
-        refreshData();
+        await storageService.updateKitchenWorkflowRequestAsync(updated);
+        await refreshData();
         setView('list');
         alert("Workflow approved and sent to client.");
     };
 
-    const rejectRequest = () => {
+    const rejectRequest = async () => {
         if (!selectedRequest) return;
         if (!confirm("Are you sure you want to reject this request?")) return;
         const updated: KitchenWorkflowRequest = {
@@ -151,8 +151,8 @@ export const KitchenWorkflow: React.FC<KitchenWorkflowProps> = ({ user, onUserUp
             status: 'rejected',
             completedDate: new Date().toISOString()
         };
-        storageService.updateKitchenWorkflowRequest(updated);
-        refreshData();
+        await storageService.updateKitchenWorkflowRequestAsync(updated);
+        await refreshData();
         setView('list');
     };
 

@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { User, SOP, SOPRequest, UserRole } from '../types';
 import { generateSOP, suggestSOPsFromImage } from '../services/geminiService';
-import { storageService } from '../services/storageService';
+import { storageService, storageEvents } from '../services/storageService';
 import { CREDIT_COSTS } from '../constants';
 import { FileText, Loader2, Sparkles, Save, Search, AlertCircle, CheckCircle2, Clock, Wallet, BookOpen, Printer, Share2, User as UserIcon, X, Copy, Mail, Key, Link, Upload, Camera, CheckSquare, Square, ArrowRight } from 'lucide-react';
 
@@ -41,9 +41,16 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
   useEffect(() => {
     loadSavedSOPs();
     if (isAdmin) loadRequests();
+    
+    window.addEventListener(storageEvents.DATA_UPDATED, loadSavedSOPs);
+    return () => window.removeEventListener(storageEvents.DATA_UPDATED, loadSavedSOPs);
   }, [user.id, isAdmin]);
 
-  const loadSavedSOPs = () => setSavedSOPs(storageService.getSavedSOPs(user.id));
+  const loadSavedSOPs = async () => {
+      const sops = await storageService.getSavedSOPsAsync(user.id);
+      setSavedSOPs(sops);
+  };
+  
   const loadRequests = () => setRequests(storageService.getAllSOPRequests().filter(r => r.status === 'pending'));
 
   const toggleTopicSelection = (t: string) => {
@@ -101,7 +108,7 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
               
               if (isBulk) {
                   // Auto-save generated SOPs in bulk mode
-                  storageService.saveSOP(user.id, sop);
+                  await storageService.saveSOPAsync(user.id, sop);
                   storageService.addTask(user.id, `Train staff on new SOP: ${sop.title}`, ['SOP', 'Training']);
               }
               
@@ -118,7 +125,7 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
           onUserUpdate({ ...user, credits: newBalance });
       }
 
-      loadSavedSOPs();
+      await loadSavedSOPs();
 
       if (isBulk) {
           setViewMode('saved');
@@ -139,10 +146,10 @@ export const SOPStudio: React.FC<SOPStudioProps> = ({ user, onUserUpdate }) => {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (generatedSOP) {
-      storageService.saveSOP(user.id, generatedSOP);
-      loadSavedSOPs();
+      await storageService.saveSOPAsync(user.id, generatedSOP);
+      await loadSavedSOPs();
       setViewMode('saved');
       setGeneratedSOP(null);
       setTopic('');

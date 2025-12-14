@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { User, UserRole, MarketingRequest } from '../types';
 import { generateMarketingVideo, generateMarketingImage, hasValidApiKey } from '../services/geminiService';
@@ -33,8 +34,8 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
       loadHistory();
   }, [user.id]);
 
-  const loadHistory = () => {
-      const all = storageService.getAllMarketingRequests();
+  const loadHistory = async () => {
+      const all = await storageService.getAllMarketingRequestsAsync();
       // Filter by user and sort descending
       setHistory(all.filter(r => r.userId === user.id).sort((a,b) => new Date(b.requestDate).getTime() - new Date(a.requestDate).getTime()));
   };
@@ -92,7 +93,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
               completedDate: new Date().toISOString()
           };
 
-          storageService.saveMarketingRequest(newReq);
+          await storageService.saveMarketingRequestAsync(newReq);
           
           // Auto-generate Task
           const taskAction = mediaType === 'video' ? 'Review & Post Video' : 'Post Image';
@@ -103,7 +104,7 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
           );
 
           setCurrentResult(newReq);
-          loadHistory();
+          await loadHistory();
 
       } catch (err: any) {
           console.error(err);
@@ -134,10 +135,10 @@ export const VideoStudio: React.FC<VideoStudioProps> = ({ user }) => {
       }
   };
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
       if(!confirm("Are you sure you want to delete this asset?")) return;
-      storageService.deleteMarketingRequest(id);
-      loadHistory();
+      await storageService.deleteMarketingRequestAsync(id);
+      await loadHistory();
       if (currentResult?.id === id) setCurrentResult(null);
   };
 
