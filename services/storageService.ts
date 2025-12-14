@@ -1,5 +1,4 @@
 
-
 import { RecipeCard, SOP, AppNotification, UserRole, POSChangeRequest, MenuItem, PlanConfig, PlanType, RecipeRequest, SOPRequest, MarketingRequest, CreditTransaction, SocialStats, KitchenWorkflowRequest, MenuGenerationRequest, InventoryItem, OnboardingState, Task, SystemActivity, VisitorSession, RecipeComment } from '../types';
 import { MOCK_MENU, MOCK_SALES_DATA, MOCK_INGREDIENT_PRICES, MOCK_RECIPES, PLANS as DEFAULT_PLANS } from '../constants';
 import { ingredientService } from './ingredientService';
@@ -55,8 +54,44 @@ export const storageService = {
     },
 
     setItem: (userId: string, key: string, data: any) => {
-        localStorage.setItem(getKey(userId, key), JSON.stringify(data));
-        dispatchDataUpdatedEvent(); // Notify listeners
+        try {
+            localStorage.setItem(getKey(userId, key), JSON.stringify(data));
+            dispatchDataUpdatedEvent(); // Notify listeners
+        } catch (e: any) {
+            // Check for QuotaExceededError (code 22 or name 'QuotaExceededError')
+            if (e.name === 'QuotaExceededError' || e.code === 22 || e.message.toLowerCase().includes('quota')) {
+                console.warn("Storage Limit Reached. Attempting cleanup...");
+                
+                // Cleanup Strategy: Remove non-essential logs and cache
+                const cleanupKeys = [
+                    GLOBAL_ACTIVITY_KEY,
+                    VISITOR_SESSIONS_KEY,
+                    'bistro_marketing_requests' // Often contains base64 images
+                ];
+
+                let spaceCleared = false;
+                cleanupKeys.forEach(k => {
+                    if (localStorage.getItem(k)) {
+                        localStorage.removeItem(k);
+                        spaceCleared = true;
+                    }
+                });
+
+                // If space was cleared, try saving again
+                if (spaceCleared) {
+                    try {
+                        localStorage.setItem(getKey(userId, key), JSON.stringify(data));
+                        dispatchDataUpdatedEvent();
+                        return;
+                    } catch (retryError) {
+                        console.error("Retry failed after cleanup.", retryError);
+                    }
+                }
+
+                throw new Error("Your browser storage is full. Please delete some old Recipes, SOPs, or Marketing Assets to save new data.");
+            }
+            throw e;
+        }
     },
 
     clearAllData: () => {
@@ -73,25 +108,28 @@ export const storageService = {
 
     // --- ACTIVITY LOGGING (NEW) ---
     logActivity: (userId: string, userName: string, actionType: SystemActivity['actionType'], description: string, metadata?: any) => {
-        const activity: SystemActivity = {
-            id: `act_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-            userId,
-            userName,
-            actionType,
-            description,
-            metadata,
-            timestamp: new Date().toISOString()
-        };
-        
-        // Save to global log for Admin
-        const storedLog = localStorage.getItem(GLOBAL_ACTIVITY_KEY);
-        const log: SystemActivity[] = storedLog ? JSON.parse(storedLog) : [];
-        log.unshift(activity); // Add to top
-        if (log.length > 500) log.pop(); // Keep limit
-        localStorage.setItem(GLOBAL_ACTIVITY_KEY, JSON.stringify(log));
-        
-        // Also save to user specific log if needed, but global is enough for now
-        dispatchDataUpdatedEvent();
+        try {
+            const activity: SystemActivity = {
+                id: `act_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+                userId,
+                userName,
+                actionType,
+                description,
+                metadata,
+                timestamp: new Date().toISOString()
+            };
+            
+            // Save to global log for Admin
+            const storedLog = localStorage.getItem(GLOBAL_ACTIVITY_KEY);
+            const log: SystemActivity[] = storedLog ? JSON.parse(storedLog) : [];
+            log.unshift(activity); // Add to top
+            if (log.length > 200) log.pop(); // Reduced limit to save space
+            localStorage.setItem(GLOBAL_ACTIVITY_KEY, JSON.stringify(log));
+            
+            dispatchDataUpdatedEvent();
+        } catch (e) {
+            console.warn("Could not log activity due to storage constraints");
+        }
     },
 
     getRecentSystemActivity: (): SystemActivity[] => {
@@ -111,17 +149,21 @@ export const storageService = {
     },
 
     saveVisitorSession: (session: VisitorSession) => {
-        const sessions = storageService.getVisitorSessions();
-        const index = sessions.findIndex(s => s.sessionId === session.sessionId);
-        if (index > -1) {
-            sessions[index] = session;
-        } else {
-            sessions.push(session);
+        try {
+            const sessions = storageService.getVisitorSessions();
+            const index = sessions.findIndex(s => s.sessionId === session.sessionId);
+            if (index > -1) {
+                sessions[index] = session;
+            } else {
+                sessions.push(session);
+            }
+            // Keep only recent 50 sessions (Reduced to save space)
+            const recentSessions = sessions.slice(-50);
+            localStorage.setItem(VISITOR_SESSIONS_KEY, JSON.stringify(recentSessions));
+            dispatchDataUpdatedEvent();
+        } catch (e) {
+            console.warn("Could not save visitor session due to storage constraints");
         }
-        // Keep only recent 100 sessions
-        const recentSessions = sessions.slice(-100);
-        localStorage.setItem(VISITOR_SESSIONS_KEY, JSON.stringify(recentSessions));
-        dispatchDataUpdatedEvent();
     },
 
     // --- ONBOARDING ---
@@ -251,47 +293,64 @@ export const storageService = {
     },
 
     saveRecipe: (userId: string, recipe: RecipeCard) => {
-        const recipes = storageService.getSavedRecipes(userId);
-        const index = recipes.findIndex(r => r.sku_id === recipe.sku_id);
-        const isNew = index === -1;
-        
-        if (index >= 0) recipes[index] = recipe; else recipes.push(recipe);
-        storageService.setItem(userId, 'saved_recipes', recipes);
-        
-        // --- AUTOMATION TRIGGERS ---
-        // Retrieve current user details for context
-        const currentUser = JSON.parse(localStorage.getItem('bistro_current_user_cache') || '{}');
-        const userName = currentUser.name || 'User';
-        const restaurantName = currentUser.restaurantName || 'Restaurant';
-
-        // 1. Log Activity (Only if it's new or significantly modified)
-        if (isNew || !recipe.comments) {
-             storageService.logActivity(userId, userName, 'RECIPE', `Saved Recipe: ${recipe.name}`, {
-                purpose: recipe.human_summary || 'Standard Menu Item',
-                restaurant: restaurantName,
-                isNew
-            });
-        }
-
-        if (isNew) {
-            // 2. Auto-Generate SOP Task
-            storageService.addTask(
-                userId, 
-                `Auto-Generate SOP for: ${recipe.name}`, 
-                ['SOP', 'Auto-System']
-            );
+        try {
+            const recipes = storageService.getSavedRecipes(userId);
+            const index = recipes.findIndex(r => r.sku_id === recipe.sku_id);
+            const isNew = index === -1;
             
-            // 3. Auto-Generate Inventory Task
-            storageService.addTask(
-                userId, 
-                `Update Inventory Master for: ${recipe.name}`, 
-                ['Inventory', 'Auto-System']
-            );
+            if (index >= 0) recipes[index] = recipe; else recipes.push(recipe);
+            storageService.setItem(userId, 'saved_recipes', recipes);
+            
+            // --- AUTOMATION TRIGGERS ---
+            // Retrieve current user details for context
+            const currentUser = JSON.parse(localStorage.getItem('bistro_current_user_cache') || '{}');
+            const userName = currentUser.name || 'User';
+            const restaurantName = currentUser.restaurantName || 'Restaurant';
 
-            // Log System Automations
-            storageService.logActivity(userId, 'Bistro System', 'SYSTEM', `Auto-triggered SOP & Inventory tasks for ${recipe.name}`, {
-                restaurant: restaurantName
-            });
+            // 1. Log Activity (Only if it's new or significantly modified)
+            if (isNew || !recipe.comments) {
+                 storageService.logActivity(userId, userName, 'RECIPE', `Saved Recipe: ${recipe.name}`, {
+                    purpose: recipe.human_summary || 'Standard Menu Item',
+                    restaurant: restaurantName,
+                    isNew
+                });
+            }
+
+            if (isNew) {
+                // 2. Auto-Generate SOP Task
+                storageService.addTask(
+                    userId, 
+                    `Auto-Generate SOP for: ${recipe.name}`, 
+                    ['SOP', 'Auto-System']
+                );
+                
+                // 3. Auto-Generate Inventory Task
+                storageService.addTask(
+                    userId, 
+                    `Update Inventory Master for: ${recipe.name}`, 
+                    ['Inventory', 'Auto-System']
+                );
+
+                // Log System Automations
+                storageService.logActivity(userId, 'Bistro System', 'SYSTEM', `Auto-triggered SOP & Inventory tasks for ${recipe.name}`, {
+                    restaurant: restaurantName
+                });
+            }
+        } catch (e: any) {
+            // Attempt recovery if recipe save fails (likely due to image size)
+            if (e.message.includes('full') || e.name === 'QuotaExceededError') {
+                console.warn("Recipe save failed due to size. Retrying without image...");
+                // Create a copy without the heavy image
+                const lightRecipe = { ...recipe, imageUrl: undefined };
+                const recipes = storageService.getSavedRecipes(userId);
+                const index = recipes.findIndex(r => r.sku_id === recipe.sku_id);
+                if (index >= 0) recipes[index] = lightRecipe; else recipes.push(lightRecipe);
+                
+                // Try saving the lighter version
+                storageService.setItem(userId, 'saved_recipes', recipes);
+                throw new Error("Recipe saved, but image was removed due to storage limits.");
+            }
+            throw e;
         }
     },
 
@@ -414,11 +473,16 @@ export const storageService = {
 
     // --- NOTIFICATIONS ---
     sendSystemNotification: (notification: AppNotification) => {
-        const stored = localStorage.getItem(GLOBAL_NOTIFICATIONS_KEY);
-        const list = stored ? JSON.parse(stored) : [];
-        list.push(notification);
-        localStorage.setItem(GLOBAL_NOTIFICATIONS_KEY, JSON.stringify(list));
-        dispatchDataUpdatedEvent();
+        try {
+            const stored = localStorage.getItem(GLOBAL_NOTIFICATIONS_KEY);
+            const list = stored ? JSON.parse(stored) : [];
+            list.push(notification);
+            if (list.length > 50) list.shift(); // Keep notification list reasonable
+            localStorage.setItem(GLOBAL_NOTIFICATIONS_KEY, JSON.stringify(list));
+            dispatchDataUpdatedEvent();
+        } catch (e) {
+            console.warn("Notification dropped due to storage limit");
+        }
     },
 
     getNotifications: (userId: string, userRole: UserRole): AppNotification[] => {
