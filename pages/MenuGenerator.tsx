@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { User, MenuGenerationRequest, UserRole, MenuStructure } from '../types';
 import { storageService } from '../services/storageService';
@@ -306,19 +305,24 @@ export const MenuGenerator: React.FC<MenuGeneratorProps> = ({ user, onUserUpdate
             
             const responseText = await generateMenu(request);
             
-            try {
-                const parsedMenu = cleanAndParseJSON<MenuStructure>(responseText);
-                setGeneratedResult(parsedMenu);
-                if (parsedMenu.tagline === "Generated Offline Mode") setIsOffline(true);
-            } catch (jsonErr) {
-                throw new Error("Failed to parse menu layout. API Key might be invalid.");
-            }
+            // Clean parsing with fallback to avoid crashing on partial/invalid AI output
+            const parsedMenu = cleanAndParseJSON<MenuStructure>(responseText, {
+                title: formData.restaurantName,
+                tagline: "Menu Generated (Parsing Fallback)",
+                currency: "₹",
+                sections: [],
+                footer_note: ""
+            });
+            
+            setGeneratedResult(parsedMenu);
+            if (parsedMenu.tagline === "Generated Offline Mode") setIsOffline(true);
 
             const finalRequest = { ...request, generatedMenu: responseText };
             await storageService.saveMenuGenerationRequestAsync(finalRequest);
             loadHistory();
         } catch (err: any) {
-            setError(err.message);
+            console.error("Menu Gen Error", err);
+            setError(err.message || "Failed to generate menu. Please try again.");
         } finally {
             setLoading(false);
         }
@@ -522,7 +526,12 @@ export const MenuGenerator: React.FC<MenuGeneratorProps> = ({ user, onUserUpdate
                         {history.map(item => (
                             <div key={item.id} className="p-4 border rounded-xl hover:border-emerald-500 transition-colors cursor-pointer" onClick={() => {
                                 try {
-                                    const parsed = cleanAndParseJSON<MenuStructure>(item.generatedMenu);
+                                    // Safe parsing for history items
+                                    const parsed = cleanAndParseJSON<MenuStructure>(item.generatedMenu, {
+                                        title: item.restaurantName,
+                                        currency: "₹",
+                                        sections: []
+                                    });
                                     setGeneratedResult(parsed);
                                     setFormData(prev => ({...prev, restaurantName: item.restaurantName, cuisineType: item.cuisineType, themeStyle: item.themeStyle || 'Modern'}));
                                     setView('create');

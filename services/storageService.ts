@@ -1,4 +1,3 @@
-
 import { RecipeCard, SOP, AppNotification, UserRole, POSChangeRequest, MenuItem, PlanConfig, PlanType, RecipeRequest, SOPRequest, MarketingRequest, CreditTransaction, SocialStats, KitchenWorkflowRequest, MenuGenerationRequest, InventoryItem, OnboardingState, Task, SystemActivity, VisitorSession, RecipeComment } from '../types';
 import { MOCK_MENU, MOCK_SALES_DATA, MOCK_INGREDIENT_PRICES, MOCK_RECIPES, PLANS as DEFAULT_PLANS } from '../constants';
 import { ingredientService } from './ingredientService';
@@ -281,6 +280,14 @@ export const storageService = {
                 isNew
             });
         }
+    },
+
+    deleteRecipeAsync: async (userId: string, skuId: string) => {
+        const recipes = await storageService.getSavedRecipesAsync(userId);
+        const updated = recipes.filter(r => r.sku_id !== skuId);
+        const key = getKey(userId, 'saved_recipes');
+        await idbSet(key, updated);
+        dispatchDataUpdatedEvent();
     },
 
     getSavedRecipes: (userId: string): RecipeCard[] => {

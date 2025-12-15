@@ -1,5 +1,4 @@
-
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { 
     RecipeCard, 
     SOP, 
@@ -54,9 +53,12 @@ const createAIClient = () => {
 
 // --- HELPER FUNCTIONS ---
 
-export function cleanAndParseJSON<T>(text: string, defaultValue?: T): T {
+export function cleanAndParseJSON<T>(text: string | undefined | null, defaultValue?: T): T {
     try {
-        if (!text) throw new Error("Empty response");
+        if (!text) {
+            if (defaultValue !== undefined) return defaultValue;
+            throw new Error("Empty response received from AI");
+        }
         
         // 1. Locate the first '{' or '['
         const firstOpenBrace = text.indexOf('{');
@@ -90,6 +92,7 @@ export function cleanAndParseJSON<T>(text: string, defaultValue?: T): T {
     } catch (e) {
         console.warn("JSON Parse Failed:", e);
         if (defaultValue !== undefined) return defaultValue;
+        // If no default value is provided, rethrow so the caller knows something went wrong
         throw new Error("Failed to parse AI response.");
     }
 }
@@ -115,10 +118,12 @@ async function safeGenerate<T>(
         const key = getApiKey();
         const msg = e.toString().replace(key, '[REDACTED]');
         
+        console.error(`[${operationName}] Error:`, msg); // Log full error for debugging
+
         if (msg.includes("403") || msg.includes("PERMISSION_DENIED")) {
             console.warn(`[${operationName}] API Key Restricted/Invalid. Switching to Demo Mode.`);
         } else {
-            console.warn(`[${operationName}] Failed: ${msg}. Using fallback.`);
+            console.warn(`[${operationName}] Failed. Using fallback.`);
         }
         return fallback;
     }
@@ -182,27 +187,73 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
         Available Ingredient Price Knowledge (Use these costs if applicable, else estimate India market rates):
         ${learnedPrices}
 
-        Output JSON matching the RecipeCard interface. 
-        1. 'ingredients': array with name, qty (string), cost_per_unit (number), unit, cost_per_serving (number), waste_pct (number).
-        2. 'food_cost_per_serving': Sum of ingredient costs.
-        3. 'suggested_selling_price': Calculate specific selling price targeting 30-35% food cost.
-        4. 'nutritional_info': Object with { calories: number, protein: number, carbs: number, fat: number }.
-        5. 'prep_time_minutes', 'cook_time_minutes', 'total_time_minutes'.
-
         IMPORTANT:
-        - 'preparation_steps': Must be an ARRAY OF STRINGS. Each string is a step. Do NOT use objects for steps.
-        - 'portioning_guideline': Must include specific GOURMET PLATING instructions (e.g. 'stack vertically', 'garnish with microgreens', 'drizzle oil in a circular motion').
-        - 'human_summary': A descriptive overview of the dish, its flavor profile, and why it works.
-        - 'visual_description': A highly detailed visual description of the final dish for an image generator. Focus ONLY on visual appearance: colors, textures, key ingredients visible, plating style, and lighting. Do NOT mention taste.
+        - 'preparation_steps': Must be an ARRAY OF STRINGS. Each string is a step.
+        - 'ingredients': List all ingredients with accurate quantities and estimated costs.
+        - 'nutritional_info': Estimate calories, protein, carbs, fat.
         `;
+
+        // STRICT SCHEMA DEFINITION
+        const schema: Schema = {
+            type: Type.OBJECT,
+            properties: {
+                sku_id: { type: Type.STRING },
+                name: { type: Type.STRING },
+                category: { type: Type.STRING },
+                prep_time_min: { type: Type.NUMBER },
+                cook_time_minutes: { type: Type.NUMBER },
+                total_time_minutes: { type: Type.NUMBER },
+                current_price: { type: Type.NUMBER },
+                yield: { type: Type.NUMBER },
+                preparation_steps: { type: Type.ARRAY, items: { type: Type.STRING } },
+                equipment_needed: { type: Type.ARRAY, items: { type: Type.STRING } },
+                portioning_guideline: { type: Type.STRING },
+                allergens: { type: Type.ARRAY, items: { type: Type.STRING } },
+                shelf_life_hours: { type: Type.NUMBER },
+                food_cost_per_serving: { type: Type.NUMBER },
+                suggested_selling_price: { type: Type.NUMBER },
+                tags: { type: Type.ARRAY, items: { type: Type.STRING } },
+                human_summary: { type: Type.STRING },
+                visual_description: { type: Type.STRING },
+                ingredients: {
+                    type: Type.ARRAY,
+                    items: {
+                        type: Type.OBJECT,
+                        properties: {
+                            ingredient_id: { type: Type.STRING },
+                            name: { type: Type.STRING },
+                            qty: { type: Type.STRING },
+                            cost_per_unit: { type: Type.NUMBER },
+                            unit: { type: Type.STRING },
+                            cost_per_serving: { type: Type.NUMBER },
+                            waste_pct: { type: Type.NUMBER }
+                        }
+                    }
+                },
+                nutritional_info: {
+                    type: Type.OBJECT,
+                    properties: {
+                        calories: { type: Type.NUMBER },
+                        protein: { type: Type.NUMBER },
+                        carbs: { type: Type.NUMBER },
+                        fat: { type: Type.NUMBER }
+                    }
+                }
+            }
+        };
 
         const response = await client.models.generateContent({
             model: "gemini-2.5-flash",
-            contents: { parts: [{ text: SYSTEM_INSTRUCTION }, { text: prompt }] },
-            config: { responseMimeType: "application/json" }
+            contents: prompt,
+            config: { 
+                systemInstruction: SYSTEM_INSTRUCTION,
+                responseMimeType: "application/json",
+                responseSchema: schema
+            }
         });
 
-        const result = cleanAndParseJSON<RecipeCard>(response.text || "{}");
+        // With strict schema, we can trust the text is valid JSON, but still use helper for safety
+        const result = cleanAndParseJSON<RecipeCard>(response.text, {} as RecipeCard);
         
         // Merge with fallback to ensure arrays exist
         const finalResult = { ...fallback, ...result };
@@ -213,20 +264,6 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
             ...ing,
             ingredient_id: ing.ingredient_id || `new_${Date.now()}_${i}`
         }));
-
-        // --- SANITIZE STEPS ---
-        // Fix for React Error #31 if LLM returns objects instead of strings for steps
-        if (Array.isArray(finalResult.preparation_steps)) {
-            finalResult.preparation_steps = finalResult.preparation_steps.map((step: any) => {
-                if (typeof step === 'string') return step;
-                if (typeof step === 'object' && step !== null) {
-                    return step.description || step.instruction || step.action || step.step || JSON.stringify(step);
-                }
-                return String(step);
-            });
-        } else {
-            finalResult.preparation_steps = [];
-        }
 
         // --- AUTO-CALCULATION FIX ---
         // 1. Recalculate Food Cost based on ingredients to ensure accuracy
@@ -256,15 +293,11 @@ export const generateRecipeCard = async (userId: string, item: MenuItem, require
             const visualDesc = finalResult.visual_description || finalResult.human_summary || '';
             const platingDetails = finalResult.portioning_guideline || '';
             
-            const imagePrompt = `
-                Professional high-end food photography of ${finalResult.name}.
-                Visual Description: ${visualDesc}.
-                Plating Style: ${platingDetails}.
-                Specific User Requirements: ${requirements}.
-                Style: Michelin star restaurant presentation, 8k resolution, photorealistic, appetizing, macro shot, soft studio lighting, sharp focus.
-                Environment: Blurred upscale restaurant background.
-            `.trim();
+            // Simplified Image Prompt for better compatibility with flash-image models
+            const imagePrompt = `Professional food photography of ${finalResult.name}. Visuals: ${visualDesc}. Plating: ${platingDetails}. Style: ${requirements}. High resolution, appetizing, 8k, photorealistic, cinematic lighting, no text.`;
 
+            // We use the image generator directly. The safeGenerate wrapper will catch errors.
+            // If the user's key supports it, this will yield a custom image.
             const imgUrl = await generateMarketingImage(imagePrompt, "1:1");
             finalResult.imageUrl = imgUrl;
         } catch (imgError) {
@@ -294,16 +327,51 @@ export const generateSOP = async (topic: string): Promise<SOP> => {
         const client = createAIClient();
         if (!client) throw new Error("No Client");
 
-        const prompt = `Generate a Standard Operating Procedure (SOP) for: "${topic}". Return JSON matching the SOP interface.`;
+        const prompt = `
+        Generate a comprehensive Standard Operating Procedure (SOP) for: "${topic}".
+        Ensure it follows industry standards for food safety and operational efficiency.
+        `;
+
+        const schema: Schema = {
+            type: Type.OBJECT,
+            properties: {
+                title: { type: Type.STRING },
+                scope: { type: Type.STRING },
+                prerequisites: { type: Type.STRING },
+                materials_equipment: { type: Type.ARRAY, items: { type: Type.STRING } },
+                stepwise_procedure: {
+                    type: Type.ARRAY,
+                    items: {
+                        type: Type.OBJECT,
+                        properties: {
+                            step_no: { type: Type.NUMBER },
+                            action: { type: Type.STRING },
+                            responsible_role: { type: Type.STRING },
+                            time_limit: { type: Type.STRING }
+                        },
+                        required: ["step_no", "action", "responsible_role"]
+                    }
+                },
+                critical_control_points: { type: Type.ARRAY, items: { type: Type.STRING } },
+                monitoring_checklist: { type: Type.ARRAY, items: { type: Type.STRING } },
+                kpis: { type: Type.ARRAY, items: { type: Type.STRING } },
+                quick_troubleshooting: { type: Type.STRING }
+            },
+            required: ["title", "scope", "stepwise_procedure", "critical_control_points"]
+        };
 
         const response = await client.models.generateContent({
             model: "gemini-2.5-flash",
-            contents: { parts: [{ text: SYSTEM_INSTRUCTION }, { text: prompt }] },
-            config: { responseMimeType: "application/json" }
+            contents: prompt,
+            config: { 
+                systemInstruction: SYSTEM_INSTRUCTION,
+                responseMimeType: "application/json",
+                responseSchema: schema
+            }
         });
 
-        const result = cleanAndParseJSON<SOP>(response.text || "{}");
-        return { ...fallback, ...result };
+        const result = cleanAndParseJSON<SOP>(response.text, {} as SOP);
+        return { ...fallback, ...result, sop_id: `sop_${Date.now()}` };
     });
 };
 
@@ -337,7 +405,7 @@ export const suggestSOPsFromImage = async (image: string): Promise<string[]> => 
             config: { responseMimeType: "application/json" }
         });
 
-        return cleanAndParseJSON<string[]>(response.text || "[]", fallback);
+        return cleanAndParseJSON<string[]>(response.text, fallback);
     });
 };
 
@@ -364,11 +432,14 @@ export const generateStrategy = async (user: User, query: string, salesContext: 
 
         const response = await client.models.generateContent({
             model: "gemini-3-pro-preview",
-            contents: { parts: [{ text: SYSTEM_INSTRUCTION }, { text: prompt }] },
-            config: { responseMimeType: "application/json" }
+            contents: prompt,
+            config: { 
+                systemInstruction: SYSTEM_INSTRUCTION,
+                responseMimeType: "application/json" 
+            }
         });
 
-        const result = cleanAndParseJSON<any>(response.text || "{}");
+        const result = cleanAndParseJSON<any>(response.text, {});
         
         return {
             summary: Array.isArray(result.summary) ? result.summary : fallback.summary,
@@ -404,11 +475,14 @@ export const generateABTestStrategy = async (user: User, query: string, salesCon
 
         const response = await client.models.generateContent({
             model: "gemini-3-pro-preview",
-            contents: { parts: [{ text: SYSTEM_INSTRUCTION }, { text: prompt }] },
-            config: { responseMimeType: "application/json" }
+            contents: prompt,
+            config: { 
+                systemInstruction: SYSTEM_INSTRUCTION,
+                responseMimeType: "application/json" 
+            }
         });
 
-        const result = cleanAndParseJSON<ABTestResult>(response.text || "{}");
+        const result = cleanAndParseJSON<ABTestResult>(response.text, {} as ABTestResult);
         return { ...fallback, ...result };
     });
 };
@@ -426,7 +500,8 @@ export const generateKitchenWorkflow = async (description: string): Promise<stri
 
         const response = await client.models.generateContent({
             model: "gemini-2.5-flash",
-            contents: { parts: [{ text: MARKDOWN_INSTRUCTION }, { text: prompt }] }
+            contents: prompt,
+            config: { systemInstruction: MARKDOWN_INSTRUCTION }
         });
 
         return response.text || "Failed to generate workflow.";
@@ -512,8 +587,11 @@ export const generateMenu = async (request: MenuGenerationRequest): Promise<stri
 
         const response = await client.models.generateContent({
             model: "gemini-2.5-flash",
-            contents: { parts: [{ text: SYSTEM_INSTRUCTION }, { text: prompt }] },
-            config: { responseMimeType: "application/json" }
+            contents: prompt,
+            config: { 
+                systemInstruction: SYSTEM_INSTRUCTION,
+                responseMimeType: "application/json" 
+            }
         });
 
         return response.text || fallback;
@@ -531,13 +609,14 @@ export const generateMarketingImage = async (prompt: string, aspectRatio: string
         const client = createAIClient();
         if (!client) throw new Error("No Client");
 
+        // Use 'gemini-2.5-flash-image' for general availability
         const response = await client.models.generateContent({
-            model: 'gemini-3-pro-image-preview',
+            model: 'gemini-2.5-flash-image',
             contents: { parts: [{ text: prompt }] },
             config: {
                 imageConfig: {
                     aspectRatio: aspectRatio,
-                    imageSize: "1K"
+                    // imageSize: "2K" // Removed: Not supported by flash-image
                 }
             }
         });
@@ -620,7 +699,7 @@ export const analyzeStaffMovement = async (prompt: string, zones: string[], imag
             config: { responseMimeType: "application/json" }
         });
 
-        const result = cleanAndParseJSON<CCTVAnalysisResult>(response.text || "{}");
+        const result = cleanAndParseJSON<CCTVAnalysisResult>(response.text, {} as CCTVAnalysisResult);
         
         return {
             ...fallback,
@@ -640,7 +719,6 @@ export const generateKitchenLayout = async (cuisine: string, type: string, area:
         if (!client) throw new Error("No Client");
 
         const parts: any[] = [
-            { text: SYSTEM_INSTRUCTION },
             { text: `Generate a commercial kitchen layout for ${cuisine} cuisine (${type}, ${area} sqft). Constraints: ${constraints}. Return JSON matching KitchenLayout interface.` }
         ];
 
@@ -654,16 +732,19 @@ export const generateKitchenLayout = async (cuisine: string, type: string, area:
                 }
             });
             // Improved Prompt for Sketch Analysis
-            parts.push({ text: "Analyze this hand-drawn sketch carefully. Identify the zones drawn (e.g., 'Cook line', 'Dishwashing', 'Storage') and their relative positions. Convert this visual layout into a structured list of zones with `placement_hint` (e.g., 'top-left', 'center', 'bottom-right'). List the required equipment for each zone." });
+            parts.push({ text: "Analyze this hand-drawn sketch carefully. Identify the zones drawn (e.g. 'Cook line', 'Dishwashing', 'Storage') and their relative positions. Convert this visual layout into a structured list of zones with `placement_hint` (e.g. 'top-left', 'center', 'bottom-right'). List the required equipment for each zone." });
         }
 
         const response = await client.models.generateContent({
             model: "gemini-2.5-flash",
             contents: { parts: parts },
-            config: { responseMimeType: "application/json" }
+            config: { 
+                systemInstruction: SYSTEM_INSTRUCTION,
+                responseMimeType: "application/json" 
+            }
         });
 
-        const result = cleanAndParseJSON<KitchenLayout>(response.text || "{}");
+        const result = cleanAndParseJSON<KitchenLayout>(response.text, {} as KitchenLayout);
         return { ...fallback, ...result };
     });
 };
@@ -701,11 +782,14 @@ export const forecastInventoryNeeds = async (inventory: InventoryItem[], context
 
         const response = await client.models.generateContent({
             model: "gemini-2.5-flash",
-            contents: { parts: [{ text: SYSTEM_INSTRUCTION }, { text: prompt }] },
-            config: { responseMimeType: "application/json" }
+            contents: prompt,
+            config: { 
+                systemInstruction: SYSTEM_INSTRUCTION,
+                responseMimeType: "application/json" 
+            }
         });
 
-        return cleanAndParseJSON(response.text || "{}");
+        return cleanAndParseJSON(response.text, { recommendations: [] });
     });
 };
 
